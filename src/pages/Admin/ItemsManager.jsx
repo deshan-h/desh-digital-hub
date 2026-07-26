@@ -29,7 +29,7 @@ const INITIAL_CATEGORIES = [
     { id: 'bb-3', name: 'Book Binding [pgs < 100]', price: 400 },
     { id: 'bb-4', name: 'Book Binding - Tape Binding', price: 250 },
   ]},
-  { category: 'Graphic & Editing', icon: 'Image', color: 'text-pink-400', items: [
+  { category: 'Type Setting', icon: 'Type', color: 'text-orange-400', items: [
     { id: 'ge-1', name: 'CV [Without Photo]', price: 250 },
     { id: 'ge-2', name: 'CV [With Photo]', price: 350 },
     { id: 'ge-3', name: 'CV [Advanced + ATS]', price: 800 },
@@ -75,11 +75,30 @@ export default function ItemsManager() {
       const snap = await getDocs(collection(db, 'pos_categories'));
       let data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
+      // Temporary Migration: Update 'Graphic & Editing' to 'Type Setting' in Firestore
+      data = await Promise.all(data.map(async (cat) => {
+        if (cat.category === 'Graphic & Editing') {
+          cat.category = 'Type Setting';
+          cat.icon = 'Type';
+          cat.color = 'text-orange-400';
+          try {
+            await updateDoc(doc(db, 'pos_categories', cat.id), { 
+              category: 'Type Setting', 
+              icon: 'Type',
+              color: 'text-orange-400'
+            });
+          } catch (e) {
+            console.error("Migration update failed", e);
+          }
+        }
+        return cat;
+      }));
+
       const CATEGORY_ORDER = [
         "Printing & Scanning",
         "Document Laminating",
         "Book Binding",
-        "Graphic & Editing",
+        "Type Setting",
         "Online Services",
         "Downloads & Media",
         "Custom & Utilities"

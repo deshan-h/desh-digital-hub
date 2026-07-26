@@ -1,6 +1,6 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence, browserSessionPersistence } from 'firebase/auth';
-import { collection, addDoc, getDocs, query, orderBy, serverTimestamp, doc, deleteDoc, where } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, orderBy, serverTimestamp, doc, deleteDoc, where, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../../config/firebase';
 import { format } from 'date-fns';
 import logo from '../../assets/logo.webp';
@@ -120,11 +120,30 @@ export default function Admin() {
       const snap = await getDocs(collection(db, 'pos_categories'));
       let data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
+      // Temporary Migration: Update 'Graphic & Editing' to 'Type Setting' in Firestore
+      data = await Promise.all(data.map(async (cat) => {
+        if (cat.category === 'Graphic & Editing') {
+          cat.category = 'Type Setting';
+          cat.icon = 'Type';
+          cat.color = 'text-orange-400';
+          try {
+            await updateDoc(doc(db, 'pos_categories', cat.id), { 
+              category: 'Type Setting', 
+              icon: 'Type',
+              color: 'text-orange-400'
+            });
+          } catch (e) {
+            console.error("Migration update failed", e);
+          }
+        }
+        return cat;
+      }));
+
       const CATEGORY_ORDER = [
         "Printing & Scanning",
         "Document Laminating",
         "Book Binding",
-        "Graphic & Editing",
+        "Type Setting",
         "Online Services",
         "Downloads & Media",
         "Custom & Utilities"

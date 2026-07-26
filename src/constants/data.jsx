@@ -1,4 +1,4 @@
-import { Printer, Layers, FileText, Image, Download, Monitor, Code, Settings } from 'lucide-react';
+import { Printer, Layers, FileText, Download, Code, Settings, Type } from 'lucide-react';
 
 export const POS_CATEGORIES = [
   {
@@ -35,9 +35,9 @@ export const POS_CATEGORIES = [
     ]
   },
   {
-    category: 'Graphic & Editing',
-    icon: Image,
-    color: 'text-pink-400',
+    category: 'Type Setting',
+    icon: Type,
+    color: 'text-orange-400',
     items: [
       { id: 'ge-1', name: 'CV [Without Photo]', price: 250 },
       { id: 'ge-2', name: 'CV [With Photo]', price: 350 },
