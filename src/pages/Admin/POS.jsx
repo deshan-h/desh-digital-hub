@@ -1,6 +1,19 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { ShoppingCart, Minus, Plus, Trash2, Printer, MessageCircle, Search, Package, RefreshCw } from 'lucide-react';
 import * as Icons from 'lucide-react';
+import { FcPackage, FcPrint, FcTemplate, FcDocument, FcRules, FcImageFile, FcDataBackup, FcCommandLine, FcSettings } from 'react-icons/fc';
+
+const ICON_MAP = {
+  'Package': FcPackage,
+  'Printer': FcPrint,
+  'Layers': FcTemplate,
+  'FileText': FcDocument,
+  'Type': FcRules,
+  'Image': FcImageFile,
+  'Download': FcDataBackup,
+  'Code': FcCommandLine,
+  'Settings': FcSettings
+};
 
 // Memoized Components for Performance
 const POSItem = React.memo(({ item, addToCart }) => (
@@ -20,7 +33,7 @@ const POSItem = React.memo(({ item, addToCart }) => (
 ));
 
 const CategoryTab = React.memo(({ cat, isActive, onClick }) => {
-  const CatIcon = Icons[cat.icon] || Package;
+  const CatIcon = ICON_MAP[cat.icon] || FcPackage;
   return (
     <button
       onClick={onClick}
@@ -31,7 +44,7 @@ const CategoryTab = React.memo(({ cat, isActive, onClick }) => {
       }`}
     >
       <div className="z-10 w-full h-full relative overflow-hidden flex flex-col items-center justify-center">
-        {CatIcon && <CatIcon className={`w-6 h-6 mb-1 ${cat.color}`} />}
+        {CatIcon && <CatIcon className={`w-6 h-6 mb-1 drop-shadow-sm`} />}
         <span className={`text-[11px] font-extrabold tracking-widest uppercase text-center leading-tight ${isActive ? 'text-emerald-400' : 'text-slate-100'}`}>
           {cat.category}
         </span>
@@ -195,10 +208,10 @@ export default function POS({
           
           {/* Background Category Icon */}
           {activeCategory && activeCategory.icon && (() => {
-            const Icon = Icons[activeCategory.icon];
+            const Icon = ICON_MAP[activeCategory.icon];
             return Icon ? (
               <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none overflow-hidden">
-                <Icon className="w-[30rem] h-[30rem]" />
+                <Icon className="w-[30rem] h-[30rem] grayscale" />
               </div>
             ) : null;
           })()}

@@ -6,9 +6,26 @@ import { db } from '../../config/firebase';
 import { notify } from '../../utils/toast';
 import DeleteConfirmModal from '../../components/DeleteConfirmModal';
 import { 
-  Tags, Plus, Edit2, Trash2, Save, X, Printer, Layers, FileText, Image as ImageIcon, Download, Code, Settings, Package 
+  Tags, Plus, Edit2, Trash2, Save, X, Printer, Layers, FileText, Image as ImageIcon, Download, Code, Settings, Package, FileDown, ArrowUp, ArrowDown, MoveUp, MoveDown 
 } from 'lucide-react';
 import * as Icons from 'lucide-react';
+import jsPDF from 'jspdf';
+import { toPng } from 'html-to-image';
+import { FcPackage, FcPrint, FcTemplate, FcDocument, FcRules, FcImageFile, FcDataBackup, FcCommandLine, FcSettings } from 'react-icons/fc';
+
+const ICON_MAP = {
+  'Package': FcPackage,
+  'Printer': FcPrint,
+  'Layers': FcTemplate,
+  'FileText': FcDocument,
+  'Type': FcRules,
+  'Image': FcImageFile,
+  'Download': FcDataBackup,
+  'Code': FcCommandLine,
+  'Settings': FcSettings
+};
+
+const AVAILABLE_ICONS = Object.keys(ICON_MAP);
 
 const INITIAL_CATEGORIES = [
   { category: 'Printing & Scanning', icon: 'Printer', color: 'text-blue-400', items: [
@@ -68,6 +85,55 @@ export default function ItemsManager() {
   const [editingQty, setEditingQty] = useState("");
   const [editingName, setEditingName] = useState("");
   const [itemToDelete, setItemToDelete] = useState(null);
+  
+  // Category CRUD State
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
+  const [newCatIcon, setNewCatIcon] = useState("Package");
+  
+  const [editingCategory, setEditingCategory] = useState(null); // catId
+  const [editCatName, setEditCatName] = useState("");
+  const [editCatIcon, setEditCatIcon] = useState("");
+  
+  const [catToDelete, setCatToDelete] = useState(null);
+
+  const handleExportCSV = () => {
+    let csvContent = "data:text/csv;charset=utf-8,Category,Service Name,Cost (Rs),Price (Rs)\n";
+    categories.forEach(cat => {
+      cat.items.forEach(item => {
+        const cost = item.cost !== undefined ? item.cost : 0;
+        const price = item.price !== undefined ? item.price : 0;
+        csvContent += `"${cat.category}","${item.name}",${cost},${price}\n`;
+      });
+    });
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `desh_services_prices_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleExportPDF = async () => {
+    const element = document.getElementById('pdf-export-container');
+    if (!element) return;
+    try {
+      const imgData = await toPng(element, { backgroundColor: '#ffffff', pixelRatio: 2 });
+      
+      const doc = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = doc.internal.pageSize.getWidth();
+      const pdfHeight = doc.internal.pageSize.getHeight();
+      
+      // The element is now exactly A4 proportion, so we fill the entire page.
+      doc.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      doc.save(`desh_services_prices_${new Date().toISOString().split('T')[0]}.pdf`);
+      notify.success("PDF Downloaded!");
+    } catch (error) {
+      console.error(error);
+      notify.error("Failed to generate PDF");
+    }
+  };
 
   const fetchCategories = async () => {
     setLoading(true);
@@ -105,6 +171,9 @@ export default function ItemsManager() {
       ];
       
       data.sort((a, b) => {
+        if (a.order !== undefined && b.order !== undefined) {
+          return a.order - b.order;
+        }
         let indexA = CATEGORY_ORDER.indexOf(a.category);
         let indexB = CATEGORY_ORDER.indexOf(b.category);
         if (indexA === -1) indexA = 999;
@@ -112,12 +181,12 @@ export default function ItemsManager() {
         return indexA - indexB;
       });
 
-      // Sort items inside each category from lowest price to highest
-      data.forEach(cat => {
-        if (cat.items && Array.isArray(cat.items)) {
-          cat.items.sort((a, b) => (Number(a.price) || 0) - (Number(b.price) || 0));
-        }
-      });
+      // NO LONGER SORTING ITEMS BY PRICE - We respect the custom array order
+      // data.forEach(cat => {
+      //   if (cat.items && Array.isArray(cat.items)) {
+      //     cat.items.sort((a, b) => (Number(a.price) || 0) - (Number(b.price) || 0));
+      //   }
+      // });
 
       setCategories(data);
     } catch (err) {
@@ -230,6 +299,99 @@ export default function ItemsManager() {
     }
   };
 
+  // --- NEW FEATURES ---
+
+  const handleAddCategory = async () => {
+    if (!newCatName) return;
+    try {
+      const newOrder = categories.length; // Place at the end
+      const newCat = {
+        category: newCatName,
+        icon: newCatIcon || 'Package',
+        color: 'text-emerald-400',
+        items: [],
+        order: newOrder
+      };
+      const docRef = await addDoc(collection(db, 'pos_categories'), newCat);
+      setCategories([...categories, { id: docRef.id, ...newCat }]);
+      notify.success("Category added!");
+      setNewCatName("");
+      setIsAddingCategory(false);
+    } catch (error) {
+      console.error(error);
+      notify.error("Failed to add category");
+    }
+  };
+
+  const handleUpdateCategory = async (catId) => {
+    if (!editCatName) return;
+    try {
+      await updateDoc(doc(db, 'pos_categories', catId), { category: editCatName, icon: editCatIcon });
+      setCategories(categories.map(c => c.id === catId ? { ...c, category: editCatName, icon: editCatIcon } : c));
+      notify.success("Category updated!");
+      setEditingCategory(null);
+    } catch (error) {
+      console.error(error);
+      notify.error("Failed to update category");
+    }
+  };
+
+  const confirmDeleteCategory = async () => {
+    if (!catToDelete) return;
+    try {
+      await deleteDoc(doc(db, 'pos_categories', catToDelete));
+      setCategories(categories.filter(c => c.id !== catToDelete));
+      notify.success("Category deleted!");
+    } catch (error) {
+      console.error(error);
+      notify.error("Failed to delete category");
+    } finally {
+      setCatToDelete(null);
+    }
+  };
+
+  const moveCategory = async (index, direction) => {
+    if ((direction === -1 && index === 0) || (direction === 1 && index === categories.length - 1)) return;
+    const newCategories = [...categories];
+    const temp = newCategories[index];
+    newCategories[index] = newCategories[index + direction];
+    newCategories[index + direction] = temp;
+    
+    // Update order values and save to db
+    try {
+      const batch = writeBatch(db);
+      newCategories.forEach((cat, idx) => {
+        cat.order = idx;
+        batch.update(doc(db, 'pos_categories', cat.id), { order: idx });
+      });
+      await batch.commit();
+      setCategories(newCategories);
+      // notify.success("Order updated"); // Optional
+    } catch (error) {
+      console.error(error);
+      notify.error("Failed to reorder categories");
+    }
+  };
+
+  const moveItem = async (catId, itemIndex, direction) => {
+    const categoryIndex = categories.findIndex(c => c.id === catId);
+    const categoryDoc = categories[categoryIndex];
+    if ((direction === -1 && itemIndex === 0) || (direction === 1 && itemIndex === categoryDoc.items.length - 1)) return;
+    
+    const newItems = [...categoryDoc.items];
+    const temp = newItems[itemIndex];
+    newItems[itemIndex] = newItems[itemIndex + direction];
+    newItems[itemIndex + direction] = temp;
+
+    try {
+      await updateDoc(doc(db, 'pos_categories', catId), { items: newItems });
+      setCategories(categories.map(c => c.id === catId ? { ...c, items: newItems } : c));
+    } catch (error) {
+      console.error(error);
+      notify.error("Failed to reorder items");
+    }
+  };
+
   if (loading) {
     return <div className="flex h-full items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full"></div></div>;
   }
@@ -244,28 +406,151 @@ export default function ItemsManager() {
           </h2>
           <p className="text-sm text-slate-400 mt-1">Manage POS categories, items and their real-time prices.</p>
         </div>
-        
-        {categories.length === 0 && (
+        <div className="flex items-center gap-3">
           <button 
-            onClick={handleMigrate}
-            disabled={isMigrating}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold transition-all disabled:opacity-50 flex items-center gap-2"
+            onClick={handleExportPDF}
+            className="px-4 py-2 bg-red-900/40 hover:bg-red-800 text-red-200 rounded-xl font-bold transition-all border border-red-500/30 flex items-center gap-2"
           >
-            {isMigrating ? 'Migrating...' : 'Migrate Default Items'}
+            <FileDown className="w-4 h-4" /> Export PDF
           </button>
-        )}
+          
+          <button 
+            onClick={handleExportCSV}
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-bold transition-all border border-white/10 flex items-center gap-2"
+          >
+            <FileDown className="w-4 h-4" /> Export CSV
+          </button>
+          
+          <button 
+            onClick={() => setIsAddingCategory(true)}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold transition-all flex items-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+          >
+            <Plus className="w-4 h-4" /> Add Category
+          </button>
+
+          {categories.length === 0 && (
+            <button 
+              onClick={handleMigrate}
+              disabled={isMigrating}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold transition-all disabled:opacity-50 flex items-center gap-2"
+            >
+              {isMigrating ? 'Migrating...' : 'Default Items'}
+            </button>
+          )}
+        </div>
       </div>
 
+      {isAddingCategory && (
+        <div className="bg-slate-900/80 border border-emerald-500/30 rounded-2xl p-5 flex flex-col gap-4 animate-fade-in shadow-[0_0_30px_rgba(16,185,129,0.1)]">
+          <div className="flex items-center gap-4">
+            <input 
+              type="text" 
+              placeholder="New Category Name..."
+              value={newCatName}
+              onChange={(e) => setNewCatName(e.target.value)}
+              className="flex-1 bg-slate-950 text-slate-200 px-4 py-2.5 rounded-xl border border-white/10 focus:border-emerald-500 outline-none"
+            />
+            <button onClick={handleAddCategory} className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl font-bold flex items-center gap-2">
+              <Save className="w-4 h-4" /> Save
+            </button>
+            <button onClick={() => setIsAddingCategory(false)} className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold">
+              Cancel
+            </button>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-medium text-slate-400 mr-2">Select Icon:</span>
+            {AVAILABLE_ICONS.map(iconName => {
+              const IconBtn = ICON_MAP[iconName];
+              const isSelected = newCatIcon === iconName;
+              return (
+                <button
+                  key={iconName}
+                  onClick={() => setNewCatIcon(iconName)}
+                  title={iconName}
+                  className={`p-2 rounded-lg border transition-all ${
+                    isSelected 
+                      ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' 
+                      : 'bg-slate-950 border-white/5 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                  }`}
+                >
+                  <IconBtn className="w-6 h-6 drop-shadow-md" />
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col gap-6 pb-20">
-        {categories.map((cat) => {
-          const Icon = Icons[cat.icon] || Package;
+        {categories.map((cat, catIndex) => {
+          const IconCmp = ICON_MAP[cat.icon] || FcPackage;
+          const isCatEditing = editingCategory === cat.id;
+
           return (
             <div key={cat.id} className="bg-slate-900/40 border border-white/5 rounded-2xl overflow-hidden flex flex-col">
-              <div className="p-4 border-b border-white/5 bg-slate-950/30 flex items-center gap-3">
-                <div className={`p-2 rounded-lg bg-slate-800 border border-white/5 ${cat.color}`}>
-                  <Icon className="w-5 h-5" />
-                </div>
-                <h3 className="text-lg font-bold text-slate-200">{cat.category}</h3>
+              <div className="p-4 border-b border-white/5 bg-slate-950/30 flex items-center justify-between group">
+                {isCatEditing ? (
+                  <div className="flex flex-col gap-3 flex-1">
+                    <div className="flex items-center gap-3">
+                      <input 
+                        type="text" 
+                        value={editCatName}
+                        onChange={(e) => setEditCatName(e.target.value)}
+                        className="bg-slate-900 text-lg font-bold text-emerald-400 px-3 py-1.5 rounded-lg border border-emerald-500/50 outline-none flex-1"
+                      />
+                      <button onClick={() => handleUpdateCategory(cat.id)} className="p-2 bg-emerald-500/20 text-emerald-400 rounded-lg hover:bg-emerald-500/40"><Save className="w-5 h-5" /></button>
+                      <button onClick={() => setEditingCategory(null)} className="p-2 bg-slate-800 text-slate-400 rounded-lg hover:bg-slate-700"><X className="w-5 h-5" /></button>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap bg-slate-950/50 p-2 rounded-xl border border-white/5">
+                      <span className="text-xs font-medium text-slate-500 mr-1">Icon:</span>
+                      {AVAILABLE_ICONS.map(iconName => {
+                        const IconBtn = ICON_MAP[iconName];
+                        const isSelected = editCatIcon === iconName;
+                        return (
+                          <button
+                            key={iconName}
+                            onClick={() => setEditCatIcon(iconName)}
+                            title={iconName}
+                            className={`p-1.5 rounded-lg border transition-all ${
+                              isSelected 
+                                ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' 
+                                : 'bg-transparent border-transparent text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+                            }`}
+                          >
+                            <IconBtn className="w-5 h-5" />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg bg-slate-800 border border-white/5`}>
+                        <IconCmp className="w-6 h-6 drop-shadow-md" />
+                      </div>
+                      <h3 className="text-lg font-bold text-slate-200">{cat.category}</h3>
+                    </div>
+                    
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => moveCategory(catIndex, -1)} disabled={catIndex === 0} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg disabled:opacity-30"><ArrowUp className="w-4 h-4" /></button>
+                      <button onClick={() => moveCategory(catIndex, 1)} disabled={catIndex === categories.length - 1} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg disabled:opacity-30"><ArrowDown className="w-4 h-4" /></button>
+                      <div className="w-px h-4 bg-white/10 mx-1"></div>
+                      <button 
+                        onClick={() => { setEditingCategory(cat.id); setEditCatName(cat.category); setEditCatIcon(cat.icon || 'Package'); }} 
+                        className="p-1.5 text-blue-400 hover:bg-blue-400/10 rounded-lg"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => setCatToDelete(cat.id)} 
+                        className="p-1.5 text-red-400 hover:bg-red-400/10 rounded-lg"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
               
               <div className="p-4 flex-1 space-y-2">
@@ -336,6 +621,9 @@ export default function ItemsManager() {
                           </>
                         ) : (
                           <>
+                            <button onClick={() => moveItem(cat.id, idx, -1)} disabled={idx === 0} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg disabled:opacity-30"><ArrowUp className="w-4 h-4" /></button>
+                            <button onClick={() => moveItem(cat.id, idx, 1)} disabled={idx === cat.items.length - 1} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg disabled:opacity-30"><ArrowDown className="w-4 h-4" /></button>
+                            <div className="w-px h-4 bg-white/10 mx-1"></div>
                             <button 
                               onClick={() => {
                                 setEditingItem({ catId: cat.id, itemIndex: idx });
@@ -399,7 +687,7 @@ export default function ItemsManager() {
                     onClick={() => setNewItemMode(cat.id)}
                     className="w-full mt-2 py-3 border-2 border-dashed border-white/10 rounded-xl text-sm font-semibold text-slate-400 hover:text-emerald-400 hover:border-emerald-500/30 hover:bg-emerald-500/5 transition-all flex items-center justify-center gap-2"
                   >
-                    <Plus className="w-4 h-4" /> Add Item
+                    <Plus className="w-4 h-4" /> Add Service
                   </button>
                 )}
               </div>
@@ -413,6 +701,53 @@ export default function ItemsManager() {
         onClose={() => setItemToDelete(null)} 
         onConfirm={confirmDeleteItem} 
       />
+      
+      <DeleteConfirmModal 
+        isOpen={!!catToDelete} 
+        onClose={() => setCatToDelete(null)} 
+        onConfirm={confirmDeleteCategory} 
+      />
+
+      {/* Hidden container for PDF export */}
+      <div className="absolute top-0 left-0 -z-50 opacity-0 pointer-events-none h-0 w-0 overflow-hidden">
+        {/* 1200x1697 is exactly A4 aspect ratio (1 : 1.414). This ensures it fits perfectly without scaling margins. */}
+        <div id="pdf-export-container" className="p-6 font-sans" style={{ width: '1200px', height: '1697px', backgroundColor: '#ffffff', color: '#0f172a' }}>
+          <div className="text-center mb-6 border-b-2 pb-4" style={{ borderColor: '#10b981' }}>
+            <h1 className="text-4xl font-black" style={{ color: '#1e293b' }}>DESH Digital Hub</h1>
+            <p className="text-lg font-medium mt-1" style={{ color: '#64748b' }}>Services & Prices List</p>
+          </div>
+          
+          <div className="columns-2 gap-8">
+            {categories.map(cat => {
+              const IconCmp = ICON_MAP[cat.icon] || FcPackage;
+              return (
+                <div key={cat.id} className="border rounded-xl overflow-hidden mb-6 break-inside-avoid" style={{ borderColor: '#e2e8f0' }}>
+                  <div className="p-3 flex items-center gap-3 border-b" style={{ backgroundColor: '#f1f5f9', borderColor: '#e2e8f0' }}>
+                    <IconCmp className="w-6 h-6" />
+                    <h2 className="text-xl font-bold" style={{ color: '#1e293b' }}>{cat.category}</h2>
+                  </div>
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="text-sm" style={{ backgroundColor: '#f8fafc', color: '#64748b' }}>
+                        <th className="p-3 border-b font-bold" style={{ borderColor: '#e2e8f0' }}>Service Name</th>
+                        <th className="p-3 border-b font-bold text-right w-32" style={{ borderColor: '#e2e8f0' }}>Price (Rs)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cat.items.map((item, idx) => (
+                        <tr key={idx} className="border-b last:border-none" style={{ borderColor: '#f1f5f9' }}>
+                          <td className="p-3 font-semibold" style={{ color: '#334155' }}>{item.name}</td>
+                          <td className="p-3 font-bold text-right" style={{ color: '#059669' }}>Rs {item.price !== undefined ? Number(item.price).toFixed(2) : '0.00'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
