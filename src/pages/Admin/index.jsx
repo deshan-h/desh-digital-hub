@@ -150,6 +150,9 @@ export default function Admin() {
       ];
       
       data.sort((a, b) => {
+        if (a.order !== undefined && b.order !== undefined) {
+          return a.order - b.order;
+        }
         let indexA = CATEGORY_ORDER.indexOf(a.category);
         let indexB = CATEGORY_ORDER.indexOf(b.category);
         if (indexA === -1) indexA = 999;
@@ -157,12 +160,12 @@ export default function Admin() {
         return indexA - indexB;
       });
 
-      // Sort items inside each category from lowest price to highest
-      data.forEach(cat => {
-        if (cat.items && Array.isArray(cat.items)) {
-          cat.items.sort((a, b) => (Number(a.price) || 0) - (Number(b.price) || 0));
-        }
-      });
+      // We no longer sort items by price to respect the custom order set in ItemsManager
+      // data.forEach(cat => {
+      //   if (cat.items && Array.isArray(cat.items)) {
+      //     cat.items.sort((a, b) => (Number(a.price) || 0) - (Number(b.price) || 0));
+      //   }
+      // });
 
       setPosCategories(data);
       localStorage.setItem('posCategories', JSON.stringify(data));
