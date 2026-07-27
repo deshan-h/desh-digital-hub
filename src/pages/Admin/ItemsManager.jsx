@@ -11,6 +11,7 @@ import {
 import * as Icons from 'lucide-react';
 import jsPDF from 'jspdf';
 import { toPng } from 'html-to-image';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { FcPackage, FcPrint, FcTemplate, FcDocument, FcRules, FcImageFile, FcDataBackup, FcCommandLine, FcSettings } from 'react-icons/fc';
 
 const ICON_MAP = {
@@ -392,6 +393,33 @@ export default function ItemsManager() {
     }
   };
 
+  const handleDragEnd = async (result) => {
+    if (!result.destination) return;
+    
+    const { source, destination } = result;
+    
+    if (source.droppableId !== destination.droppableId) return;
+    
+    const catId = source.droppableId;
+    const categoryIndex = categories.findIndex(c => c.id === catId);
+    if (categoryIndex === -1) return;
+    
+    const categoryDoc = categories[categoryIndex];
+    const newItems = Array.from(categoryDoc.items);
+    
+    const [movedItem] = newItems.splice(source.index, 1);
+    newItems.splice(destination.index, 0, movedItem);
+    
+    setCategories(categories.map(c => c.id === catId ? { ...c, items: newItems } : c));
+    
+    try {
+      await updateDoc(doc(db, 'pos_categories', catId), { items: newItems });
+    } catch (error) {
+      console.error(error);
+      notify.error("Failed to save reordered items");
+    }
+  };
+
   if (loading) {
     return <div className="flex h-full items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full"></div></div>;
   }
@@ -481,7 +509,8 @@ export default function ItemsManager() {
         </div>
       )}
 
-      <div className="flex flex-col gap-6 pb-20">
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <div className="flex flex-col gap-6 pb-20">
         {categories.map((cat, catIndex) => {
           const IconCmp = ICON_MAP[cat.icon] || FcPackage;
           const isCatEditing = editingCategory === cat.id;
@@ -553,101 +582,131 @@ export default function ItemsManager() {
                 )}
               </div>
               
-              <div className="p-4 flex-1 space-y-2">
-                {cat.items.map((item, idx) => {
-                  const isEditing = editingItem?.catId === cat.id && editingItem?.itemIndex === idx;
-                  return (
-                    <div key={item.id || idx} className="flex items-center justify-between p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-transparent hover:border-white/5 group transition-all">
-                      {isEditing ? (
-                        <div className="flex-1 flex gap-2 mr-2">
-                          <input 
-                            type="text" 
-                            value={editingName} 
-                            onChange={(e) => setEditingName(e.target.value)}
-                            placeholder="Item Name"
-                            className="bg-slate-950 text-sm text-slate-200 px-3 py-1.5 rounded-lg border border-white/10 focus:border-emerald-500 outline-none flex-1"
-                          />
-                          <input 
-                            type="number" 
-                            value={editingQty} 
-                            onChange={(e) => setEditingQty(e.target.value)}
-                            placeholder="Qty"
-                            className="bg-slate-950 text-sm text-blue-400 font-bold px-2 py-1.5 rounded-lg border border-white/10 focus:border-blue-500 outline-none w-16"
-                          />
-                          <input 
-                            type="number" 
-                            value={editingCost} 
-                            onChange={(e) => setEditingCost(e.target.value)}
-                            placeholder="Cost"
-                            className="bg-slate-950 text-sm text-red-400 font-bold px-2 py-1.5 rounded-lg border border-white/10 focus:border-red-500 outline-none w-20"
-                          />
-                          <input 
-                            type="number" 
-                            value={editingPrice} 
-                            onChange={(e) => setEditingPrice(e.target.value)}
-                            placeholder="Price"
-                            className="bg-slate-950 text-sm text-emerald-400 font-bold px-2 py-1.5 rounded-lg border border-white/10 focus:border-emerald-500 outline-none w-20"
-                          />
-                        </div>
-                      ) : (
-                        <div className="flex-1 flex justify-between pr-4 items-center">
-                          <p className="text-sm font-semibold text-slate-200">{item.name}</p>
-                          <div className="flex gap-4">
-                            {item.qty !== undefined && (
-                              <p className="text-xs text-blue-400 font-medium text-right flex flex-col items-end">
-                                <span className="text-[9px] uppercase tracking-widest text-slate-500">Qty</span>
-                                {Number(item.qty)}
-                              </p>
+              <div className="p-4 flex-1 flex flex-col">
+                <Droppable droppableId={cat.id}>
+                  {(provided) => (
+                    <div 
+                      className="space-y-2 mb-2"
+                      {...provided.droppableProps}
+                      ref={provided.innerRef}
+                    >
+                      {cat.items.map((item, idx) => {
+                        const isEditing = editingItem?.catId === cat.id && editingItem?.itemIndex === idx;
+                        return (
+                          <Draggable key={item.id || `item-${idx}`} draggableId={item.id || `item-${idx}`} index={idx}>
+                            {(provided, snapshot) => (
+                              <div 
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                className={`flex items-center justify-between p-3 rounded-xl border group transition-all ${
+                                  snapshot.isDragging 
+                                    ? 'bg-slate-800 border-emerald-500/50 shadow-2xl ring-2 ring-emerald-500/20 z-50' 
+                                    : 'bg-white/5 border-transparent hover:bg-white/10 hover:border-white/5'
+                                }`}
+                              >
+                                {/* Drag Handle */}
+                                {!isEditing && (
+                                  <div 
+                                    {...provided.dragHandleProps} 
+                                    className="mr-3 text-slate-600 hover:text-slate-300 cursor-grab active:cursor-grabbing"
+                                  >
+                                    <Icons.GripVertical className="w-5 h-5" />
+                                  </div>
+                                )}
+                                
+                                {isEditing ? (
+                                  <div className="flex-1 flex gap-2 mr-2">
+                                    <input 
+                                      type="text" 
+                                      value={editingName} 
+                                      onChange={(e) => setEditingName(e.target.value)}
+                                      placeholder="Item Name"
+                                      className="bg-slate-950 text-sm text-slate-200 px-3 py-1.5 rounded-lg border border-white/10 focus:border-emerald-500 outline-none flex-1"
+                                    />
+                                    <input 
+                                      type="number" 
+                                      value={editingQty} 
+                                      onChange={(e) => setEditingQty(e.target.value)}
+                                      placeholder="Qty"
+                                      className="bg-slate-950 text-sm text-blue-400 font-bold px-2 py-1.5 rounded-lg border border-white/10 focus:border-blue-500 outline-none w-16"
+                                    />
+                                    <input 
+                                      type="number" 
+                                      value={editingCost} 
+                                      onChange={(e) => setEditingCost(e.target.value)}
+                                      placeholder="Cost"
+                                      className="bg-slate-950 text-sm text-red-400 font-bold px-2 py-1.5 rounded-lg border border-white/10 focus:border-red-500 outline-none w-20"
+                                    />
+                                    <input 
+                                      type="number" 
+                                      value={editingPrice} 
+                                      onChange={(e) => setEditingPrice(e.target.value)}
+                                      placeholder="Price"
+                                      className="bg-slate-950 text-sm text-emerald-400 font-bold px-2 py-1.5 rounded-lg border border-white/10 focus:border-emerald-500 outline-none w-20"
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="flex-1 flex justify-between pr-4 items-center">
+                                    <p className="text-sm font-semibold text-slate-200">{item.name}</p>
+                                    <div className="flex gap-4">
+                                      {item.qty !== undefined && (
+                                        <p className="text-xs text-blue-400 font-medium text-right flex flex-col items-end">
+                                          <span className="text-[9px] uppercase tracking-widest text-slate-500">Qty</span>
+                                          {Number(item.qty)}
+                                        </p>
+                                      )}
+                                      {item.cost !== undefined && (
+                                        <p className="text-xs text-red-400 font-medium text-right flex flex-col items-end">
+                                          <span className="text-[9px] uppercase tracking-widest text-slate-500">Cost</span>
+                                          Rs {Number(item.cost).toFixed(2)}
+                                        </p>
+                                      )}
+                                      <p className="text-xs text-emerald-400 font-bold text-right flex flex-col items-end">
+                                        <span className="text-[9px] uppercase tracking-widest text-slate-500">Price</span>
+                                        Rs {Number(item.price).toFixed(2)}
+                                      </p>
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  {isEditing ? (
+                                    <>
+                                      <button onClick={() => handleEditSave(cat.id)} className="p-1.5 text-emerald-400 hover:bg-emerald-400/10 rounded-lg"><Save className="w-4 h-4" /></button>
+                                      <button onClick={() => setEditingItem(null)} className="p-1.5 text-slate-400 hover:bg-slate-800 rounded-lg"><X className="w-4 h-4" /></button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <button 
+                                        onClick={() => {
+                                          setEditingItem({ catId: cat.id, itemIndex: idx });
+                                          setEditingName(item.name);
+                                          setEditingPrice(item.price);
+                                          setEditingCost(item.cost !== undefined ? item.cost : "");
+                                          setEditingQty(item.qty !== undefined ? item.qty : "");
+                                        }} 
+                                        className="p-1.5 text-blue-400 hover:bg-blue-400/10 rounded-lg"
+                                      >
+                                        <Edit2 className="w-4 h-4" />
+                                      </button>
+                                      <button 
+                                        onClick={() => handleDeleteItem(cat.id, idx)}
+                                        className="p-1.5 text-red-400 hover:bg-red-400/10 rounded-lg"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
                             )}
-                            {item.cost !== undefined && (
-                              <p className="text-xs text-red-400 font-medium text-right flex flex-col items-end">
-                                <span className="text-[9px] uppercase tracking-widest text-slate-500">Cost</span>
-                                Rs {Number(item.cost).toFixed(2)}
-                              </p>
-                            )}
-                            <p className="text-xs text-emerald-400 font-bold text-right flex flex-col items-end">
-                              <span className="text-[9px] uppercase tracking-widest text-slate-500">Price</span>
-                              Rs {Number(item.price).toFixed(2)}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                      
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        {isEditing ? (
-                          <>
-                            <button onClick={() => handleEditSave(cat.id)} className="p-1.5 text-emerald-400 hover:bg-emerald-400/10 rounded-lg"><Save className="w-4 h-4" /></button>
-                            <button onClick={() => setEditingItem(null)} className="p-1.5 text-slate-400 hover:bg-slate-800 rounded-lg"><X className="w-4 h-4" /></button>
-                          </>
-                        ) : (
-                          <>
-                            <button onClick={() => moveItem(cat.id, idx, -1)} disabled={idx === 0} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg disabled:opacity-30"><ArrowUp className="w-4 h-4" /></button>
-                            <button onClick={() => moveItem(cat.id, idx, 1)} disabled={idx === cat.items.length - 1} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg disabled:opacity-30"><ArrowDown className="w-4 h-4" /></button>
-                            <div className="w-px h-4 bg-white/10 mx-1"></div>
-                            <button 
-                              onClick={() => {
-                                setEditingItem({ catId: cat.id, itemIndex: idx });
-                                setEditingName(item.name);
-                                setEditingPrice(item.price);
-                                setEditingCost(item.cost !== undefined ? item.cost : "");
-                                setEditingQty(item.qty !== undefined ? item.qty : "");
-                              }} 
-                              className="p-1.5 text-blue-400 hover:bg-blue-400/10 rounded-lg"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                            <button 
-                              onClick={() => handleDeleteItem(cat.id, idx)}
-                              className="p-1.5 text-red-400 hover:bg-red-400/10 rounded-lg"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </>
-                        )}
-                      </div>
+                          </Draggable>
+                        );
+                      })}
+                      {provided.placeholder}
                     </div>
-                  );
-                })}
+                  )}
+                </Droppable>
 
                 {newItemMode === cat.id ? (
                   <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
@@ -695,6 +754,7 @@ export default function ItemsManager() {
           );
         })}
       </div>
+      </DragDropContext>
       
       <DeleteConfirmModal 
         isOpen={!!itemToDelete} 
