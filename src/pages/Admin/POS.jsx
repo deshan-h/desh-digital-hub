@@ -201,6 +201,21 @@ export default function POS({
           >
             <RefreshCw className="w-[18px] h-[18px]" />
           </button>
+
+          {/* Custom Item Button */}
+          <button
+            onClick={() => handleAddToCart({
+              id: 'custom-' + Date.now(),
+              name: 'Custom Service / Utilities',
+              price: 0, // Triggers the manual price input field in the cart
+              qty: 1
+            })}
+            className="flex items-center gap-2 px-4 h-10 shrink-0 text-slate-200 hover:text-emerald-400 rounded-full bg-slate-900 border border-slate-800 hover:border-emerald-500/40 transition-all ml-auto group"
+            title="Add Custom Item"
+          >
+            <Plus className="w-[18px] h-[18px] text-emerald-500 group-hover:scale-110 transition-transform" />
+            <span className="text-sm font-bold hidden sm:inline">Custom Service</span>
+          </button>
         </div>
 
         {/* Middle Area: Items Grid */}

@@ -120,6 +120,9 @@ export default function Admin() {
       const snap = await getDocs(collection(db, 'pos_categories'));
       let data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
+      // Remove Custom & Utilities completely from POS and Items Manager
+      data = data.filter(cat => cat.category !== 'Custom & Utilities');
+      
       // Temporary Migration: Update 'Graphic & Editing' to 'Type Setting' in Firestore
       data = await Promise.all(data.map(async (cat) => {
         if (cat.category === 'Graphic & Editing') {
