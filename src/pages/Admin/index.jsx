@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect, Suspense, lazy, useCallback } from 'react';
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence, browserSessionPersistence } from 'firebase/auth';
 import { collection, addDoc, getDocs, query, orderBy, serverTimestamp, doc, deleteDoc, where, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../../config/firebase';
@@ -24,6 +24,13 @@ const Expenses = lazy(() => import('./Expenses'));
 const ItemsManager = lazy(() => import('./ItemsManager'));
 const CustomerDirectory = lazy(() => import('./CustomerDirectory'));
 
+const parseTimestamp = (ts) => {
+  if (!ts) return new Date();
+  if (typeof ts.toDate === 'function') return ts.toDate();
+  if (ts.seconds) return new Date(ts.seconds * 1000);
+  return new Date(ts);
+};
+
 export default function Admin() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -32,15 +39,31 @@ export default function Admin() {
 
   // Dashboard State
   const [activeTab, setActiveTab] = useState('pos');
-  const [salesHistory, setSalesHistory] = useState([]);
-  const [customersList, setCustomersList] = useState([]);
+  const [salesHistory, setSalesHistory] = useState(() => {
+    const saved = localStorage.getItem('salesHistory');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [customersList, setCustomersList] = useState(() => {
+    const saved = localStorage.getItem('customersList');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [posCategories, setPosCategories] = useState(() => {
     const saved = localStorage.getItem('posCategories');
     return saved ? JSON.parse(saved) : [];
   });
-  const [chartData, setChartData] = useState([]);
+  const [chartData, setChartData] = useState(() => {
+    const saved = localStorage.getItem('chartData');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [totalPendingDues, setTotalPendingDues] = useState(0);
+  const [totalPendingDues, setTotalPendingDues] = useState(() => {
+    const saved = localStorage.getItem('totalPendingDues');
+    return saved ? JSON.parse(saved) : 0;
+  });
+  const [customerDuesList, setCustomerDuesList] = useState(() => {
+    const saved = localStorage.getItem('customerDuesList');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   // POS State
   const [cart, setCart] = useState([]);
@@ -94,13 +117,14 @@ export default function Admin() {
 
         // Prepare chart data (Group by date)
         if (data.timestamp) {
-          const dateStr = format(data.timestamp.toDate(), 'MMM dd');
+          const dateStr = format(parseTimestamp(data.timestamp), 'MMM dd');
           if (!aggregatedData[dateStr]) aggregatedData[dateStr] = 0;
           aggregatedData[dateStr] += Number(data.amount);
         }
       });
 
       setSalesHistory(sales);
+      localStorage.setItem('salesHistory', JSON.stringify(sales));
 
       // Format chart data for recharts
       const formattedChartData = Object.keys(aggregatedData).map(date => ({
@@ -109,6 +133,7 @@ export default function Admin() {
       })).reverse(); // Oldest to newest for the chart
 
       setChartData(formattedChartData);
+      localStorage.setItem('chartData', JSON.stringify(formattedChartData));
     } catch (error) {
       console.error("Error fetching sales: ", error);
     }
@@ -181,13 +206,18 @@ export default function Admin() {
     try {
       const snap = await getDocs(collection(db, 'customer_dues'));
       let total = 0;
+      const duesList = [];
       snap.forEach(doc => {
         const data = doc.data();
         if (data.status === 'Pending') {
           total += Number(data.amount || 0);
+          duesList.push({ id: doc.id, ...data });
         }
       });
       setTotalPendingDues(total);
+      localStorage.setItem('totalPendingDues', JSON.stringify(total));
+      setCustomerDuesList(duesList);
+      localStorage.setItem('customerDuesList', JSON.stringify(duesList));
     } catch (error) {
       console.error("Error fetching customer dues:", error);
     }
@@ -202,6 +232,7 @@ export default function Admin() {
         data.push({ id: doc.id, ...doc.data() });
       });
       setCustomersList(data);
+      localStorage.setItem('customersList', JSON.stringify(data));
     } catch (error) {
       console.error("Error fetching customers list:", error);
     }
@@ -223,7 +254,7 @@ export default function Admin() {
   };
 
   // 4. POS Cart Methods
-  const addToCart = (item) => {
+  const addToCart = useCallback((item) => {
     setCart(prev => {
       const existing = prev.find(i => i.id === item.id);
       if (existing) {
@@ -231,9 +262,9 @@ export default function Admin() {
       }
       return [...prev, { ...item, qty: 1 }];
     });
-  };
+  }, []);
 
-  const updateCartItem = (id, field, value) => {
+  const updateCartItem = useCallback((id, field, value) => {
     setCart(prev => prev.map(item => {
       if (item.id === id) {
         let newVal;
@@ -246,15 +277,15 @@ export default function Admin() {
       }
       return item;
     }));
-  };
+  }, []);
 
-  const removeFromCart = (id) => {
+  const removeFromCart = useCallback((id) => {
     setCart(prev => prev.filter(item => item.id !== id));
-  };
+  }, []);
 
   const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
 
-  const handleCheckout = async (posCustomerName = '', discount = 0, isCredit = false, cashGivenAmount = '') => {
+  const handleCheckout = async (posCustomerName = '', discount = 0, isCredit = false, cashGivenAmount = '', currentArrears = 0) => {
     if (cart.length === 0) return;
     setCheckoutLoading(true);
 
@@ -264,6 +295,7 @@ export default function Admin() {
     const cash = cashGivenAmount === '' ? 0 : Number(cashGivenAmount);
     let paidAmount = finalTotal;
     let creditAmount = 0;
+    let arrearsCleared = false;
 
     if (isCredit) {
       if (cash >= finalTotal) {
@@ -276,11 +308,16 @@ export default function Admin() {
         paidAmount = 0;
         creditAmount = finalTotal;
       }
+    } else {
+      if (currentArrears > 0 && (cashGivenAmount === '' || cash >= finalTotal + currentArrears)) {
+        paidAmount = finalTotal + currentArrears;
+        arrearsCleared = true;
+      }
     }
 
     let finalCustomerName = posCustomerName.trim();
     if (!finalCustomerName) {
-      const todaySalesCount = salesHistory.filter(s => s.timestamp && new Date(s.timestamp.toDate()).toDateString() === new Date().toDateString()).length;
+      const todaySalesCount = salesHistory.filter(s => s.timestamp && parseTimestamp(s.timestamp).toDateString() === new Date().toDateString()).length;
       finalCustomerName = `Customer ${todaySalesCount + 1}`;
     } else if (!finalCustomerName.startsWith('Customer ')) {
       // Add to customers collection if not exists
@@ -332,6 +369,16 @@ export default function Admin() {
            timestamp: serverTimestamp()
          });
          fetchCustomerDues();
+      }
+
+      if (arrearsCleared && finalCustomerName) {
+        const duesToClear = customerDuesList.filter(d => d.name && d.name.toLowerCase() === finalCustomerName.toLowerCase() && d.status === 'Pending');
+        for (const due of duesToClear) {
+          try {
+            await updateDoc(doc(db, 'customer_dues', due.id), { status: 'Paid' });
+          } catch (e) { console.error(e); }
+        }
+        fetchCustomerDues();
       }
       
       // Trigger external sync asynchronously so it doesn't block UI
@@ -474,12 +521,12 @@ export default function Admin() {
         handleLogout={handleLogout}
         user={user}
         todaySalesSum={salesHistory
-          .filter(s => s.timestamp && new Date(s.timestamp.toDate()).toDateString() === new Date().toDateString())
+          .filter(s => s.timestamp && parseTimestamp(s.timestamp).toDateString() === new Date().toDateString())
           .reduce((sum, s) => sum + Number(s.amount), 0)}
         totalPendingDues={totalPendingDues}
       >
         <Suspense fallback={<Loader />}>
-          {activeTab === 'dashboard' && <Dashboard salesHistory={salesHistory} setActiveTab={setActiveTab} posCategories={posCategories} totalPendingDues={totalPendingDues} />}
+          {activeTab === 'dashboard' && <Dashboard salesHistory={salesHistory} setActiveTab={setActiveTab} posCategories={posCategories} totalPendingDues={totalPendingDues} fetchSales={fetchSales} fetchCustomerDues={fetchCustomerDues} />}
           {activeTab === 'pos' && (
             <POS 
               cart={cart}
@@ -495,6 +542,9 @@ export default function Admin() {
               setWhatsappNumber={setWhatsappNumber}
               sendWhatsAppBill={sendWhatsAppBill}
               customersList={customersList}
+              salesHistory={salesHistory}
+              customerDuesList={customerDuesList}
+              refreshPOSData={fetchCategories}
             />
           )}
           {activeTab === 'customers' && <Customers isAdmin={isAdmin} />}

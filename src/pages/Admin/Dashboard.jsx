@@ -2,36 +2,68 @@ import React, { useState, useEffect } from 'react';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ReferenceDot, Label, LabelList } from 'recharts';
 import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../../config/firebase';
+import { formatDistanceToNow } from 'date-fns';
 import { 
   TrendingUp, Activity, Wrench, ShoppingBag, 
-  PlusCircle, Clock, CheckCircle2, AlertCircle, ShoppingCart, Users
+  PlusCircle, Clock, CheckCircle2, AlertCircle, ShoppingCart, Users, RefreshCw
 } from 'lucide-react';
 
 const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'];
 
-export default function Dashboard({ salesHistory, setActiveTab, posCategories = [], totalPendingDues = 0 }) {
+const parseTimestamp = (ts) => {
+  if (!ts) return new Date();
+  if (typeof ts.toDate === 'function') return ts.toDate();
+  if (ts.seconds) return new Date(ts.seconds * 1000);
+  return new Date(ts);
+};
+
+export default function Dashboard({ salesHistory, setActiveTab, posCategories = [], totalPendingDues = 0, fetchSales, fetchCustomerDues }) {
   const [repairs, setRepairs] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [lastRefreshed, setLastRefreshed] = useState(() => localStorage.getItem('dashboardLastRefreshed') || null);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const repairsQ = query(collection(db, 'repairs'), orderBy('createdAt', 'desc'));
-        const repairsSnap = await getDocs(repairsQ);
-        setRepairs(repairsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-
-        const expensesQ = query(collection(db, 'shop_expenses'), orderBy('timestamp', 'desc'));
-        const expensesSnap = await getDocs(expensesQ);
-        setExpenses(expensesSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      } catch (error) {
-        console.error("Error fetching dashboard data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
+    const savedRepairs = localStorage.getItem('dashboardRepairs');
+    const savedExpenses = localStorage.getItem('dashboardExpenses');
+    
+    if (savedRepairs) setRepairs(JSON.parse(savedRepairs));
+    if (savedExpenses) setExpenses(JSON.parse(savedExpenses));
+    
+    if (!savedRepairs || !savedExpenses) {
+      handleManualRefresh();
+    } else {
+      setLoading(false);
+    }
   }, []);
+
+  const handleManualRefresh = async () => {
+    setLoading(true);
+    try {
+      if (fetchSales) await fetchSales();
+      if (fetchCustomerDues) await fetchCustomerDues();
+
+      const repairsQ = query(collection(db, 'repairs'), orderBy('createdAt', 'desc'));
+      const repairsSnap = await getDocs(repairsQ);
+      const repairsData = repairsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setRepairs(repairsData);
+      localStorage.setItem('dashboardRepairs', JSON.stringify(repairsData));
+
+      const expensesQ = query(collection(db, 'shop_expenses'), orderBy('timestamp', 'desc'));
+      const expensesSnap = await getDocs(expensesQ);
+      const expensesData = expensesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setExpenses(expensesData);
+      localStorage.setItem('dashboardExpenses', JSON.stringify(expensesData));
+
+      const now = new Date().toISOString();
+      setLastRefreshed(now);
+      localStorage.setItem('dashboardLastRefreshed', now);
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const today = new Date();
 
@@ -50,9 +82,9 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
   };
   
   // -- NEW SALES & INCOME METRICS --
-  const todaySales = salesHistory.filter(s => s.timestamp && new Date(s.timestamp.toDate()).toDateString() === today.toDateString());
-  const monthSales = salesHistory.filter(s => s.timestamp && new Date(s.timestamp.toDate()).getMonth() === today.getMonth() && new Date(s.timestamp.toDate()).getFullYear() === today.getFullYear());
-  const monthExpensesList = expenses.filter(e => e.timestamp && new Date(e.timestamp.toDate()).getMonth() === today.getMonth() && new Date(e.timestamp.toDate()).getFullYear() === today.getFullYear());
+  const todaySales = salesHistory.filter(s => s.timestamp && parseTimestamp(s.timestamp).toDateString() === today.toDateString());
+  const monthSales = salesHistory.filter(s => s.timestamp && parseTimestamp(s.timestamp).getMonth() === today.getMonth() && parseTimestamp(s.timestamp).getFullYear() === today.getFullYear());
+  const monthExpensesList = expenses.filter(e => e.timestamp && parseTimestamp(e.timestamp).getMonth() === today.getMonth() && parseTimestamp(e.timestamp).getFullYear() === today.getFullYear());
   
   const todaySalesTotal = todaySales.reduce((sum, s) => sum + Number(s.amount || 0), 0);
   const todayIncomeTotal = todaySales.reduce((sum, s) => sum + getSaleIncome(s), 0);
@@ -87,7 +119,7 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
 
   salesHistory.forEach(sale => {
     if (sale.timestamp) {
-      const d = new Date(sale.timestamp.toDate());
+      const d = parseTimestamp(sale.timestamp);
       if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
         const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: '2-digit' });
         if (salesIncomeMap[dateStr] !== undefined) {
@@ -116,7 +148,7 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
 
   todaySales.forEach(sale => {
     if (sale.timestamp) {
-      const d = new Date(sale.timestamp.toDate());
+      const d = parseTimestamp(sale.timestamp);
       const h = d.getHours();
       
       let timeKey = 'Later';
@@ -151,7 +183,7 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
   const incomeCategoryMap = {};
   salesHistory.forEach(sale => {
     if (sale.timestamp) {
-      const d = new Date(sale.timestamp.toDate());
+      const d = parseTimestamp(sale.timestamp);
       if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
         if (sale.isRepair) {
           if (!incomeCategoryMap['PC Repairs']) incomeCategoryMap['PC Repairs'] = 0;
@@ -184,48 +216,49 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
     .map(name => ({ name, value: statusMap[name] }))
     .sort((a, b) => b.value - a.value);
 
-  // -- CHART: Repair Profit (By Month) --
+  // -- CHART: Combined Monthly Financials (Repair Profit, POS Income, Expenses) --
   const monthsList = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const repairProfitMap = {};
-  monthsList.forEach(m => repairProfitMap[m] = 0);
+  const monthlyDataMap = {};
+  monthsList.forEach(m => {
+    monthlyDataMap[m] = { month: m, repairProfit: 0, posIncome: 0, expenses: 0 };
+  });
 
   salesHistory.forEach(sale => {
-    if (sale.isRepair && sale.timestamp) {
-      const d = new Date(sale.timestamp.toDate());
+    if (sale.timestamp) {
+      const d = parseTimestamp(sale.timestamp);
       if (d.getFullYear() === currentYear) {
         const monthStr = monthsList[d.getMonth()];
-        const profit = Number(sale.amount || 0) - Number(sale.cost || 0);
-        if (profit > 0) {
-          repairProfitMap[monthStr] += profit;
+        if (sale.isRepair) {
+          const profit = Number(sale.amount || 0) - Number(sale.cost || 0);
+          if (profit > 0) {
+            monthlyDataMap[monthStr].repairProfit += profit;
+          }
+        } else {
+          let posProfit = 0;
+          (sale.cartItems || []).forEach(item => {
+             posProfit += (Number(item.price || 0) - Number(item.cost || 0)) * Number(item.qty || 1);
+          });
+          if (posProfit > 0) {
+            monthlyDataMap[monthStr].posIncome += posProfit;
+          }
         }
       }
     }
   });
 
-  const repairProfitData = monthsList.map(month => ({
-    month,
-    profit: repairProfitMap[month]
-  }));
-
-  // -- CHART: Monthly Expenses (By Month) --
-  const monthlyExpensesMap = {};
-  monthsList.forEach(m => monthlyExpensesMap[m] = 0);
-  
   expenses.forEach(expense => {
     if (expense.timestamp) {
-      const d = new Date(expense.timestamp.toDate());
+      const d = parseTimestamp(expense.timestamp);
       if (d.getFullYear() === currentYear) {
          const monthStr = monthsList[d.getMonth()];
-         monthlyExpensesMap[monthStr] += Number(expense.amount || 0);
+         monthlyDataMap[monthStr].expenses += Number(expense.amount || 0);
       }
     }
   });
-  const monthlyExpensesData = monthsList.map(month => ({
-    month,
-    expense: monthlyExpensesMap[month]
-  }));
 
-  // -- TOP 10 CUSTOMERS --
+  const combinedMonthlyData = monthsList.map(month => monthlyDataMap[month]);
+
+  // -- TOP 5 CUSTOMERS --
   const customerSpendMap = {};
   salesHistory.forEach(sale => {
     const custName = sale.customerName?.trim() || 'Walk-in Customer';
@@ -236,10 +269,10 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
     customerSpendMap[custName].orderCount += 1;
   });
   
-  const top10Customers = Object.values(customerSpendMap)
+  const top5Customers = Object.values(customerSpendMap)
     .filter(c => c.name !== 'Walk-in Customer' && !c.name.toLowerCase().startsWith('customer '))
     .sort((a, b) => b.totalSpend - a.totalSpend)
-    .slice(0, 10);
+    .slice(0, 5);
 
   // -- RECENT ACTIVITY --
   // Merge sales and repairs, sort by date
@@ -257,7 +290,7 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
         type: 'SALE',
         title: categories.length > 0 ? categories.join(', ') : 'POS Sale',
         amount: s.amount,
-        date: s.timestamp ? s.timestamp.toDate() : new Date(),
+        date: s.timestamp ? parseTimestamp(s.timestamp) : new Date(),
         items: s.cartItems?.length || 0
       };
     }),
@@ -267,7 +300,7 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
       title: `Repair Job: ${r.deviceType || 'Device'}`,
       status: r.status,
       customer: r.customerName,
-      date: r.createdAt ? r.createdAt.toDate() : new Date()
+      date: r.createdAt ? parseTimestamp(r.createdAt) : new Date()
     }))
   ].sort((a, b) => b.date - a.date).slice(0, 8);
 
@@ -275,7 +308,6 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
   // Data for High Labels
   const maxRevenueData = salesIncomeChartData.length > 0 ? salesIncomeChartData.reduce((prev, current) => (prev.sales > current.sales) ? prev : current) : null;
   const maxTodayData = todayHoursData.length > 0 ? todayHoursData.reduce((prev, current) => (prev.revenue > current.revenue) ? prev : current) : null;
-  const maxProfitIndex = repairProfitData.length > 0 ? repairProfitData.reduce((iMax, x, i, arr) => x.profit > arr[iMax].profit ? i : iMax, 0) : 0;
 
   // Render Helpers
   const renderHorizontalBarLabel = (props) => {
@@ -288,15 +320,7 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
     );
   };
 
-  const renderVerticalBarLabel = (props) => {
-    const { x, y, width, value, index } = props;
-    if (index !== maxProfitIndex || value === 0) return null;
-    return (
-      <text x={x + width / 2} y={y - 8} fill="#e2e8f0" fontSize={11} fontWeight="bold" textAnchor="middle">
-        High: Rs {value}
-      </text>
-    );
-  };
+
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
@@ -359,18 +383,22 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
           <h2 className="text-2xl font-black text-slate-100 tracking-tight">Dashboard Overview</h2>
           <p className="text-slate-400 text-sm mt-1">Here's what's happening at your store today.</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex items-center">
           <button 
-            onClick={() => setActiveTab && setActiveTab('pos')}
-            className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-all shadow-sm border border-slate-700/50 hover:border-slate-600"
+            onClick={handleManualRefresh}
+            className="flex items-center bg-slate-900/50 backdrop-blur-md border border-white/10 hover:border-white/20 hover:bg-slate-900/80 transition-all rounded-full px-5 py-2 shadow-lg group"
           >
-            <ShoppingCart className="w-4 h-4" /> Go to POS
-          </button>
-          <button 
-            onClick={() => setActiveTab && setActiveTab('repairs')}
-            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:shadow-[0_0_20px_rgba(16,185,129,0.5)] border border-emerald-500"
-          >
-            <PlusCircle className="w-4 h-4" /> New Repair
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse"></span>
+              <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+                UPDATED: {lastRefreshed ? formatDistanceToNow(new Date(lastRefreshed), { addSuffix: true }).toUpperCase() : 'JUST NOW'}
+              </span>
+            </div>
+            <div className="w-px h-4 bg-white/10 mx-4"></div>
+            <div className="flex items-center gap-2 text-slate-300 group-hover:text-white transition-colors">
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-emerald-400' : ''}`} />
+              <span className="text-[11px] font-black tracking-widest">REFRESH</span>
+            </div>
           </button>
         </div>
       </div>
@@ -389,11 +417,11 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
           <div className="grid grid-cols-2 gap-4 relative z-10">
             <div>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Sales (Revenue)</p>
-              <h3 className="text-xl font-black text-slate-100">Rs {todaySalesTotal.toFixed(2)}</h3>
+              <h3 className="text-xl font-black text-slate-100">{todaySalesTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</h3>
             </div>
             <div className="border-l border-white/10 pl-4">
               <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider mb-1">Income (Profit)</p>
-              <h3 className="text-xl font-black text-emerald-400">Rs {todayIncomeTotal.toFixed(2)}</h3>
+              <h3 className="text-xl font-black text-emerald-400">{todayIncomeTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</h3>
             </div>
           </div>
         </div>
@@ -409,11 +437,11 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
           <div className="grid grid-cols-2 gap-4 relative z-10">
             <div>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Sales (Revenue)</p>
-              <h3 className="text-xl font-black text-slate-100">Rs {monthSalesTotal.toFixed(2)}</h3>
+              <h3 className="text-xl font-black text-slate-100">{monthSalesTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</h3>
             </div>
             <div className="border-l border-white/10 pl-4">
               <p className="text-[10px] text-blue-400 font-bold uppercase tracking-wider mb-1">Income (Profit)</p>
-              <h3 className="text-xl font-black text-blue-400">Rs {monthIncomeTotal.toFixed(2)}</h3>
+              <h3 className="text-xl font-black text-blue-400">{monthIncomeTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</h3>
             </div>
           </div>
         </div>
@@ -429,11 +457,11 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
           <div className="grid grid-cols-2 gap-4 relative z-10">
             <div>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Total Sales</p>
-              <h3 className="text-xl font-black text-slate-100">Rs {totalSalesTotal.toFixed(2)}</h3>
+              <h3 className="text-xl font-black text-slate-100">{totalSalesTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</h3>
             </div>
             <div className="border-l border-white/10 pl-4">
               <p className="text-[10px] text-purple-400 font-bold uppercase tracking-wider mb-1">Total Income</p>
-              <h3 className="text-xl font-black text-purple-400">Rs {totalIncomeTotal.toFixed(2)}</h3>
+              <h3 className="text-xl font-black text-purple-400">{totalIncomeTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</h3>
             </div>
           </div>
         </div>
@@ -452,7 +480,7 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
           </div>
           <div className="relative z-10">
             <p className="text-[10px] text-red-400/80 font-bold uppercase tracking-wider mb-1">Total Pending</p>
-            <h3 className="text-xl font-black text-red-400">Rs {totalPendingDues.toFixed(2)}</h3>
+            <h3 className="text-xl font-black text-red-400">{totalPendingDues.toLocaleString('en-US', { maximumFractionDigits: 0 })}</h3>
           </div>
         </div>
       </div>
@@ -532,11 +560,11 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
         {/* Main Chart */}
         <div className="flex flex-col gap-6">
 
-          <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-lg flex-1">
-            <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest mb-6">Today's Revenue (By Time)</h3>
-            <div className="h-[200px] w-full">
+          <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-lg flex flex-col flex-1">
+            <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest mb-2">Today's Revenue (By Time)</h3>
+            <div className="flex-1 w-full min-h-[200px] mt-4">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={todayHoursData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <AreaChart data={todayHoursData} margin={{ top: 35, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorToday" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
@@ -558,27 +586,28 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
           </div>
         </div>
 
-        {/* Top 10 Customers */}
-        <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-lg flex flex-col h-full min-h-[400px]">
-          <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest mb-6 flex items-center gap-2">
-            <Users className="w-5 h-5 text-indigo-400" /> Top 10 Customers
+        {/* Top 5 Customers */}
+        <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-5 shadow-lg flex flex-col h-full min-h-[320px]">
+          <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest mb-4 flex items-center justify-between">
+            Top 5 Customers
+            <Users className="w-4 h-4 text-indigo-400" />
           </h3>
-          <div className="flex-1 overflow-y-auto pr-2 space-y-3 no-scrollbar">
-            {top10Customers.length === 0 ? (
-               <p className="text-slate-500 text-sm text-center mt-10">No customer data yet</p>
+          <div className="flex-1 overflow-y-auto pr-1 space-y-2 no-scrollbar">
+            {top5Customers.length === 0 ? (
+               <p className="text-slate-500 text-xs text-center mt-6">No customer data yet</p>
             ) : (
-               top10Customers.map((cust, i) => (
-                 <div key={i} className="flex gap-4 items-center p-3 rounded-xl bg-slate-800/30 hover:bg-slate-800/60 transition-all border border-white/5">
-                   <div className="w-8 h-8 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 flex items-center justify-center font-black text-sm shrink-0 shadow-[0_0_10px_rgba(99,102,241,0.2)]">
+               top5Customers.map((cust, i) => (
+                 <div key={i} className="flex gap-3 items-center p-2.5 rounded-xl bg-slate-800/30 hover:bg-slate-800/60 transition-all border border-white/5">
+                   <div className="w-7 h-7 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 flex items-center justify-center font-black text-xs shrink-0 shadow-[0_0_10px_rgba(99,102,241,0.2)]">
                      {i + 1}
                    </div>
                    <div className="flex-1 min-w-0">
                      <p className="text-sm font-bold text-slate-200 truncate">{cust.name}</p>
-                     <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+                     <p className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
                        <ShoppingCart className="w-3 h-3" /> {cust.orderCount} Orders
                      </p>
                    </div>
-                   <div className="text-sm font-black text-emerald-400 whitespace-nowrap bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20">
+                   <div className="text-xs font-black text-emerald-400 whitespace-nowrap bg-emerald-500/10 px-2.5 py-1.5 rounded-lg border border-emerald-500/20">
                      Rs {cust.totalSpend.toFixed(0)}
                    </div>
                  </div>
@@ -610,36 +639,25 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
 
 
 
-        {/* Repair Profit Chart */}
-        {/* Repair Profit Chart */}
-        <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-lg">
-          <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest mb-6">Monthly Repair Profit ({currentYear})</h3>
-          <div className="h-[250px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={repairProfitData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <XAxis dataKey="month" stroke="#475569" fontSize={11} tickMargin={10} axisLine={false} tickLine={false} />
-                <YAxis stroke="#475569" fontSize={11} tickFormatter={(val) => `Rs${val}`} axisLine={false} tickLine={false} />
-                <Tooltip cursor={{fill: '#1e293b'}} content={<CustomTooltip />} />
-                <Bar dataKey="profit" fill="#14b8a6" radius={[4, 4, 0, 0]}>
-                  <LabelList dataKey="profit" content={renderVerticalBarLabel} />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+        {/* Combined Monthly Financials Chart */}
+        <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-lg flex flex-col">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest">Monthly Overview ({currentYear})</h3>
+            <div className="flex gap-4 text-xs font-semibold">
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-blue-500"></div> POS Income</div>
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-teal-500"></div> Repair Profit</div>
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-red-500"></div> Expenses</div>
+            </div>
           </div>
-        </div>
-
-        {/* Monthly Expenses Chart */}
-        <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-lg">
-          <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest mb-6">Monthly Expenses ({currentYear})</h3>
-          <div className="h-[250px] w-full">
+          <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthlyExpensesData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <BarChart data={combinedMonthlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <XAxis dataKey="month" stroke="#475569" fontSize={11} tickMargin={10} axisLine={false} tickLine={false} />
                 <YAxis stroke="#475569" fontSize={11} tickFormatter={(val) => `Rs${val}`} axisLine={false} tickLine={false} />
                 <Tooltip cursor={{fill: '#1e293b'}} content={<CustomTooltip />} />
-                <Bar dataKey="expense" fill="#ef4444" radius={[4, 4, 0, 0]}>
-                  <LabelList dataKey="expense" content={renderVerticalBarLabel} />
-                </Bar>
+                <Bar dataKey="posIncome" name="POS Income" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="repairProfit" name="Repair Profit" fill="#14b8a6" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="expenses" name="Expenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
