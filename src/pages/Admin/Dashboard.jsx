@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ReferenceDot, Label, LabelList } from 'recharts';
+import { AreaChart, Area, BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ReferenceDot, Label, LabelList } from 'recharts';
 import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { formatDistanceToNow } from 'date-fns';
@@ -258,15 +258,59 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
 
   const combinedMonthlyData = monthsList.map(month => monthlyDataMap[month]);
 
-  // -- TOP 5 CUSTOMERS --
+  // -- CHART: Daily Comparison (This Month vs Last Month) --
+  const dailyComparisonMap = {};
+  for (let i = 1; i <= 31; i++) {
+    dailyComparisonMap[i] = { 
+      day: i.toString(), 
+      thisMonthSales: 0, 
+      thisMonthIncome: 0, 
+      lastMonthSales: 0, 
+      lastMonthIncome: 0 
+    };
+  }
+  const prevMonthDate = new Date(currentYear, currentMonth - 1, 1);
+  const lastMonth = prevMonthDate.getMonth();
+  const yearOfLastMonth = prevMonthDate.getFullYear();
+
+  salesHistory.forEach(sale => {
+    if (sale.timestamp) {
+      const d = parseTimestamp(sale.timestamp);
+      const day = d.getDate();
+      const m = d.getMonth();
+      const y = d.getFullYear();
+      
+      const saleAmount = Number(sale.amount || 0);
+      const saleIncome = getSaleIncome(sale);
+
+      if (m === currentMonth && y === currentYear) {
+        dailyComparisonMap[day].thisMonthSales += saleAmount;
+        dailyComparisonMap[day].thisMonthIncome += saleIncome;
+      } else if (m === lastMonth && y === yearOfLastMonth) {
+        dailyComparisonMap[day].lastMonthSales += saleAmount;
+        dailyComparisonMap[day].lastMonthIncome += saleIncome;
+      }
+    }
+  });
+  
+  const dailyComparisonData = Object.values(dailyComparisonMap).filter(d => 
+     Number(d.day) <= 28 || d.thisMonthSales > 0 || d.lastMonthSales > 0 || d.thisMonthIncome > 0 || d.lastMonthIncome > 0
+  );
+
+  // -- TOP 5 CUSTOMERS (THIS MONTH) --
   const customerSpendMap = {};
   salesHistory.forEach(sale => {
-    const custName = sale.customerName?.trim() || 'Walk-in Customer';
-    if (!customerSpendMap[custName]) {
-      customerSpendMap[custName] = { name: custName, totalSpend: 0, orderCount: 0 };
+    if (sale.timestamp) {
+      const d = parseTimestamp(sale.timestamp);
+      if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
+        const custName = sale.customerName?.trim() || 'Walk-in Customer';
+        if (!customerSpendMap[custName]) {
+          customerSpendMap[custName] = { name: custName, totalSpend: 0, orderCount: 0 };
+        }
+        customerSpendMap[custName].totalSpend += Number(sale.amount || 0);
+        customerSpendMap[custName].orderCount += 1;
+      }
     }
-    customerSpendMap[custName].totalSpend += Number(sale.amount || 0);
-    customerSpendMap[custName].orderCount += 1;
   });
   
   const top5Customers = Object.values(customerSpendMap)
@@ -589,7 +633,7 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
         {/* Top 5 Customers */}
         <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-5 shadow-lg flex flex-col h-full min-h-[320px]">
           <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest mb-4 flex items-center justify-between">
-            Top 5 Customers
+            Top 5 Customers (This Month)
             <Users className="w-4 h-4 text-indigo-400" />
           </h3>
           <div className="flex-1 overflow-y-auto pr-1 space-y-2 no-scrollbar">
@@ -659,6 +703,32 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
                 <Bar dataKey="repairProfit" name="Repair Profit" fill="#14b8a6" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="expenses" name="Expenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
               </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Daily Comparison (This vs Last Month) */}
+        <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-lg lg:col-span-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+            <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest">Daily Comparison (This vs Last Month)</h3>
+            <div className="flex flex-wrap gap-4 text-xs font-semibold">
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-emerald-400"></div> This Month Income</div>
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full border-2 border-emerald-400 border-dashed"></div> Last Month Income</div>
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-blue-400"></div> This Month Sales</div>
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full border-2 border-blue-400 border-dashed"></div> Last Month Sales</div>
+            </div>
+          </div>
+          <div className="h-[350px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={dailyComparisonData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <XAxis dataKey="day" stroke="#475569" fontSize={11} tickMargin={10} axisLine={false} tickLine={false} tickFormatter={(val) => `Day ${val}`} />
+                <YAxis stroke="#475569" fontSize={11} tickFormatter={(val) => `Rs${val}`} axisLine={false} tickLine={false} />
+                <Tooltip cursor={{stroke: '#334155', strokeWidth: 1, strokeDasharray: '4 4'}} content={<CustomTooltip />} />
+                <Line type="monotone" dataKey="thisMonthIncome" name="This Month Income" stroke="#34d399" strokeWidth={3} dot={false} activeDot={{ r: 6 }} />
+                <Line type="monotone" dataKey="lastMonthIncome" name="Last Month Income" stroke="#34d399" strokeWidth={2} strokeDasharray="5 5" dot={false} />
+                <Line type="monotone" dataKey="thisMonthSales" name="This Month Sales" stroke="#60a5fa" strokeWidth={3} dot={false} activeDot={{ r: 6 }} />
+                <Line type="monotone" dataKey="lastMonthSales" name="Last Month Sales" stroke="#60a5fa" strokeWidth={2} strokeDasharray="5 5" dot={false} />
+              </LineChart>
             </ResponsiveContainer>
           </div>
         </div>

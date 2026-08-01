@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../config/firebase';
-import { Search, Plus, Trash2, CheckCircle, Clock, User, Phone, MapPin, DollarSign } from 'lucide-react';
+import { Search, Plus, Trash2, CheckCircle, Clock, User, Phone, MapPin, DollarSign, RotateCcw } from 'lucide-react';
 import { notify } from '../../utils/toast';
 import DeleteConfirmModal from '../../components/DeleteConfirmModal';
 
@@ -74,14 +74,44 @@ export default function Customers({ isAdmin }) {
     }
   };
 
-  const toggleStatus = async (id, currentStatus) => {
-    if (currentStatus === 'Paid') return; // Cannot reverse
-    const newStatus = 'Paid';
+  const toggleStatus = async (record) => {
     try {
-      await updateDoc(doc(db, 'customer_dues', id), {
-        status: newStatus
-      });
-      notify.success(`Marked as ${newStatus}`);
+      if (record.status === 'Pending') {
+        const newStatus = 'Paid';
+        
+        // Add to daily_sales
+        const saleRef = await addDoc(collection(db, 'daily_sales'), {
+          amount: record.amount,
+          discount: 0,
+          description: `Account Settled: ${record.name}`,
+          cartItems: [{ name: 'Account Settlement', price: record.amount, cost: 0, qty: 1 }],
+          timestamp: serverTimestamp(),
+          userId: 'system',
+          customerName: record.name,
+          isCredit: false,
+          isAccountSettlement: true
+        });
+
+        await updateDoc(doc(db, 'customer_dues', record.id), {
+          status: newStatus,
+          linkedSaleId: saleRef.id
+        });
+        
+        notify.success(`Marked as Paid & Added to Sales`);
+      } else {
+        const newStatus = 'Pending';
+        
+        if (record.linkedSaleId) {
+          await deleteDoc(doc(db, 'daily_sales', record.linkedSaleId));
+        }
+        
+        await updateDoc(doc(db, 'customer_dues', record.id), {
+          status: newStatus,
+          linkedSaleId: null
+        });
+
+        notify.success(`Undone Paid status & Removed from Sales`);
+      }
       fetchRecords();
     } catch (error) {
       console.error("Error updating status:", error);
@@ -303,13 +333,21 @@ export default function Customers({ isAdmin }) {
                       </div>
 
                       <div className="flex gap-2">
-                        {record.status === 'Pending' && (
+                        {record.status === 'Pending' ? (
                           <button
-                            onClick={() => toggleStatus(record.id, record.status)}
+                            onClick={() => toggleStatus(record)}
                             className="p-2 rounded-xl transition-all bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white"
                             title="Mark as Paid"
                           >
                             <CheckCircle className="w-5 h-5" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => toggleStatus(record)}
+                            className="p-2 rounded-xl transition-all bg-orange-500/10 text-orange-400 hover:bg-orange-500 hover:text-white"
+                            title="Undo Paid"
+                          >
+                            <RotateCcw className="w-5 h-5" />
                           </button>
                         )}
                         
