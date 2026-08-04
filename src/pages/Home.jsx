@@ -7,19 +7,33 @@ import About from '../components/home/About';
 export default function Home() {
   return (
     <MainLayout>
-      <section id="home" className="relative flex flex-col items-center pt-16 md:pt-24 pb-16 min-h-[90vh] overflow-hidden">
-        {/* Ambient Glowing Orbs */}
-        <div className="absolute top-0 left-1/4 w-[30rem] h-[30rem] bg-cyan-600/20 rounded-full blur-[120px] pointer-events-none"></div>
-        <div className="absolute bottom-0 right-1/4 w-[30rem] h-[30rem] bg-blue-600/20 rounded-full blur-[120px] pointer-events-none"></div>
+      <div className="bg-slate-950 text-slate-200">
+        <section id="home" className="relative flex flex-col items-center pt-20 md:pt-20 pb-16 min-h-screen overflow-hidden">
+          {/* Ultra-Premium Ambient Glowing Orbs */}
+          <div className="absolute top-[-10%] left-[-10%] w-[40rem] h-[40rem] bg-cyan-500/20 rounded-full blur-[150px] pointer-events-none mix-blend-screen animate-pulse-slow"></div>
+          <div className="absolute bottom-[-10%] right-[-10%] w-[40rem] h-[40rem] bg-emerald-500/10 rounded-full blur-[150px] pointer-events-none mix-blend-screen"></div>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[50rem] h-[50rem] bg-blue-600/10 rounded-full blur-[180px] pointer-events-none mix-blend-screen"></div>
+          
+          {/* Premium Animated Tech Grid Overlay */}
+          <div 
+            className="absolute inset-0 opacity-20 pointer-events-none" 
+            style={{ 
+              backgroundImage: `
+                linear-gradient(to right, rgba(255,255,255,0.05) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px)
+              `, 
+              backgroundSize: '40px 40px',
+              maskImage: 'radial-gradient(ellipse 80% 80% at 50% 50%, black 20%, transparent 100%)',
+              WebkitMaskImage: 'radial-gradient(ellipse 80% 80% at 50% 50%, black 20%, transparent 100%)'
+            }}
+          ></div>
+          
+          <Hero />
+          <Services />
+        </section>
         
-        {/* Tech Mesh Overlay */}
-        <div className="absolute inset-0 opacity-[0.15] pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at center, #ffffff 1px, transparent 1px)', backgroundSize: '32px 32px' }}></div>
-        
-        <Hero />
-        <Services />
-      </section>
-      
-      <About />
+        <About />
+      </div>
     </MainLayout>
   );
 }

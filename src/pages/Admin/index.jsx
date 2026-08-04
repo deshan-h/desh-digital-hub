@@ -23,6 +23,7 @@ const Customers = lazy(() => import('./Customers'));
 const Expenses = lazy(() => import('./Expenses'));
 const ItemsManager = lazy(() => import('./ItemsManager'));
 const CustomerDirectory = lazy(() => import('./CustomerDirectory'));
+const Settings = lazy(() => import('./Settings'));
 
 const parseTimestamp = (ts) => {
   if (!ts) return new Date();
@@ -553,6 +554,7 @@ export default function Admin() {
           {activeTab === 'history' && <History salesHistory={salesHistory} fetchSales={fetchSales} handleDeleteSale={handleDeleteSale} user={user} posCategories={posCategories} isAdmin={isAdmin} />}
           {activeTab === 'repairs' && <Repairs user={user} fetchSales={fetchSales} />}
           {activeTab === 'items' && <ItemsManager posCategories={posCategories} fetchCategories={fetchCategories} />}
+          {activeTab === 'settings' && <Settings isAdmin={isAdmin} />}
         </Suspense>
       </AdminLayout>
 
