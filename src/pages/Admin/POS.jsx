@@ -3,6 +3,7 @@ import { ShoppingCart, Minus, Plus, Trash2, Printer, MessageCircle, Search, Pack
 import * as Icons from 'lucide-react';
 import { FcPackage, FcPrint, FcTemplate, FcDocument, FcRules, FcImageFile, FcDataBackup, FcCommandLine, FcSettings } from 'react-icons/fc';
 import { notify } from '../../utils/toast';
+import { generateInvoiceHtml } from '../../utils/invoiceTemplate';
 
 const ICON_MAP = {
   'Package': FcPackage,
@@ -242,6 +243,31 @@ export default function POS({
       .filter(due => due.name && due.name.toLowerCase() === nameMatch)
       .reduce((sum, due) => sum + Number(due.amount || 0), 0);
   }, [customerName, customerDuesList]);
+
+  const handlePrint = () => {
+    if (cart.length === 0) {
+      notify.error("Cart is empty");
+      return;
+    }
+    const sale = {
+      id: Math.random().toString(36).substring(2, 8).toUpperCase(),
+      timestamp: new Date(),
+      customerName: customerName,
+      cartItems: cart,
+      amount: cartTotal - Number(discount || 0),
+      description: 'POS Sale'
+    };
+    
+    const printWindow = window.open('', '_blank');
+    const html = generateInvoiceHtml(sale);
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
+  };
 
   const activeCategory = posCategories[activeCategoryIndex] || null;
 
@@ -548,7 +574,7 @@ export default function POS({
                 {/* Options: Print, WhatsApp */}
                 <div className="flex gap-4 h-14 mt-6">
                   <button
-                    onClick={() => window.print()}
+                    onClick={handlePrint}
                     className="px-6 bg-slate-800 hover:bg-slate-700 text-slate-200 transition-all rounded-xl flex items-center justify-center border border-slate-700 shadow-md font-bold gap-2"
                     title="Print Bill"
                   >
