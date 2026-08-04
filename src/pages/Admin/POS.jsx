@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { ShoppingCart, Minus, Plus, Trash2, Printer, MessageCircle, Search, Package, RefreshCw } from 'lucide-react';
 import * as Icons from 'lucide-react';
 import { FcPackage, FcPrint, FcTemplate, FcDocument, FcRules, FcImageFile, FcDataBackup, FcCommandLine, FcSettings } from 'react-icons/fc';
@@ -89,6 +89,90 @@ const CartItem = React.memo(({ item, updateCartItem, removeFromCart }) => (
   </div>
 ));
 
+const CustomerInput = React.memo(({ customerName, setCustomerName, customersList, whatsappNumber, setWhatsappNumber, isCredit }) => {
+  const [localVal, setLocalVal] = useState(customerName);
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  useEffect(() => {
+    setLocalVal(customerName);
+  }, [customerName]);
+
+  const commitChange = (val) => {
+    setCustomerName(val);
+    const matchedCustomer = customersList.find(c => c.name === val);
+    if (matchedCustomer && matchedCustomer.phone && !whatsappNumber) {
+      setWhatsappNumber(matchedCustomer.phone);
+    }
+  };
+
+  const filteredCustomers = customersList.filter(c => c.name.toLowerCase().includes(localVal.toLowerCase()));
+
+  return (
+    <div className="flex-1 relative">
+      <div className="relative">
+        <input
+          type="text"
+          placeholder={isCredit ? "Customer Name (Required)" : "Customer Name (Optional)"}
+          value={localVal}
+          onChange={(e) => {
+            setLocalVal(e.target.value);
+            setShowDropdown(true);
+          }}
+          onFocus={() => setShowDropdown(true)}
+          onBlur={(e) => {
+            const val = e.target.value;
+            setTimeout(() => {
+              setShowDropdown(false);
+              commitChange(val);
+            }, 200);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              const val = e.target.value.trim().toLowerCase();
+              if (val) {
+                const exactMatch = customersList.find(c => c.name.toLowerCase().startsWith(val));
+                const match = exactMatch || customersList.find(c => c.name.toLowerCase().includes(val));
+                if (match && match.name !== localVal) {
+                  e.preventDefault();
+                  setLocalVal(match.name);
+                  commitChange(match.name);
+                  setShowDropdown(false);
+                }
+              }
+            }
+          }}
+          className={`w-full text-base bg-slate-950 border ${isCredit && !localVal.trim() ? 'border-red-500/50' : 'border-slate-800'} text-slate-200 rounded-xl px-5 py-4 focus:outline-none focus:border-emerald-500/50 transition-all shadow-inner`}
+        />
+        <div 
+          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 cursor-pointer p-1.5 hover:bg-slate-800 rounded-full transition-colors"
+          onClick={() => setShowDropdown(!showDropdown)}
+        >
+          <Icons.ChevronDown className={`w-5 h-5 transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
+        </div>
+      </div>
+      
+      {showDropdown && filteredCustomers.length > 0 && (
+        <div className="absolute z-50 mt-2 w-full max-h-60 overflow-y-auto bg-slate-900 border border-slate-700 rounded-xl shadow-2xl custom-scrollbar py-1">
+          {filteredCustomers.map((c, idx) => (
+            <div 
+              key={idx}
+              className="px-5 py-3 hover:bg-slate-800 cursor-pointer text-slate-200 font-bold border-b border-slate-800/50 last:border-0 flex items-center justify-between"
+              onClick={() => {
+                setLocalVal(c.name);
+                commitChange(c.name);
+                setShowDropdown(false);
+              }}
+            >
+              <span>{c.name}</span>
+              {c.phone && <span className="text-slate-500 text-xs font-normal bg-slate-950 px-2 py-0.5 rounded-md border border-slate-800">{c.phone}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+});
+
 export default function POS({ 
   cart, 
   addToCart, 
@@ -108,19 +192,37 @@ export default function POS({
   refreshPOSData
 }) {
   const topCustomers = useMemo(() => {
-    if (!salesHistory) return [];
-    const customerTotals = {};
-    salesHistory.forEach(sale => {
-      if (sale.customerName && sale.customerName.trim() !== '') {
-        const name = sale.customerName.trim();
-        customerTotals[name] = (customerTotals[name] || 0) + Number(sale.amount || 0);
-      }
-    });
-    
-    return Object.entries(customerTotals)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([name]) => name);
+    if (salesHistory && salesHistory.length > 0) {
+      const customerTotals = {};
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+
+      salesHistory.forEach(sale => {
+        if (sale.timestamp && sale.customerName && sale.customerName.trim() !== '') {
+          let d = new Date();
+          if (typeof sale.timestamp.toDate === 'function') d = sale.timestamp.toDate();
+          else if (sale.timestamp.seconds) d = new Date(sale.timestamp.seconds * 1000);
+          else d = new Date(sale.timestamp);
+
+          if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
+            const name = sale.customerName.trim();
+            customerTotals[name] = (customerTotals[name] || 0) + Number(sale.amount || 0);
+          }
+        }
+      });
+      
+      const tops = Object.entries(customerTotals)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 7)
+        .map(([name]) => name);
+        
+      localStorage.setItem('topCustomersThisMonth', JSON.stringify(tops));
+      return tops;
+    } else {
+      const cached = localStorage.getItem('topCustomersThisMonth');
+      return cached ? JSON.parse(cached) : [];
+    }
   }, [salesHistory]);
 
   const [activeCategoryIndex, setActiveCategoryIndex] = useState(0);
@@ -375,7 +477,7 @@ export default function POS({
                 {/* Top Customers Quick Add */}
                 {topCustomers.length > 0 && (
                   <div className="flex flex-col gap-3">
-                    <span className="text-sm uppercase tracking-wider font-bold text-slate-500">Quick Add Customer</span>
+                    <span className="text-sm uppercase tracking-wider font-bold text-slate-500">Quick Select (Top 7 This Month)</span>
                     <div className="flex flex-wrap gap-2">
                       {topCustomers.map((name, idx) => (
                         <button
@@ -401,45 +503,14 @@ export default function POS({
                 <div className="flex flex-col gap-3">
                   <span className="text-sm uppercase tracking-wider font-bold text-slate-500">Customer Details</span>
                   <div className="flex gap-4">
-                    <div className="flex-1">
-                      <input
-                        type="text"
-                        list="customers-list"
-                        placeholder={isCredit ? "Customer Name (Required)" : "Customer Name (Optional)"}
-                        value={customerName}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setCustomerName(val);
-                          const matchedCustomer = customersList.find(c => c.name === val);
-                          if (matchedCustomer && matchedCustomer.phone && !whatsappNumber) {
-                            setWhatsappNumber(matchedCustomer.phone);
-                          }
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            const val = e.target.value.trim().toLowerCase();
-                            if (val) {
-                              // Find best match (starts with first, then includes)
-                              const exactMatch = customersList.find(c => c.name.toLowerCase().startsWith(val));
-                              const match = exactMatch || customersList.find(c => c.name.toLowerCase().includes(val));
-                              if (match && match.name !== customerName) {
-                                e.preventDefault();
-                                setCustomerName(match.name);
-                                if (match.phone && !whatsappNumber) {
-                                  setWhatsappNumber(match.phone);
-                                }
-                              }
-                            }
-                          }
-                        }}
-                        className={`w-full text-base bg-slate-950 border ${isCredit && !customerName.trim() ? 'border-red-500/50' : 'border-slate-800'} text-slate-200 rounded-xl px-5 py-4 focus:outline-none focus:border-emerald-500/50 transition-all shadow-inner`}
-                      />
-                      <datalist id="customers-list">
-                        {customersList && customersList.map((c, idx) => (
-                          <option key={idx} value={c.name} />
-                        ))}
-                      </datalist>
-                    </div>
+                    <CustomerInput 
+                      customerName={customerName}
+                      setCustomerName={setCustomerName}
+                      customersList={customersList}
+                      whatsappNumber={whatsappNumber}
+                      setWhatsappNumber={setWhatsappNumber}
+                      isCredit={isCredit}
+                    />
                     <div className="w-36 relative">
                       <input
                         type="number"
