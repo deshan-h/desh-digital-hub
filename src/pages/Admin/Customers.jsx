@@ -16,6 +16,7 @@ export default function Customers({ isAdmin }) {
   const [area, setArea] = useState('');
   const [amount, setAmount] = useState('');
   const [status, setStatus] = useState('Pending');
+  const [isPosArrears, setIsPosArrears] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Delete Modal State
@@ -57,6 +58,7 @@ export default function Customers({ isAdmin }) {
         area,
         amount: Number(amount),
         status,
+        isPosArrears,
         timestamp: serverTimestamp()
       });
       notify.success("Record added successfully!");
@@ -65,6 +67,7 @@ export default function Customers({ isAdmin }) {
       setArea('');
       setAmount('');
       setStatus('Pending');
+      setIsPosArrears(true);
       fetchRecords();
     } catch (error) {
       console.error("Error adding record:", error);
@@ -79,22 +82,27 @@ export default function Customers({ isAdmin }) {
       if (record.status === 'Pending') {
         const newStatus = 'Paid';
         
-        // Add to daily_sales
-        const saleRef = await addDoc(collection(db, 'daily_sales'), {
-          amount: record.amount,
-          discount: 0,
-          description: `Account Settled: ${record.name}`,
-          cartItems: [{ name: 'Account Settlement', price: record.amount, cost: 0, qty: 1 }],
-          timestamp: serverTimestamp(),
-          userId: 'system',
-          customerName: record.name,
-          isCredit: false,
-          isAccountSettlement: true
-        });
+        let saleRefId = null;
+        
+        // Add to daily_sales only if it's a POS Arrears
+        if (record.isPosArrears !== false) {
+          const saleRef = await addDoc(collection(db, 'daily_sales'), {
+            amount: record.amount,
+            discount: 0,
+            description: `Account Settled: ${record.name}`,
+            cartItems: [{ name: 'Account Settlement', price: record.amount, cost: 0, qty: 1 }],
+            timestamp: serverTimestamp(),
+            userId: 'system',
+            customerName: record.name,
+            isCredit: false,
+            isAccountSettlement: true
+          });
+          saleRefId = saleRef.id;
+        }
 
         await updateDoc(doc(db, 'customer_dues', record.id), {
           status: newStatus,
-          linkedSaleId: saleRef.id
+          ...(saleRefId && { linkedSaleId: saleRefId })
         });
         
         notify.success(`Marked as Paid & Added to Sales`);
@@ -257,6 +265,16 @@ export default function Customers({ isAdmin }) {
                     Paid
                   </button>
                 </div>
+              </div>
+
+              <div className="flex items-center gap-3 bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 cursor-pointer select-none hover:border-cyan-500/30 transition-colors" onClick={() => setIsPosArrears(!isPosArrears)}>
+                <input
+                  type="checkbox"
+                  checked={isPosArrears}
+                  onChange={(e) => setIsPosArrears(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-700 text-cyan-500 focus:ring-cyan-500/50 bg-slate-900 pointer-events-none"
+                />
+                <span className="text-sm font-semibold text-slate-300 flex-1">Add to POS Sales when Paid</span>
               </div>
 
               <button

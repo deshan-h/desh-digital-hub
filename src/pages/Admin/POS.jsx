@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { ShoppingCart, Minus, Plus, Trash2, Printer, MessageCircle, Search, Package, RefreshCw } from 'lucide-react';
 import * as Icons from 'lucide-react';
-import { FcPackage, FcPrint, FcTemplate, FcDocument, FcRules, FcImageFile, FcDataBackup, FcCommandLine, FcSettings } from 'react-icons/fc';
+import { FcPackage, FcPrint, FcTemplate, FcDocument, FcRules, FcImageFile, FcDataBackup, FcCommandLine, FcSettings, FcGlobe } from 'react-icons/fc';
 import { notify } from '../../utils/toast';
 import { generateInvoiceHtml } from '../../utils/invoiceTemplate';
 
@@ -14,7 +14,8 @@ const ICON_MAP = {
   'Image': FcImageFile,
   'Download': FcDataBackup,
   'Code': FcCommandLine,
-  'Settings': FcSettings
+  'Settings': FcSettings,
+  'Globe': FcGlobe
 };
 
 // Memoized Components for Performance
@@ -35,7 +36,7 @@ const POSItem = React.memo(({ item, addToCart }) => (
 ));
 
 const CategoryTab = React.memo(({ cat, isActive, onClick }) => {
-  const CatIcon = ICON_MAP[cat.icon] || FcPackage;
+  const CatIcon = ICON_MAP[cat.category === 'Online Services' ? 'Globe' : (cat.icon || 'Package')] || FcPackage;
   return (
     <button
       onClick={onClick}
@@ -122,10 +123,8 @@ const CustomerInput = React.memo(({ customerName, setCustomerName, customersList
           onFocus={() => setShowDropdown(true)}
           onBlur={(e) => {
             const val = e.target.value;
-            setTimeout(() => {
-              setShowDropdown(false);
-              commitChange(val);
-            }, 200);
+            setShowDropdown(false);
+            commitChange(val);
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
@@ -158,7 +157,8 @@ const CustomerInput = React.memo(({ customerName, setCustomerName, customersList
             <div 
               key={idx}
               className="px-5 py-3 hover:bg-slate-800 cursor-pointer text-slate-200 font-bold border-b border-slate-800/50 last:border-0 flex items-center justify-between"
-              onClick={() => {
+              onMouseDown={(e) => {
+                e.preventDefault(); // Prevents onBlur from firing before we set the value
                 setLocalVal(c.name);
                 commitChange(c.name);
                 setShowDropdown(false);
@@ -385,19 +385,9 @@ export default function POS({
           </button>
         </div>
 
-        {/* Middle Area: Items Grid */}
+        {/* Middle Area: Items Grid (Background Icon Removed for Performance) */}
         <div className="flex-1 overflow-y-auto mb-6 pr-2 relative" style={{ scrollbarWidth: 'thin' }}>
           
-          {/* Background Category Icon */}
-          {activeCategory && activeCategory.icon && (() => {
-            const Icon = ICON_MAP[activeCategory.icon];
-            return Icon ? (
-              <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none overflow-hidden">
-                <Icon className="w-[30rem] h-[30rem] grayscale" />
-              </div>
-            ) : null;
-          })()}
-
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 relative z-10">
             {filteredItems.map((item) => (
               <POSItem key={`${item.id}-${item.name}`} item={item} addToCart={handleAddToCart} />
@@ -471,7 +461,7 @@ export default function POS({
           <button
             onClick={() => setShowPaymentModal(true)}
             disabled={cart.length === 0}
-            className="w-full bg-emerald-500 hover:bg-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.2)] hover:shadow-[0_0_25px_rgba(16,185,129,0.4)] text-slate-950 font-extrabold py-4 disabled:opacity-50 transition-all rounded-xl flex items-center justify-center text-lg uppercase tracking-wide"
+            className="w-full bg-emerald-500 hover:bg-emerald-400 shadow-md hover:shadow-lg text-slate-950 font-extrabold py-4 disabled:opacity-50 transition-all rounded-xl flex items-center justify-center text-lg uppercase tracking-wide"
           >
             Proceed to Checkout
           </button>
@@ -480,8 +470,8 @@ export default function POS({
 
       {/* Checkout Modal */}
       {showPaymentModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-5xl shadow-2xl shadow-black/50 overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/95">
+          <div className="bg-slate-900 border border-slate-700/50 rounded-3xl w-full max-w-5xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-950/80 shrink-0">
               <h2 className="text-2xl font-black text-slate-100 uppercase tracking-widest flex items-center gap-3">
                 <ShoppingCart className="w-6 h-6 text-emerald-500" />
@@ -665,7 +655,7 @@ export default function POS({
                 <div className="flex flex-col gap-4">
                   <div className="flex justify-between items-end pt-2 pb-2">
                     <span className="text-sm text-slate-400 font-extrabold uppercase tracking-widest mb-1">Final Total</span>
-                    <span className="text-4xl font-black text-emerald-400 drop-shadow-[0_0_15px_rgba(16,185,129,0.3)] flex items-baseline gap-2">
+                    <span className="text-4xl font-black text-emerald-400 drop-shadow-sm flex items-baseline gap-2">
                       <span className="text-xl font-bold opacity-75">Rs</span>
                       {(Math.max(0, cartTotal - Number(discount || 0)) + currentCustomerArrears).toFixed(2)}
                     </span>
@@ -684,7 +674,7 @@ export default function POS({
                       }
                     }}
                     disabled={cart.length === 0 || checkoutLoading || (!isCredit && cashGiven && Number(cashGiven) < Math.max(0, cartTotal - Number(discount || 0)) + currentCustomerArrears) || (isCredit && !customerName.trim())}
-                    className={`w-full mt-2 ${isCredit ? 'bg-red-500 hover:bg-red-400 shadow-[0_0_20px_rgba(239,68,68,0.3)]' : 'bg-emerald-500 hover:bg-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.3)]'} text-slate-950 font-black py-5 disabled:opacity-50 transition-all rounded-2xl flex items-center justify-center text-xl uppercase tracking-wide`}
+                    className={`w-full mt-2 ${isCredit ? 'bg-red-500 hover:bg-red-400' : 'bg-emerald-500 hover:bg-emerald-400'} shadow-md hover:shadow-lg text-slate-950 font-black py-5 disabled:opacity-50 transition-all rounded-2xl flex items-center justify-center text-xl uppercase tracking-wide`}
                   >
                     {checkoutLoading ? 'Processing...' : isCredit ? 'Confirm Credit Sale' : 'Confirm Order & Pay'}
                   </button>

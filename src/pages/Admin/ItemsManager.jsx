@@ -56,7 +56,7 @@ const INITIAL_CATEGORIES = [
     { id: 'ge-6', name: 'Name Stickers [B/W]', price: 80 },
     { id: 'ge-7', name: 'Book Cover Design', price: 200 },
   ]},
-  { category: 'Online Services', icon: 'Code', color: 'text-purple-400', items: [
+  { category: 'Online Services', icon: 'Globe', color: 'text-purple-400', items: [
     { id: 'os-1', name: 'Online App [Per Page]', price: 150 },
     { id: 'os-2', name: 'Campus Application', price: 400 },
     { id: 'os-3', name: 'Email', price: 50 },
