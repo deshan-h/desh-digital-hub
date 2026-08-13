@@ -5,7 +5,8 @@ import { db } from '../../config/firebase';
 import { formatDistanceToNow } from 'date-fns';
 import { 
   TrendingUp, TrendingDown, Activity, Wrench, ShoppingBag, 
-  PlusCircle, Clock, CheckCircle2, AlertCircle, ShoppingCart, Users, RefreshCw, PieChart as PieChartIcon
+  PlusCircle, Clock, CheckCircle2, AlertCircle, ShoppingCart, Users, RefreshCw, PieChart as PieChartIcon,
+  ChevronDown, ChevronRight
 } from 'lucide-react';
 import { FcPackage, FcPrint, FcTemplate, FcDocument, FcRules, FcImageFile, FcDataBackup, FcCommandLine, FcSettings } from 'react-icons/fc';
 
@@ -22,6 +23,10 @@ const ICON_MAP = {
 };
 
 const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'];
+const COLORS_EXTENDED = [
+  '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16',
+  '#0ea5e9', '#d946ef', '#f43f5e', '#eab308', '#22c55e', '#a855f7', '#06b6d4'
+];
 
 const parseTimestamp = (ts) => {
   if (!ts) return new Date();
@@ -30,12 +35,39 @@ const parseTimestamp = (ts) => {
   return new Date(ts);
 };
 
+const BarCustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-slate-900/95 backdrop-blur-md border border-slate-700/50 p-4 rounded-xl shadow-2xl">
+        <p className="text-slate-200 font-bold mb-3 border-b border-slate-700/50 pb-2">{label}</p>
+        <div className="space-y-2">
+          {payload.map((entry, index) => {
+             if (!entry.value) return null;
+             return (
+               <div key={index} className="flex justify-between items-center gap-6 text-sm">
+                 <span style={{ color: entry.color }} className="font-medium">{entry.name}</span>
+                 <span className="text-slate-100 font-bold">Rs {entry.value.toFixed(0)}</span>
+               </div>
+             );
+          })}
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
 export default function Dashboard({ salesHistory, setActiveTab, posCategories = [], totalPendingDues = 0, fetchSales, fetchCustomerDues }) {
   const [repairs, setRepairs] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lastRefreshed, setLastRefreshed] = useState(() => localStorage.getItem('dashboardLastRefreshed') || null);
   const [revenueTimeFilter, setRevenueTimeFilter] = useState('month');
+  const [expandedCats, setExpandedCats] = useState({});
+
+  const toggleCat = (catName) => {
+    setExpandedCats(prev => ({ ...prev, [catName]: !prev[catName] }));
+  };
 
   useEffect(() => {
     const savedRepairs = localStorage.getItem('dashboardRepairs');
@@ -45,10 +77,11 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
     if (savedExpenses) setExpenses(JSON.parse(savedExpenses));
     
     if (!savedRepairs || !savedExpenses) {
-      handleManualRefresh();
-    } else {
-      setLoading(false);
+      // no local data, we just wait for the refresh
     }
+    
+    // Always fetch fresh data when dashboard mounts
+    handleManualRefresh();
   }, []);
 
   const handleManualRefresh = async () => {
@@ -113,6 +146,14 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
   });
   const monthExpensesList = expenses.filter(e => e.timestamp && parseTimestamp(e.timestamp).getMonth() === today.getMonth() && parseTimestamp(e.timestamp).getFullYear() === today.getFullYear());
   
+  const currentMonth = today.getMonth();
+  const currentYear = today.getFullYear();
+  const lastMonthIndex = currentMonth === 0 ? 11 : currentMonth - 1;
+  const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+
+  const lastMonthSales = salesHistory.filter(s => s.timestamp && parseTimestamp(s.timestamp).getMonth() === lastMonthIndex && parseTimestamp(s.timestamp).getFullYear() === lastMonthYear);
+  const lastMonthExpensesList = expenses.filter(e => e.timestamp && parseTimestamp(e.timestamp).getMonth() === lastMonthIndex && parseTimestamp(e.timestamp).getFullYear() === lastMonthYear);
+  
   const todaySalesTotal = todaySales.reduce((sum, s) => sum + Number(s.amount || 0), 0);
   const yesterdaySalesTotal = yesterdaySales.reduce((sum, s) => sum + Number(s.amount || 0), 0);
   const todaySalesDiff = todaySalesTotal - yesterdaySalesTotal;
@@ -124,10 +165,14 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
   const monthSalesTotal = monthSales.reduce((sum, s) => sum + Number(s.amount || 0), 0);
   const monthIncomeTotal = monthSales.reduce((sum, s) => sum + getSaleIncome(s), 0);
   
+  const lastMonthSalesTotal = lastMonthSales.reduce((sum, s) => sum + Number(s.amount || 0), 0);
+  const lastMonthIncomeTotal = lastMonthSales.reduce((sum, s) => sum + getSaleIncome(s), 0);
+
   const totalSalesTotal = salesHistory.reduce((sum, s) => sum + Number(s.amount || 0), 0);
   const totalIncomeTotal = salesHistory.reduce((sum, s) => sum + getSaleIncome(s), 0);
 
   const monthExpensesTotal = monthExpensesList.reduce((sum, e) => sum + Number(e.amount), 0);
+  const lastMonthExpensesTotal = lastMonthExpensesList.reduce((sum, e) => sum + Number(e.amount), 0);
   const weekExpensesTotal = expenses.filter(e => {
     if (!e.timestamp) return false;
     const d = parseTimestamp(e.timestamp);
@@ -142,8 +187,6 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
   const readyDeliveries = repairs.filter(r => r.status === 'Ready');
 
   // -- CHART: Sales vs Income (Week/Month toggle) --
-  const currentMonth = today.getMonth();
-  const currentYear = today.getFullYear();
   const currentDay = today.getDate();
 
   const thisWeekDays = [];
@@ -158,12 +201,29 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
     return d.toLocaleDateString('en-US', { month: 'short', day: '2-digit' });
   });
 
-  const chartDays = revenueTimeFilter === 'week' ? thisWeekDays : thisMonthDays;
+  const lastMonthDaysCount = new Date(lastMonthYear, lastMonthIndex + 1, 0).getDate();
+  const lastMonthDaysArray = [...Array(lastMonthDaysCount)].map((_, i) => {
+    const d = new Date(lastMonthYear, lastMonthIndex, i + 1);
+    return d.toLocaleDateString('en-US', { month: 'short', day: '2-digit' });
+  });
+
+  let chartDays = [];
+  if (revenueTimeFilter === 'week') chartDays = thisWeekDays;
+  else if (revenueTimeFilter === 'lastMonth') chartDays = lastMonthDaysArray;
+  else chartDays = thisMonthDays;
+
   const salesIncomeMap = {};
   chartDays.forEach(d => salesIncomeMap[d] = { sales: 0, income: 0, expenses: 0 });
 
-  const sourceDataForChart = revenueTimeFilter === 'week' ? weekSales : monthSales;
-  const sourceExpensesForChart = revenueTimeFilter === 'week' ? expenses.filter(e => e.timestamp && parseTimestamp(e.timestamp) >= startOfWeek && parseTimestamp(e.timestamp) <= today) : monthExpensesList;
+  let sourceDataForChart = [];
+  if (revenueTimeFilter === 'week') sourceDataForChart = weekSales;
+  else if (revenueTimeFilter === 'lastMonth') sourceDataForChart = lastMonthSales;
+  else sourceDataForChart = monthSales;
+
+  let sourceExpensesForChart = [];
+  if (revenueTimeFilter === 'week') sourceExpensesForChart = expenses.filter(e => e.timestamp && parseTimestamp(e.timestamp) >= startOfWeek && parseTimestamp(e.timestamp) <= today);
+  else if (revenueTimeFilter === 'lastMonth') sourceExpensesForChart = lastMonthExpensesList;
+  else sourceExpensesForChart = monthExpensesList;
 
   sourceDataForChart.forEach(sale => {
     if (sale.timestamp) {
@@ -236,43 +296,84 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
     });
   });
 
-  // -- CHART: Income by Category (This Month) --
-  const incomeCategoryMap = {};
+  // -- CHART: Income Comparison by Category (This vs Last Month) --
+  const prevMonthIndex = currentMonth === 0 ? 11 : currentMonth - 1;
+  const prevMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+
+  const comparisonMap = {};
+  const allServicesSet = new Set();
+
   salesHistory.forEach(sale => {
     if (sale.timestamp) {
       const d = parseTimestamp(sale.timestamp);
-      if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
+      const isThisMonth = d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+      const isLastMonth = d.getMonth() === prevMonthIndex && d.getFullYear() === prevMonthYear;
+      
+      if (isThisMonth || isLastMonth) {
         if (sale.isRepair) {
-          if (!incomeCategoryMap['PC Repairs']) incomeCategoryMap['PC Repairs'] = { total: 0, items: {} };
+          if (!comparisonMap['PC Repairs']) comparisonMap['PC Repairs'] = { thisMonth: 0, lastMonth: 0, itemsMap: {} };
           const repairIncome = (Number(sale.amount || 0) - Number(sale.cost || 0));
-          incomeCategoryMap['PC Repairs'].total += repairIncome;
-          const repairName = sale.device || 'Other Repair';
-          if (!incomeCategoryMap['PC Repairs'].items[repairName]) incomeCategoryMap['PC Repairs'].items[repairName] = 0;
-          incomeCategoryMap['PC Repairs'].items[repairName] += repairIncome;
+          const itemName = sale.device || 'Other Repair';
+          allServicesSet.add(itemName);
+          
+          if (!comparisonMap['PC Repairs'].itemsMap[itemName]) comparisonMap['PC Repairs'].itemsMap[itemName] = { thisMonth: 0, lastMonth: 0 };
+          
+          if (isThisMonth) {
+            comparisonMap['PC Repairs'].thisMonth += repairIncome;
+            comparisonMap['PC Repairs'].itemsMap[itemName].thisMonth += repairIncome;
+          }
+          if (isLastMonth) {
+            comparisonMap['PC Repairs'].lastMonth += repairIncome;
+            comparisonMap['PC Repairs'].itemsMap[itemName].lastMonth += repairIncome;
+          }
         } else {
           (sale.cartItems || []).forEach(item => {
             const catName = itemToCategory[item.name] || 'Other';
-            if (!incomeCategoryMap[catName]) incomeCategoryMap[catName] = { total: 0, items: {} };
+            if (!comparisonMap[catName]) comparisonMap[catName] = { thisMonth: 0, lastMonth: 0, itemsMap: {} };
             const itemIncome = (Number(item.price || 0) - Number(item.cost || 0)) * Number(item.qty || 1);
-            incomeCategoryMap[catName].total += itemIncome;
-            if (!incomeCategoryMap[catName].items[item.name]) incomeCategoryMap[catName].items[item.name] = 0;
-            incomeCategoryMap[catName].items[item.name] += itemIncome;
+            const itemName = item.name;
+            allServicesSet.add(itemName);
+
+            if (!comparisonMap[catName].itemsMap[itemName]) comparisonMap[catName].itemsMap[itemName] = { thisMonth: 0, lastMonth: 0 };
+            
+            if (isThisMonth) {
+              comparisonMap[catName].thisMonth += itemIncome;
+              comparisonMap[catName].itemsMap[itemName].thisMonth += itemIncome;
+            }
+            if (isLastMonth) {
+              comparisonMap[catName].lastMonth += itemIncome;
+              comparisonMap[catName].itemsMap[itemName].lastMonth += itemIncome;
+            }
           });
         }
       }
     }
   });
 
-  const incomeByCategoryData = Object.keys(incomeCategoryMap)
-    .filter(name => incomeCategoryMap[name].total > 0)
+  const categoryComparisonData = Object.keys(comparisonMap)
+    .filter(name => comparisonMap[name].thisMonth > 0 || comparisonMap[name].lastMonth > 0)
     .map(name => {
-       const itemsArray = Object.keys(incomeCategoryMap[name].items)
-           .map(itemName => ({ name: itemName, value: incomeCategoryMap[name].items[itemName] }))
-           .filter(i => i.value > 0)
-           .sort((a,b) => b.value - a.value);
-       return { name, value: incomeCategoryMap[name].total, items: itemsArray };
+       const catData = {
+         name,
+         thisMonth: comparisonMap[name].thisMonth,
+         lastMonth: comparisonMap[name].lastMonth,
+         itemsList: Object.keys(comparisonMap[name].itemsMap).map(itemName => ({
+             name: itemName,
+             thisMonth: comparisonMap[name].itemsMap[itemName].thisMonth,
+             lastMonth: comparisonMap[name].itemsMap[itemName].lastMonth
+         })).sort((a, b) => b.thisMonth - a.thisMonth)
+       };
+       
+       Object.keys(comparisonMap[name].itemsMap).forEach(itemName => {
+           catData[`${itemName}_thisMonth`] = comparisonMap[name].itemsMap[itemName].thisMonth;
+           catData[`${itemName}_lastMonth`] = comparisonMap[name].itemsMap[itemName].lastMonth;
+       });
+
+       return catData;
     })
-    .sort((a, b) => b.value - a.value);
+    .sort((a, b) => b.thisMonth - a.thisMonth);
+
+  const uniqueServices = Array.from(allServicesSet);
 
   // -- CHART: Repair Status --
   const statusMap = { Pending: 0, 'In Progress': 0, Ready: 0, Delivered: 0, Cancelled: 0 };
@@ -518,22 +619,18 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
           <p className="text-slate-400 text-sm mt-1">Here's what's happening at your store today.</p>
         </div>
         <div className="flex items-center">
-          <button 
-            onClick={handleManualRefresh}
-            className="flex items-center bg-slate-900/50 backdrop-blur-md border border-white/10 hover:border-white/20 hover:bg-slate-900/80 transition-all rounded-full px-5 py-2 shadow-lg group"
-          >
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse"></span>
-              <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">
-                UPDATED: {lastRefreshed ? formatDistanceToNow(new Date(lastRefreshed), { addSuffix: true }).toUpperCase() : 'JUST NOW'}
+          <div className="flex items-center bg-slate-900/50 backdrop-blur-md border border-white/10 rounded-full px-5 py-2 shadow-lg">
+            <div className="flex items-center gap-2 text-slate-300">
+              {loading ? (
+                <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+              ) : (
+                <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse"></span>
+              )}
+              <span className="text-[10px] font-bold uppercase tracking-widest">
+                {loading ? 'UPDATING...' : (lastRefreshed ? `UPDATED: ${formatDistanceToNow(new Date(lastRefreshed), { addSuffix: true }).toUpperCase()}` : 'UPDATED: JUST NOW')}
               </span>
             </div>
-            <div className="w-px h-4 bg-white/10 mx-4"></div>
-            <div className="flex items-center gap-2 text-slate-300 group-hover:text-white transition-colors">
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-emerald-400' : ''}`} />
-              <span className="text-[11px] font-black tracking-widest">REFRESH</span>
-            </div>
-          </button>
+          </div>
         </div>
       </div>
 
@@ -660,7 +757,7 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
         <div className="lg:col-span-2 bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-lg flex flex-col h-[380px]">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <div className="flex flex-col gap-3">
-              <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest">Sales vs Income ({revenueTimeFilter === 'week' ? 'This Week' : 'This Month'})</h3>
+              <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest">Sales vs Income ({revenueTimeFilter === 'week' ? 'This Week' : revenueTimeFilter === 'lastMonth' ? 'Last Month' : 'This Month'})</h3>
               <div className="flex bg-slate-950/50 p-1 rounded-lg border border-white/5 w-fit">
                 <button 
                   onClick={() => setRevenueTimeFilter('week')}
@@ -674,20 +771,26 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
                 >
                   This Month
                 </button>
+                <button 
+                  onClick={() => setRevenueTimeFilter('lastMonth')}
+                  className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-md transition-all ${revenueTimeFilter === 'lastMonth' ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-500 hover:text-slate-300'}`}
+                >
+                  Last Month
+                </button>
               </div>
             </div>
             <div className="flex gap-4 md:gap-6 bg-slate-950/50 p-3 rounded-xl border border-white/5">
               <div className="text-right">
                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Total Sales</p>
-                <p className="text-sm font-black text-slate-200">Rs {(revenueTimeFilter === 'week' ? weekSalesTotal : monthSalesTotal).toFixed(2)}</p>
+                <p className="text-sm font-black text-slate-200">Rs {(revenueTimeFilter === 'week' ? weekSalesTotal : revenueTimeFilter === 'lastMonth' ? lastMonthSalesTotal : monthSalesTotal).toFixed(2)}</p>
               </div>
               <div className="text-right border-l border-white/10 pl-4 md:pl-6">
                 <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">Total Income</p>
-                <p className="text-sm font-black text-emerald-400">Rs {(revenueTimeFilter === 'week' ? weekIncomeTotal : monthIncomeTotal).toFixed(2)}</p>
+                <p className="text-sm font-black text-emerald-400">Rs {(revenueTimeFilter === 'week' ? weekIncomeTotal : revenueTimeFilter === 'lastMonth' ? lastMonthIncomeTotal : monthIncomeTotal).toFixed(2)}</p>
               </div>
               <div className="text-right border-l border-white/10 pl-4 md:pl-6">
                 <p className="text-[10px] text-red-400 font-bold uppercase tracking-wider">Total Expenses</p>
-                <p className="text-sm font-black text-red-400">Rs {(revenueTimeFilter === 'week' ? weekExpensesTotal : monthExpensesTotal).toFixed(2)}</p>
+                <p className="text-sm font-black text-red-400">Rs {(revenueTimeFilter === 'week' ? weekExpensesTotal : revenueTimeFilter === 'lastMonth' ? lastMonthExpensesTotal : monthExpensesTotal).toFixed(2)}</p>
               </div>
             </div>
           </div>
@@ -836,67 +939,102 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
           </div>
         </div>
 
-        {/* Advanced Income by Category (This Month) */}
+        {/* Advanced Income by Category (This Month vs Last Month) */}
         <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-lg lg:col-span-2 flex flex-col">
-          <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest mb-6 flex items-center gap-2">
-            <PieChartIcon className="w-5 h-5 text-indigo-400" /> Income Breakdown (This Month)
-          </h3>
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-            {incomeByCategoryData.map((cat, idx) => {
-              const categoryConfig = posCategories.find(c => c.category === cat.name);
-              const isRepair = cat.name === 'PC Repairs';
-              const CatIcon = isRepair ? Wrench : (categoryConfig && ICON_MAP[categoryConfig.icon] ? ICON_MAP[categoryConfig.icon] : FcPackage);
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest flex items-center gap-2">
+              <PieChartIcon className="w-5 h-5 text-indigo-400" /> Income Breakdown Comparison
+            </h3>
+            <div className="flex gap-4 text-xs font-semibold">
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-emerald-500"></div> This Month</div>
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-slate-500"></div> Last Month</div>
+            </div>
+          </div>
+          
+          <div className="h-[400px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart layout="vertical" data={categoryComparisonData} margin={{ top: 10, right: 30, left: 40, bottom: 0 }} barSize={12}>
+                <XAxis type="number" stroke="#475569" fontSize={11} tickFormatter={(val) => `Rs${val}`} axisLine={false} tickLine={false} />
+                <YAxis type="category" dataKey="name" stroke="#cbd5e1" fontSize={12} fontWeight="bold" axisLine={false} tickLine={false} width={120} />
+                <Tooltip cursor={{fill: '#1e293b'}} content={<BarCustomTooltip />} />
+                {uniqueServices.map((serviceName, idx) => {
+                  const color = COLORS_EXTENDED[idx % COLORS_EXTENDED.length];
+                  return (
+                    <React.Fragment key={idx}>
+                      <Bar dataKey={`${serviceName}_thisMonth`} stackId="thisMonth" name={`${serviceName} (This Month)`} fill={color} />
+                      <Bar dataKey={`${serviceName}_lastMonth`} stackId="lastMonth" name={`${serviceName} (Last Month)`} fill={color} fillOpacity={0.4} />
+                    </React.Fragment>
+                  );
+                })}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
 
-              return (
-              <div key={idx} className="bg-slate-950/40 border border-white/5 rounded-xl p-4 flex flex-col shadow-inner">
-                <div className="flex justify-between items-center mb-4 pb-3 border-b border-white/10">
-                  <div className="flex items-center gap-2">
-                    <CatIcon className={`w-5 h-5 drop-shadow-sm ${isRepair ? 'text-indigo-400' : ''}`} />
-                    <span className="text-sm font-bold text-slate-200">{cat.name}</span>
-                  </div>
-                  <span className="text-sm font-black" style={{ color: COLORS[idx % COLORS.length] }}>Rs {cat.value.toFixed(0)}</span>
-                </div>
-                
-                <div className="flex flex-col sm:flex-row gap-4 items-center">
-                  <div className="w-28 h-28 shrink-0 relative">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={cat.items}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={30}
-                          outerRadius={50}
-                          paddingAngle={2}
-                          dataKey="value"
-                          stroke="none"
-                        >
-                          {cat.items.map((entry, i) => (
-                            <Cell key={`cell-${i}`} fill={COLORS[i % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip content={<CustomTooltip />} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <div className="flex-1 w-full overflow-y-auto space-y-2 pr-1 max-h-[140px] no-scrollbar">
-                    {cat.items.map((item, itemIdx) => (
-                      <div key={itemIdx} className="flex justify-between items-center text-[11px] group">
-                        <div className="flex items-center gap-1.5 truncate">
-                           <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: COLORS[itemIdx % COLORS.length] }}></div>
-                           <span className="text-slate-400 group-hover:text-slate-300 transition-colors truncate" title={item.name}>{item.name}</span>
-                        </div>
-                        <span className="text-slate-300 font-semibold whitespace-nowrap pl-2">Rs {item.value.toFixed(0)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              );
-            })}
-            {incomeByCategoryData.length === 0 && (
-              <div className="col-span-full text-center text-slate-500 py-10 text-sm">No income data for this month</div>
-            )}
+          <div className="mt-8 overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-white/10 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                  <th className="pb-3 pl-2">Category</th>
+                  <th className="pb-3 text-right">This Month</th>
+                  <th className="pb-3 text-right">Last Month</th>
+                  <th className="pb-3 text-right pr-2">Growth</th>
+                </tr>
+              </thead>
+              <tbody className="text-sm">
+                {categoryComparisonData.map((cat, idx) => {
+                  const growth = cat.lastMonth > 0 ? ((cat.thisMonth - cat.lastMonth) / cat.lastMonth) * 100 : (cat.thisMonth > 0 ? 100 : 0);
+                  const isPositive = growth > 0;
+                  const isExpanded = expandedCats[cat.name];
+                  
+                  return (
+                    <React.Fragment key={idx}>
+                      <tr className="border-b border-white/5 hover:bg-slate-800/30 transition-colors cursor-pointer" onClick={() => toggleCat(cat.name)}>
+                        <td className="py-3 pl-2 font-semibold text-slate-200 flex items-center gap-2">
+                          {isExpanded ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+                          {cat.name}
+                        </td>
+                        <td className="py-3 text-right text-emerald-400 font-bold">Rs {cat.thisMonth.toFixed(0)}</td>
+                        <td className="py-3 text-right text-slate-400 font-semibold">Rs {cat.lastMonth.toFixed(0)}</td>
+                        <td className="py-3 text-right pr-2">
+                          {growth !== 0 ? (
+                            <span className={`inline-flex items-center gap-1 font-bold ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+                              {isPositive ? '+' : ''}{growth.toFixed(1)}%
+                            </span>
+                          ) : (
+                            <span className="text-slate-500 font-bold">-</span>
+                          )}
+                        </td>
+                      </tr>
+                      {isExpanded && cat.itemsList && cat.itemsList.map((item, itemIdx) => {
+                         const itemGrowth = item.lastMonth > 0 ? ((item.thisMonth - item.lastMonth) / item.lastMonth) * 100 : (item.thisMonth > 0 ? 100 : 0);
+                         const isItemPos = itemGrowth > 0;
+                         return (
+                           <tr key={`${idx}-${itemIdx}`} className="bg-slate-800/10 border-b border-white/5 text-xs">
+                             <td className="py-2 pl-10 font-medium text-slate-400 border-l-2 border-slate-700">{item.name}</td>
+                             <td className="py-2 text-right text-emerald-500/80">Rs {item.thisMonth.toFixed(0)}</td>
+                             <td className="py-2 text-right text-slate-500">Rs {item.lastMonth.toFixed(0)}</td>
+                             <td className="py-2 text-right pr-2">
+                                {itemGrowth !== 0 ? (
+                                  <span className={isItemPos ? 'text-emerald-500/80' : 'text-red-500/80'}>
+                                    {isItemPos ? '+' : ''}{itemGrowth.toFixed(1)}%
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-600">-</span>
+                                )}
+                             </td>
+                           </tr>
+                         );
+                      })}
+                    </React.Fragment>
+                  );
+                })}
+                {categoryComparisonData.length === 0 && (
+                  <tr>
+                    <td colSpan="4" className="text-center text-slate-500 py-6 text-sm">No comparison data available</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
 

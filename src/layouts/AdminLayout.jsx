@@ -11,7 +11,9 @@ export default function AdminLayout({
   handleLogout,
   user,
   todaySalesSum,
-  totalPendingDues
+  totalPendingDues,
+  pendingOrders = [],
+  setShowPendingOrdersModal
 }) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -148,7 +150,7 @@ export default function AdminLayout({
         {/* Top Header */}
         <div className="h-16 flex items-center justify-end px-6 bg-slate-950/60 backdrop-blur-2xl sticky top-0 z-30 border-b border-white/5 gap-4">
           
-          <h1 className="hidden sm:flex items-center absolute left-1/2 transform -translate-x-1/2 text-xl font-extrabold tracking-tight gap-3">
+          <h1 className="hidden sm:flex items-center absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 text-xl font-extrabold tracking-tight gap-3">
             <img src="/desh-digital-hub/pwa-192x192.png" alt="DESH Digital Hub Logo" className="w-8 h-8 object-contain drop-shadow-md" />
             <span className="bg-gradient-to-r from-slate-100 to-slate-400 bg-clip-text text-transparent">DESH Digital Hub</span>
           </h1>
@@ -171,6 +173,26 @@ export default function AdminLayout({
               </button>
             )}
           </div>
+
+          {pendingOrders && pendingOrders.length > 0 && (
+            <div 
+              onClick={() => {
+                setActiveTab('pos');
+                setShowPendingOrdersModal(true);
+              }}
+              className="flex items-center gap-2 px-3 py-1.5 bg-orange-500/10 border border-orange-500/20 rounded-full cursor-pointer hover:bg-orange-500/20 transition-colors shadow-inner"
+              title="View Pending Orders in POS"
+            >
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.8)] animate-pulse"></span>
+                <span className="text-[11px] font-bold text-orange-400 uppercase tracking-widest">{pendingOrders.length} Pending</span>
+              </div>
+              <div className="w-px h-3 bg-orange-500/30 mx-1"></div>
+              <span className="text-[12px] font-black text-orange-400 tracking-wide">
+                Rs {pendingOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0).toFixed(2)}
+              </span>
+            </div>
+          )}
 
           <button 
             onClick={handleHardRefresh}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, Suspense, lazy, useCallback } from 'react';
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence, browserSessionPersistence } from 'firebase/auth';
-import { collection, addDoc, getDocs, query, orderBy, serverTimestamp, doc, deleteDoc, where, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, orderBy, serverTimestamp, doc, deleteDoc, where, updateDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../../config/firebase';
 import { format } from 'date-fns';
 import logo from '../../assets/logo.webp';
@@ -70,6 +70,8 @@ export default function Admin() {
   const [cart, setCart] = useState([]);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [whatsappNumber, setWhatsappNumber] = useState('');
+  const [pendingOrders, setPendingOrders] = useState([]);
+  const [showPendingOrdersModal, setShowPendingOrdersModal] = useState(false);
 
   const isAdmin = user?.email === 'admin@desh.lk';
 
@@ -101,7 +103,20 @@ export default function Admin() {
       }
       setAuthLoading(false);
     });
-    return () => unsubscribe();
+
+    const pendingQ = query(collection(db, 'pos_pending_orders'), orderBy('createdAt', 'desc'));
+    const pendingUnsubscribe = onSnapshot(pendingQ, (snapshot) => {
+      const orders = [];
+      snapshot.forEach((doc) => {
+        orders.push({ id: doc.id, ...doc.data() });
+      });
+      setPendingOrders(orders);
+    });
+
+    return () => {
+      unsubscribe();
+      pendingUnsubscribe();
+    };
   }, []);
 
   // 2. Fetch Sales Data
@@ -525,6 +540,8 @@ export default function Admin() {
           .filter(s => s.timestamp && parseTimestamp(s.timestamp).toDateString() === new Date().toDateString())
           .reduce((sum, s) => sum + Number(s.amount), 0)}
         totalPendingDues={totalPendingDues}
+        pendingOrders={pendingOrders}
+        setShowPendingOrdersModal={setShowPendingOrdersModal}
       >
         <Suspense fallback={<Loader />}>
           {activeTab === 'dashboard' && <Dashboard salesHistory={salesHistory} setActiveTab={setActiveTab} posCategories={posCategories} totalPendingDues={totalPendingDues} fetchSales={fetchSales} fetchCustomerDues={fetchCustomerDues} />}
@@ -546,6 +563,9 @@ export default function Admin() {
               salesHistory={salesHistory}
               customerDuesList={customerDuesList}
               refreshPOSData={fetchCategories}
+              pendingOrders={pendingOrders}
+              showPendingOrdersModal={showPendingOrdersModal}
+              setShowPendingOrdersModal={setShowPendingOrdersModal}
             />
           )}
           {activeTab === 'customers' && <Customers isAdmin={isAdmin} />}

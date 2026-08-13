@@ -1,9 +1,11 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { ShoppingCart, Minus, Plus, Trash2, Printer, MessageCircle, Search, Package, RefreshCw } from 'lucide-react';
+import { ShoppingCart, Minus, Plus, Trash2, Printer, MessageCircle, Search, Package, RefreshCw, Save, Clock } from 'lucide-react';
 import * as Icons from 'lucide-react';
 import { FcPackage, FcPrint, FcTemplate, FcDocument, FcRules, FcImageFile, FcDataBackup, FcCommandLine, FcSettings, FcGlobe } from 'react-icons/fc';
 import { notify } from '../../utils/toast';
 import { generateInvoiceHtml } from '../../utils/invoiceTemplate';
+import { collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../../config/firebase';
 
 const ICON_MAP = {
   'Package': FcPackage,
@@ -77,7 +79,7 @@ const CartItem = React.memo(({ item, updateCartItem, removeFromCart }) => (
       </button>
     </div>
     <div className="w-20 text-right">
-      {item.id === 'cu-1' || item.price === 0 ? (
+      {item.id === 'cu-1' || String(item.id).startsWith('custom-') ? (
         <input
           type="number"
           value={item.price}
@@ -190,7 +192,10 @@ export default function POS({
   customersList = [],
   salesHistory = [],
   customerDuesList = [],
-  refreshPOSData
+  refreshPOSData,
+  pendingOrders = [],
+  showPendingOrdersModal,
+  setShowPendingOrdersModal
 }) {
   const topCustomers = useMemo(() => {
     if (salesHistory && salesHistory.length > 0) {
@@ -235,6 +240,11 @@ export default function POS({
   const [discount, setDiscount] = useState('');
   const [isCredit, setIsCredit] = useState(false);
 
+  // Pending Orders State
+  const [showSavePendingModal, setShowSavePendingModal] = useState(false);
+  const [pendingNote, setPendingNote] = useState('');
+  const [pendingLoading, setPendingLoading] = useState(false);
+
   const currentCustomerArrears = useMemo(() => {
     if (!customerName || customerName.trim() === '') return 0;
     const nameMatch = customerName.trim().toLowerCase();
@@ -243,6 +253,56 @@ export default function POS({
       .filter(due => due.name && due.name.toLowerCase() === nameMatch)
       .reduce((sum, due) => sum + Number(due.amount || 0), 0);
   }, [customerName, customerDuesList]);
+
+  const handleSavePending = async () => {
+    if (!pendingNote.trim()) {
+      notify.error("Please enter a note or customer name");
+      return;
+    }
+    setPendingLoading(true);
+    try {
+      await addDoc(collection(db, 'pos_pending_orders'), {
+        note: pendingNote.trim(),
+        items: cart,
+        totalAmount: cartTotal,
+        createdAt: serverTimestamp()
+      });
+      notify.success("Order saved as pending!");
+      setCart([]);
+      setShowSavePendingModal(false);
+      setPendingNote('');
+    } catch (error) {
+      console.error(error);
+      notify.error("Failed to save pending order");
+    } finally {
+      setPendingLoading(false);
+    }
+  };
+
+  const handleResumePending = async (order) => {
+    if (cart.length > 0) {
+      if (!window.confirm("Current cart will be replaced. Continue?")) return;
+    }
+    setCart(order.items);
+    setCustomerName(order.note);
+    setShowPendingOrdersModal(false);
+    try {
+      await deleteDoc(doc(db, 'pos_pending_orders', order.id));
+    } catch (e) {
+      console.error("Error removing pending doc", e);
+    }
+  };
+  
+  const handleDeletePending = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this pending order?")) return;
+    try {
+      await deleteDoc(doc(db, 'pos_pending_orders', id));
+      notify.success("Pending order deleted");
+    } catch (e) {
+      console.error(e);
+      notify.error("Failed to delete");
+    }
+  };
 
   const handlePrint = () => {
     if (cart.length === 0) {
@@ -373,7 +433,7 @@ export default function POS({
           <button
             onClick={() => handleAddToCart({
               id: 'custom-' + Date.now(),
-              name: 'Custom Service / Utilities',
+              name: 'Custom Service',
               price: 0, // Triggers the manual price input field in the cart
               qty: 1
             })}
@@ -418,7 +478,7 @@ export default function POS({
       {/* Cart Panel */}
       <div className="w-full lg:w-[420px] bg-slate-950 border-l border-slate-800 p-6 flex flex-col shrink-0 z-20">
         <div className="flex justify-between items-center mb-6 border-b border-slate-800 pb-4">
-          <h2 className="text-lg font-extrabold text-slate-100 uppercase tracking-wide">
+          <h2 className="text-lg font-extrabold text-slate-100 uppercase tracking-wide flex items-center gap-3">
             Current Order
           </h2>
           {cart.length > 0 && (
@@ -458,13 +518,22 @@ export default function POS({
             <span className="text-3xl font-black text-emerald-400">Rs {cartTotal.toFixed(2)}</span>
           </div>
 
-          <button
-            onClick={() => setShowPaymentModal(true)}
-            disabled={cart.length === 0}
-            className="w-full bg-emerald-500 hover:bg-emerald-400 shadow-md hover:shadow-lg text-slate-950 font-extrabold py-4 disabled:opacity-50 transition-all rounded-xl flex items-center justify-center text-lg uppercase tracking-wide"
-          >
-            Proceed to Checkout
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowSavePendingModal(true)}
+              disabled={cart.length === 0}
+              className="flex-1 bg-slate-800 hover:bg-slate-700 shadow-md hover:shadow-lg text-slate-200 border border-slate-700 font-extrabold py-4 disabled:opacity-50 transition-all rounded-xl flex items-center justify-center text-sm uppercase tracking-wide gap-2"
+            >
+              <Save className="w-5 h-5" /> Pending
+            </button>
+            <button
+              onClick={() => setShowPaymentModal(true)}
+              disabled={cart.length === 0}
+              className="flex-[2] bg-emerald-500 hover:bg-emerald-400 shadow-md hover:shadow-lg text-slate-950 font-extrabold py-4 disabled:opacity-50 transition-all rounded-xl flex items-center justify-center text-lg uppercase tracking-wide"
+            >
+              Checkout
+            </button>
+          </div>
         </div>
       </div>
 
@@ -680,6 +749,94 @@ export default function POS({
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Save Pending Modal */}
+      {showSavePendingModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl">
+            <div className="p-6 border-b border-slate-800 flex justify-between items-center">
+              <h3 className="text-xl font-black text-slate-100 uppercase tracking-wide">Save Pending Order</h3>
+              <button onClick={() => setShowSavePendingModal(false)} className="text-slate-400 hover:text-white transition-colors">
+                <Icons.X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2 block">
+                  Customer Name / Note
+                </label>
+                <input
+                  type="text"
+                  autoFocus
+                  value={pendingNote}
+                  onChange={(e) => setPendingNote(e.target.value)}
+                  placeholder="E.g., John Doe - Printing"
+                  className="w-full text-lg bg-slate-950 border border-slate-800 text-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:border-orange-500/50 transition-all"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSavePending();
+                  }}
+                />
+              </div>
+              <button
+                onClick={handleSavePending}
+                disabled={pendingLoading || !pendingNote.trim()}
+                className="w-full bg-orange-500 hover:bg-orange-400 text-slate-950 font-black py-4 rounded-xl text-lg uppercase tracking-wide transition-all disabled:opacity-50"
+              >
+                {pendingLoading ? 'Saving...' : 'Save Pending Order'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pending Orders Modal */}
+      {showPendingOrdersModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl">
+            <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+              <h3 className="text-xl font-black text-slate-100 uppercase tracking-wide flex items-center gap-2">
+                <Clock className="text-orange-400 w-6 h-6" /> Pending Orders
+              </h3>
+              <button onClick={() => setShowPendingOrdersModal(false)} className="text-slate-400 hover:text-white transition-colors">
+                <Icons.X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto flex-1 space-y-3 custom-scrollbar">
+              {pendingOrders.length === 0 ? (
+                <div className="text-center text-slate-500 py-10 font-bold uppercase tracking-widest">No pending orders found</div>
+              ) : (
+                pendingOrders.map(order => (
+                  <div key={order.id} className="bg-slate-950/50 border border-slate-800 p-4 rounded-2xl flex items-center justify-between group hover:border-slate-700 transition-colors">
+                    <div className="flex-1">
+                      <h4 className="text-lg font-bold text-slate-200">{order.note}</h4>
+                      <p className="text-sm text-slate-500 font-medium">
+                        {order.items?.length || 0} items • {order.createdAt?.toDate ? order.createdAt.toDate().toLocaleString() : 'Just now'}
+                      </p>
+                    </div>
+                    <div className="text-right mr-6">
+                      <p className="text-xl font-black text-emerald-400">Rs {(order.totalAmount || 0).toFixed(2)}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleDeletePending(order.id)}
+                        className="p-2.5 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition-colors border border-red-500/20 hover:border-red-500 opacity-0 group-hover:opacity-100"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => handleResumePending(order)}
+                        className="px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-400 text-slate-950 font-bold uppercase tracking-wide transition-all shadow-md"
+                      >
+                        Resume
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
