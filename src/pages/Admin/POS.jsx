@@ -42,17 +42,19 @@ const CategoryTab = React.memo(({ cat, isActive, onClick }) => {
   return (
     <button
       onClick={onClick}
-      className={`relative shrink-0 flex flex-col justify-center items-center w-28 h-20 border transition-colors rounded-2xl p-2 overflow-hidden ${
+      className={`relative shrink-0 flex flex-col items-center w-28 h-24 border transition-colors rounded-2xl p-2 overflow-hidden ${
         isActive 
           ? 'border-emerald-500/40 bg-emerald-900/30' 
           : 'border-slate-800 bg-slate-900 text-slate-400 hover:bg-slate-800'
       }`}
     >
-      <div className="z-10 w-full h-full relative overflow-hidden flex flex-col items-center justify-center">
-        {CatIcon && <CatIcon className={`w-6 h-6 mb-1 drop-shadow-sm`} />}
-        <span className={`text-[11px] font-extrabold tracking-widest uppercase text-center leading-tight ${isActive ? 'text-emerald-400' : 'text-slate-100'}`}>
-          {cat.category}
-        </span>
+      <div className="z-10 w-full h-full relative flex flex-col items-center">
+        {CatIcon && <CatIcon className={`w-6 h-6 mt-0.5 shrink-0 drop-shadow-sm`} />}
+        <div className="flex-1 w-full flex items-center justify-center mt-1">
+          <span className={`text-[10px] font-extrabold tracking-widest uppercase text-center leading-tight ${isActive ? 'text-emerald-400' : 'text-slate-100'}`}>
+            {cat.category}
+          </span>
+        </div>
       </div>
     </button>
   );

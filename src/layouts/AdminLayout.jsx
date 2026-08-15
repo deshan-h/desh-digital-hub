@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, ShoppingCart, History, LogOut, Menu, Wrench, UserCog, User, ChevronDown, Users, Wallet, RefreshCw, Tags, Contact, Settings } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, History, LogOut, Menu, Wrench, UserCog, User, ChevronDown, Users, Wallet, RefreshCw, Tags, Contact, Settings, TrendingUp, Clock } from 'lucide-react';
 
 export default function AdminLayout({ 
   children, 
@@ -148,59 +148,61 @@ export default function AdminLayout({
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto bg-slate-950 relative flex flex-col">
         {/* Top Header */}
-        <div className="h-16 flex items-center justify-end px-6 bg-slate-950/60 backdrop-blur-2xl sticky top-0 z-30 border-b border-white/5 gap-4">
+        <div className="h-20 mx-4 mt-4 rounded-2xl flex items-center justify-between px-6 bg-slate-950/60 backdrop-blur-2xl sticky top-4 z-30 border border-white/5 shadow-2xl gap-4">
           
-          <h1 className="hidden sm:flex items-center absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 text-xl font-extrabold tracking-tight gap-3">
-            <img src="/desh-digital-hub/pwa-192x192.png" alt="DESH Digital Hub Logo" className="w-8 h-8 object-contain drop-shadow-md" />
-            <span className="bg-gradient-to-r from-slate-100 to-slate-400 bg-clip-text text-transparent">DESH Digital Hub</span>
-          </h1>
-
-          <div className="mr-auto flex items-center gap-4">
+          <div className="flex items-center gap-4">
             {todaySalesSum !== undefined && (
-              <div className="hidden lg:flex items-center gap-2.5 px-4 py-1.5 bg-white/5 border border-white/10 rounded-full shadow-inner">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Today's Sales</span>
-                <span className="text-sm font-black text-emerald-400 tracking-wide">Rs {todaySalesSum.toFixed(2)}</span>
+              <div className="hidden lg:flex items-center gap-2.5 px-5 py-2 bg-white/5 border border-white/10 rounded-full shadow-inner" title="Today's Sales">
+                <TrendingUp className="w-[18px] h-[18px] text-emerald-500" />
+                <span className="text-base font-black text-emerald-400 tracking-wide">Rs {todaySalesSum.toFixed(2)}</span>
               </div>
             )}
 
             {totalPendingDues !== undefined && (
               <button 
                 onClick={() => setActiveTab('customers')}
-                className="hidden lg:flex items-center gap-2.5 px-4 py-1.5 bg-red-500/10 border border-red-500/20 rounded-full shadow-inner hover:bg-red-500/20 transition-colors cursor-pointer"
+                className="hidden lg:flex items-center gap-2.5 px-5 py-2 bg-red-500/10 border border-red-500/20 rounded-full shadow-inner hover:bg-red-500/20 transition-colors cursor-pointer"
+                title="Pending Dues"
               >
-                <span className="text-[11px] font-bold text-red-400/80 uppercase tracking-widest">Pending Dues</span>
-                <span className="text-sm font-black text-red-400 tracking-wide">Rs {totalPendingDues.toFixed(2)}</span>
+                <Clock className="w-[18px] h-[18px] text-red-400" />
+                <span className="text-base font-black text-red-400 tracking-wide">Rs {totalPendingDues.toFixed(2)}</span>
               </button>
             )}
           </div>
 
-          {pendingOrders && pendingOrders.length > 0 && (
-            <div 
-              onClick={() => {
-                setActiveTab('pos');
-                setShowPendingOrdersModal(true);
-              }}
-              className="flex items-center gap-2 px-3 py-1.5 bg-orange-500/10 border border-orange-500/20 rounded-full cursor-pointer hover:bg-orange-500/20 transition-colors shadow-inner"
-              title="View Pending Orders in POS"
-            >
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.8)] animate-pulse"></span>
-                <span className="text-[11px] font-bold text-orange-400 uppercase tracking-widest">{pendingOrders.length} Pending</span>
-              </div>
-              <div className="w-px h-3 bg-orange-500/30 mx-1"></div>
-              <span className="text-[12px] font-black text-orange-400 tracking-wide">
-                Rs {pendingOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0).toFixed(2)}
-              </span>
-            </div>
-          )}
+          <h1 className="hidden sm:flex items-center absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 text-xl font-extrabold tracking-tight gap-3">
+            <img src="/desh-digital-hub/pwa-192x192.png" alt="DESH Digital Hub Logo" className="w-8 h-8 object-contain drop-shadow-md" />
+            <span className="bg-gradient-to-r from-slate-100 to-slate-400 bg-clip-text text-transparent">DESH Digital Hub</span>
+          </h1>
 
-          <button 
-            onClick={handleHardRefresh}
-            title="Hard Refresh"
-            className="flex items-center justify-center p-2 bg-white/5 border border-white/10 rounded-full hover:bg-white/10 transition-colors text-slate-400 hover:text-slate-200"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-4">
+            {pendingOrders && pendingOrders.length > 0 && (
+              <div 
+                onClick={() => {
+                  setActiveTab('pos');
+                  setShowPendingOrdersModal(true);
+                }}
+                className="flex items-center gap-2 px-3 py-1.5 bg-orange-500/10 border border-orange-500/20 rounded-full cursor-pointer hover:bg-orange-500/20 transition-colors shadow-inner"
+                title="View Pending Orders in POS"
+              >
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.8)] animate-pulse"></span>
+                  <span className="text-[11px] font-bold text-orange-400 uppercase tracking-widest">{pendingOrders.length} Pending</span>
+                </div>
+                <div className="w-px h-3 bg-orange-500/30 mx-1"></div>
+                <span className="text-[12px] font-black text-orange-400 tracking-wide">
+                  Rs {pendingOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0).toFixed(2)}
+                </span>
+              </div>
+            )}
+
+            <button 
+              onClick={handleHardRefresh}
+              title="Hard Refresh"
+              className="flex items-center justify-center p-2 bg-white/5 border border-white/10 rounded-full hover:bg-white/10 transition-colors text-slate-400 hover:text-slate-200"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
 
           {user && (
             <div className="relative" ref={dropdownRef}>
@@ -242,11 +244,12 @@ export default function AdminLayout({
               )}
             </div>
           )}
+          </div>
         </div>
 
         <div className="absolute inset-0 top-16 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at center, #64748b 1px, transparent 1px)', backgroundSize: '48px 48px' }}></div>
 
-        <div className="w-full relative z-10 flex-1">
+        <div className="w-full relative z-10 flex-1 pt-4">
           {children}
         </div>
 
