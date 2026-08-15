@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../config/firebase';
-import { Search, Plus, Trash2, CheckCircle, Clock, User, Phone, MapPin, DollarSign, RotateCcw } from 'lucide-react';
+import { Search, Plus, Trash2, CheckCircle, Clock, User, Phone, MapPin, DollarSign, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
 import { notify } from '../../utils/toast';
 import DeleteConfirmModal from '../../components/DeleteConfirmModal';
 
@@ -9,6 +9,15 @@ export default function Customers({ isAdmin }) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [expandedGroups, setExpandedGroups] = useState({});
+  const [isPaidListExpanded, setIsPaidListExpanded] = useState(false);
+
+  const toggleGroup = (nameKey) => {
+    setExpandedGroups(prev => ({
+      ...prev,
+      [nameKey]: !prev[nameKey]
+    }));
+  };
 
   // Form State
   const [name, setName] = useState('');
@@ -151,6 +160,155 @@ export default function Customers({ isAdmin }) {
   );
 
   const totalPending = records.filter(r => r.status === 'Pending').reduce((sum, r) => sum + r.amount, 0);
+
+  const groupedRecords = Object.values(
+    filteredRecords.reduce((acc, record) => {
+      const nameKey = record.name?.trim().toLowerCase() || 'unknown';
+      if (!acc[nameKey]) {
+        acc[nameKey] = {
+          nameKey,
+          name: record.name,
+          phone: record.phone,
+          area: record.area,
+          totalPending: 0,
+          totalPaid: 0,
+          records: [],
+          hasPending: false
+        };
+      }
+      acc[nameKey].records.push(record);
+      if (record.type === 'Payment') {
+        acc[nameKey].totalPending -= record.amount;
+        acc[nameKey].totalPaid += record.amount;
+      } else if (record.status === 'Pending') {
+        acc[nameKey].totalPending += record.amount;
+      } else {
+        acc[nameKey].totalPaid += record.amount;
+      }
+      
+      if (!acc[nameKey].phone && record.phone) acc[nameKey].phone = record.phone;
+      if (!acc[nameKey].area && record.area) acc[nameKey].area = record.area;
+      return acc;
+    }, {})
+  );
+
+  // Post-process to fix hasPending based on computed totalPending
+  groupedRecords.forEach(group => {
+    if (group.totalPending > 0.01) {
+      group.hasPending = true;
+    } else {
+      group.hasPending = false;
+      group.totalPending = 0; // Prevent negative floating point dust
+    }
+  });
+
+  groupedRecords.sort((a, b) => {
+    if (a.hasPending && !b.hasPending) return -1;
+    if (!a.hasPending && b.hasPending) return 1;
+    if (a.totalPending !== b.totalPending) return b.totalPending - a.totalPending;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+
+  const pendingGroups = groupedRecords.filter(g => g.hasPending);
+  const paidGroups = groupedRecords.filter(g => !g.hasPending);
+
+  const renderGroup = (group) => {
+    const isExpanded = expandedGroups[group.nameKey];
+    return (
+      <div key={group.nameKey} className={`bg-slate-950/40 border border-white/5 rounded-2xl overflow-hidden transition-all flex flex-col ${!group.hasPending ? 'opacity-70 hover:opacity-100' : ''}`}>
+        {/* Group Header (Clickable) */}
+        <div 
+          className="px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-slate-800/40 transition-colors gap-4"
+          onClick={() => toggleGroup(group.nameKey)}
+        >
+          {/* Left: Name and Badges */}
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <h3 className="text-slate-200 font-bold text-[14px] truncate">{group.name}</h3>
+            {group.hasPending ? (
+              <span className="text-[9px] uppercase tracking-wider font-bold bg-orange-500/10 text-orange-400 px-1.5 py-0.5 rounded border border-orange-500/20 whitespace-nowrap">
+                {group.records.filter(r => r.status === 'Pending').length} Pending
+              </span>
+            ) : (
+              <span className="text-[9px] uppercase tracking-wider font-bold bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/20 whitespace-nowrap">
+                All Paid
+              </span>
+            )}
+          </div>
+
+          {/* Middle: Phone/Area (Hidden on smaller screens, flex on lg) */}
+          <div className="hidden lg:flex items-center gap-4 text-slate-400 text-[11px] truncate flex-1 justify-center">
+            {group.phone && <span className="flex items-center gap-1"><Phone className="w-3 h-3" /> {group.phone}</span>}
+            {group.area && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {group.area}</span>}
+          </div>
+
+          {/* Right: Total & Chevron */}
+          <div className="flex items-center gap-4 justify-end flex-shrink-0">
+            <p className="text-[15px] font-black text-white whitespace-nowrap">Rs {group.hasPending ? group.totalPending.toFixed(2) : group.totalPaid.toFixed(2)}</p>
+            <button className="text-cyan-500 hover:text-cyan-400 transition-colors flex-shrink-0">
+              {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Expanded Records Timeline */}
+        {isExpanded && (
+          <div className="bg-slate-900/50 border-t border-white/5 px-4 sm:px-6 py-4">
+            <div className="relative border-l border-slate-700/50 space-y-4 pb-2 ml-2 sm:ml-0">
+              {group.records.map((record, index) => (
+                <div key={record.id} className="relative pl-6">
+                  {/* Timeline Dot */}
+                  <div className={`absolute -left-[7px] top-4 w-3.5 h-3.5 rounded-full border-[3px] border-slate-900 ${record.status === 'Pending' ? 'bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.8)]' : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]'}`}></div>
+                  
+                  {/* Timeline Content */}
+                  <div className={`bg-slate-950 border border-white/5 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${record.status === 'Paid' ? 'opacity-60 hover:opacity-100 transition-opacity' : ''}`}>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-6">
+                      <span className="text-[11px] font-medium text-slate-400 min-w-[70px]">
+                        {record.timestamp ? new Date(record.timestamp.toDate()).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Just now'}
+                      </span>
+                      <span className={`font-black text-[14px] ${record.type === 'Payment' ? 'text-emerald-400' : (record.status === 'Pending' ? 'text-orange-400' : 'text-emerald-400')}`}>
+                        {record.type === 'Payment' ? '-' : ''}Rs {record.amount.toFixed(2)}
+                      </span>
+                      {record.type === 'Payment' && (
+                        <span className="text-[10px] uppercase tracking-wider font-bold bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full ml-2">
+                          Payment
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex gap-2 justify-end sm:justify-start">
+                      {record.type === 'Payment' ? (
+                        isAdmin && (
+                          <button onClick={(e) => { e.stopPropagation(); handleDelete(record.id); }} className="p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition-all" title="Delete Payment">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )
+                      ) : (
+                        <>
+                          {record.status === 'Pending' ? (
+                            <button onClick={(e) => { e.stopPropagation(); toggleStatus(record); }} className="p-1.5 rounded-lg transition-all bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white" title="Mark as Paid">
+                              <CheckCircle className="w-3.5 h-3.5" />
+                            </button>
+                          ) : (
+                            <button onClick={(e) => { e.stopPropagation(); toggleStatus(record); }} className="p-1.5 rounded-lg transition-all bg-orange-500/10 text-orange-400 hover:bg-orange-500 hover:text-white" title="Undo Paid">
+                              <RotateCcw className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {isAdmin && (
+                            <button onClick={(e) => { e.stopPropagation(); handleDelete(record.id); }} className="p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition-all" title="Delete Record">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="p-4 md:p-6 space-y-6 w-full relative z-10 h-full flex flex-col">
@@ -319,70 +477,30 @@ export default function Customers({ isAdmin }) {
               </div>
             ) : (
               <div className="flex-1 overflow-y-auto pr-2 space-y-3" style={{ scrollbarWidth: 'thin', scrollbarColor: '#0891b2 transparent' }}>
-                {filteredRecords.map(record => (
-                  <div key={record.id} className={`bg-slate-950/40 border border-white/5 rounded-2xl p-4 hover:bg-slate-800/40 transition-all flex flex-col sm:flex-row sm:items-center gap-4 ${record.status === 'Paid' ? 'opacity-50 grayscale hover:opacity-75' : ''}`}>
-                    
-                    <div className="flex-1">
-                      <h3 className="text-slate-200 font-bold text-base flex items-center gap-2">
-                        {record.name}
-                        {record.status === 'Pending' ? (
-                          <span className="text-[10px] uppercase tracking-wider font-bold bg-orange-500/10 text-orange-400 px-2 py-0.5 rounded-full border border-orange-500/20 flex items-center gap-1">
-                            <Clock className="w-3 h-3" /> Pending
-                          </span>
-                        ) : (
-                          <span className="text-[10px] uppercase tracking-wider font-bold bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/20 flex items-center gap-1">
-                            <CheckCircle className="w-3 h-3" /> Paid
-                          </span>
-                        )}
-                      </h3>
-                      <div className="text-slate-400 text-sm mt-1 flex flex-wrap gap-x-4 gap-y-1">
-                        {record.phone && <span className="flex items-center gap-1"><Phone className="w-3 h-3" /> {record.phone}</span>}
-                        {record.area && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {record.area}</span>}
-                      </div>
-                      <div className="text-xs text-slate-500 mt-2">
-                        {record.timestamp ? new Date(record.timestamp.toDate()).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Just now'}
-                      </div>
-                    </div>
+                {pendingGroups.map(renderGroup)}
+                
+                {paidGroups.length > 0 && (
+                  <div className="mt-8 border-t border-white/10 pt-4">
+                    <button 
+                      onClick={() => setIsPaidListExpanded(!isPaidListExpanded)}
+                      className="w-full flex items-center justify-between px-4 py-3 bg-slate-900/50 hover:bg-slate-800/50 border border-white/5 rounded-xl transition-colors mb-3 text-slate-300"
+                    >
+                      <span className="font-bold flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-emerald-500" /> Settled Accounts
+                      </span>
+                      <span className="flex items-center gap-2 text-sm text-slate-500">
+                        {paidGroups.length} accounts
+                        {isPaidListExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </span>
+                    </button>
 
-                    <div className="flex items-center gap-4 justify-between sm:justify-end border-t border-white/5 sm:border-0 pt-3 sm:pt-0">
-                      <div className="text-left sm:text-right">
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Amount</p>
-                        <p className="text-lg font-black text-white">Rs {record.amount.toFixed(2)}</p>
+                    {isPaidListExpanded && (
+                      <div className="space-y-3 pl-2 sm:pl-4 border-l-2 border-slate-800">
+                        {paidGroups.map(renderGroup)}
                       </div>
-
-                      <div className="flex gap-2">
-                        {record.status === 'Pending' ? (
-                          <button
-                            onClick={() => toggleStatus(record)}
-                            className="p-2 rounded-xl transition-all bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white"
-                            title="Mark as Paid"
-                          >
-                            <CheckCircle className="w-5 h-5" />
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => toggleStatus(record)}
-                            className="p-2 rounded-xl transition-all bg-orange-500/10 text-orange-400 hover:bg-orange-500 hover:text-white"
-                            title="Undo Paid"
-                          >
-                            <RotateCcw className="w-5 h-5" />
-                          </button>
-                        )}
-                        
-                        {isAdmin && (
-                          <button
-                            onClick={() => handleDelete(record.id)}
-                            className="p-2 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition-all"
-                            title="Delete Record"
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
+                    )}
                   </div>
-                ))}
+                )}
               </div>
             )}
 

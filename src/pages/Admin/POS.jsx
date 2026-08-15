@@ -249,9 +249,18 @@ export default function POS({
     if (!customerName || customerName.trim() === '') return 0;
     const nameMatch = customerName.trim().toLowerCase();
     
-    return customerDuesList
+    const arrears = customerDuesList
       .filter(due => due.name && due.name.toLowerCase() === nameMatch)
-      .reduce((sum, due) => sum + Number(due.amount || 0), 0);
+      .reduce((sum, due) => {
+        if (due.type === 'Payment') {
+          return sum - Number(due.amount || 0);
+        } else if (due.status === 'Pending') {
+          return sum + Number(due.amount || 0);
+        }
+        return sum;
+      }, 0);
+      
+    return Math.max(0, arrears);
   }, [customerName, customerDuesList]);
 
   const handleSavePending = async () => {
@@ -421,7 +430,7 @@ export default function POS({
                   for (let name of names) caches.delete(name);
                 });
               }
-              window.location.href = '/admin';
+              window.location.reload();
             }}
             className="w-10 h-10 flex shrink-0 items-center justify-center text-slate-400 hover:text-emerald-400 rounded-full bg-slate-900 border border-slate-800 shadow-none transition-colors"
             title="Refresh Items (Double click for Hard Reset)"

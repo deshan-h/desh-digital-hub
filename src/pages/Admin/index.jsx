@@ -225,11 +225,18 @@ export default function Admin() {
       const duesList = [];
       snap.forEach(doc => {
         const data = doc.data();
-        if (data.status === 'Pending') {
-          total += Number(data.amount || 0);
+        // Include both Pending debts and Payments in the dues list
+        if (data.status === 'Pending' || data.type === 'Payment') {
+          if (data.type === 'Payment') {
+            total -= Number(data.amount || 0);
+          } else if (data.status === 'Pending') {
+            total += Number(data.amount || 0);
+          }
           duesList.push({ id: doc.id, ...data });
         }
       });
+      // Prevent floating point negative dust
+      total = Math.max(0, total);
       setTotalPendingDues(total);
       localStorage.setItem('totalPendingDues', JSON.stringify(total));
       setCustomerDuesList(duesList);
@@ -307,27 +314,38 @@ export default function Admin() {
 
     const description = cart.map(item => `${item.qty}x ${item.name}`).join(', ');
     const finalTotal = Math.max(0, cartTotal - Number(discount));
+    const cashInput = cashGivenAmount === '' ? 0 : Number(cashGivenAmount);
     
-    const cash = cashGivenAmount === '' ? 0 : Number(cashGivenAmount);
-    let paidAmount = finalTotal;
-    let creditAmount = 0;
-    let arrearsCleared = false;
+    // Determine actual cash to apply based on input and credit mode
+    let actualCash = (isCredit && cashGivenAmount === '') ? 0 : (cashGivenAmount === '' ? finalTotal : cashInput);
+    
+    let saleAmount = 0;
+    let pendingToAdd = 0;
+    let paymentToAdd = 0;
 
     if (isCredit) {
-      if (cash >= finalTotal) {
-        paidAmount = finalTotal;
-        creditAmount = 0;
-      } else if (cash > 0) {
-        paidAmount = cash;
-        creditAmount = finalTotal - cash;
-      } else {
-        paidAmount = 0;
-        creditAmount = finalTotal;
+      // Put whole bill on pending, and whatever cash they gave as payment
+      saleAmount = actualCash;
+      pendingToAdd = finalTotal;
+      if (actualCash > 0) {
+        paymentToAdd = actualCash;
       }
     } else {
-      if (currentArrears > 0 && (cashGivenAmount === '' || cash >= finalTotal + currentArrears)) {
-        paidAmount = finalTotal + currentArrears;
-        arrearsCleared = true;
+      if (actualCash < finalTotal) {
+        // They didn't pay enough, force it to be a credit transaction
+        saleAmount = actualCash;
+        pendingToAdd = finalTotal;
+        if (actualCash > 0) {
+          paymentToAdd = actualCash;
+        }
+      } else {
+        // They paid enough to cover the bill
+        const excess = actualCash - finalTotal;
+        const appliedToArrears = Math.min(excess, currentArrears); // Only apply up to what they owe
+        saleAmount = finalTotal + appliedToArrears; // The rest is considered change given back to the customer
+        if (appliedToArrears > 0) {
+          paymentToAdd = appliedToArrears;
+        }
       }
     }
 
@@ -360,11 +378,11 @@ export default function Admin() {
         return cleanItem;
       });
 
-      if (paidAmount > 0) {
+      if (saleAmount > 0) {
         await addDoc(collection(db, 'daily_sales'), {
-          amount: paidAmount,
+          amount: saleAmount,
           discount: Number(discount),
-          description: description + (creditAmount > 0 ? ` (Partial: Rs ${creditAmount.toFixed(2)} Pending)` : ''),
+          description: description + (paymentToAdd > 0 ? ` (Incl. Rs ${paymentToAdd.toFixed(2)} Arrears Payment)` : '') + (isCredit ? ` (Partial)` : ''),
           cartItems: cleanCartItems,
           timestamp: serverTimestamp(),
           userId: user.uid,
@@ -374,27 +392,33 @@ export default function Admin() {
         });
       }
 
-      if (isCredit && creditAmount > 0) {
+      if (pendingToAdd > 0) {
          await addDoc(collection(db, 'customer_dues'), {
            name: finalCustomerName,
            phone: whatsappNumber || '',
            area: '',
-           amount: creditAmount,
+           amount: pendingToAdd,
            status: 'Pending',
            description: description,
            timestamp: serverTimestamp()
          });
-         fetchCustomerDues();
       }
 
-      if (arrearsCleared && finalCustomerName) {
-        const duesToClear = customerDuesList.filter(d => d.name && d.name.toLowerCase() === finalCustomerName.toLowerCase() && d.status === 'Pending');
-        for (const due of duesToClear) {
-          try {
-            await updateDoc(doc(db, 'customer_dues', due.id), { status: 'Paid' });
-          } catch (e) { console.error(e); }
-        }
-        fetchCustomerDues();
+      if (paymentToAdd > 0) {
+         await addDoc(collection(db, 'customer_dues'), {
+           name: finalCustomerName,
+           phone: whatsappNumber || '',
+           area: '',
+           amount: paymentToAdd,
+           status: 'Paid',
+           type: 'Payment',
+           description: 'Payment Received',
+           timestamp: serverTimestamp()
+         });
+      }
+
+      if (pendingToAdd > 0 || paymentToAdd > 0) {
+         fetchCustomerDues();
       }
       
       // Trigger external sync asynchronously so it doesn't block UI
