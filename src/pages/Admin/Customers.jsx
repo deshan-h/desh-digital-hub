@@ -86,20 +86,47 @@ export default function Customers({ isAdmin }) {
     }
   };
 
-  const toggleStatus = async (record) => {
+  const toggleStatus = async (record, group) => {
     try {
       if (record.status === 'Pending') {
         const newStatus = 'Paid';
         
         let saleRefId = null;
+        let consumedPaymentAmount = 0;
         
-        // Add to daily_sales only if it's a POS Arrears
-        if (record.isPosArrears !== false) {
+        // Find existing payments for this customer
+        const customerPayments = group ? group.records.filter(r => r.type === 'Payment') : [];
+        const totalPaymentsAmount = customerPayments.reduce((sum, r) => sum + r.amount, 0);
+        
+        // The actual amount paid today is the bill amount MINUS any prepaid balance (payments)
+        let amountToConsume = Math.min(record.amount, totalPaymentsAmount);
+        const actualCashReceived = record.amount - amountToConsume;
+        consumedPaymentAmount = amountToConsume;
+
+        // Consume the payments from the database
+        if (amountToConsume > 0) {
+          for (const payment of customerPayments) {
+            if (amountToConsume <= 0) break;
+            
+            if (payment.amount <= amountToConsume) {
+              await deleteDoc(doc(db, 'customer_dues', payment.id));
+              amountToConsume -= payment.amount;
+            } else {
+              await updateDoc(doc(db, 'customer_dues', payment.id), {
+                amount: payment.amount - amountToConsume
+              });
+              amountToConsume = 0;
+            }
+          }
+        }
+        
+        // Add to daily_sales only if it's a POS Arrears and actual cash was received
+        if (record.isPosArrears !== false && actualCashReceived > 0) {
           const saleRef = await addDoc(collection(db, 'daily_sales'), {
-            amount: record.amount,
+            amount: actualCashReceived,
             discount: 0,
             description: `Account Settled: ${record.name}`,
-            cartItems: [{ name: 'Account Settlement', price: record.amount, cost: 0, qty: 1 }],
+            cartItems: [{ name: 'Account Settlement (Balance)', price: actualCashReceived, cost: 0, qty: 1 }],
             timestamp: serverTimestamp(),
             userId: 'system',
             customerName: record.name,
@@ -111,20 +138,40 @@ export default function Customers({ isAdmin }) {
 
         await updateDoc(doc(db, 'customer_dues', record.id), {
           status: newStatus,
-          ...(saleRefId && { linkedSaleId: saleRefId })
+          ...(saleRefId && { linkedSaleId: saleRefId }),
+          ...(consumedPaymentAmount > 0 && { consumedPaymentAmount })
         });
         
-        notify.success(`Marked as Paid & Added to Sales`);
+        if (actualCashReceived > 0) {
+          notify.success(`Marked as Paid. Rs ${actualCashReceived.toFixed(2)} added to Sales.`);
+        } else {
+          notify.success(`Marked as Paid. Fully covered by existing payments.`);
+        }
       } else {
         const newStatus = 'Pending';
         
         if (record.linkedSaleId) {
           await deleteDoc(doc(db, 'daily_sales', record.linkedSaleId));
         }
+
+        // Restore consumed payments
+        if (record.consumedPaymentAmount && record.consumedPaymentAmount > 0) {
+           await addDoc(collection(db, 'customer_dues'), {
+             name: record.name,
+             phone: record.phone || '',
+             area: record.area || '',
+             amount: record.consumedPaymentAmount,
+             status: 'Paid',
+             type: 'Payment',
+             description: 'Restored Payment from Undo',
+             timestamp: serverTimestamp()
+           });
+        }
         
         await updateDoc(doc(db, 'customer_dues', record.id), {
           status: newStatus,
-          linkedSaleId: null
+          linkedSaleId: null,
+          consumedPaymentAmount: null
         });
 
         notify.success(`Undone Paid status & Removed from Sales`);
@@ -159,8 +206,11 @@ export default function Customers({ isAdmin }) {
     (record.area?.toLowerCase() || '').includes(searchTerm.toLowerCase())
   );
 
-  const totalPending = records.filter(r => r.status === 'Pending').reduce((sum, r) => sum + r.amount, 0);
-
+  const totalPending = records.reduce((sum, r) => {
+    if (r.type === 'Payment') return sum - r.amount;
+    if (r.status === 'Pending') return sum + r.amount;
+    return sum;
+  }, 0);
   const groupedRecords = Object.values(
     filteredRecords.reduce((acc, record) => {
       const nameKey = record.name?.trim().toLowerCase() || 'unknown';
@@ -284,11 +334,11 @@ export default function Customers({ isAdmin }) {
                       ) : (
                         <>
                           {record.status === 'Pending' ? (
-                            <button onClick={(e) => { e.stopPropagation(); toggleStatus(record); }} className="p-1.5 rounded-lg transition-all bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white" title="Mark as Paid">
+                            <button onClick={(e) => { e.stopPropagation(); toggleStatus(record, group); }} className="p-1.5 rounded-lg transition-all bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white" title="Mark as Paid">
                               <CheckCircle className="w-3.5 h-3.5" />
                             </button>
                           ) : (
-                            <button onClick={(e) => { e.stopPropagation(); toggleStatus(record); }} className="p-1.5 rounded-lg transition-all bg-orange-500/10 text-orange-400 hover:bg-orange-500 hover:text-white" title="Undo Paid">
+                            <button onClick={(e) => { e.stopPropagation(); toggleStatus(record, group); }} className="p-1.5 rounded-lg transition-all bg-orange-500/10 text-orange-400 hover:bg-orange-500 hover:text-white" title="Undo Paid">
                               <RotateCcw className="w-3.5 h-3.5" />
                             </button>
                           )}
