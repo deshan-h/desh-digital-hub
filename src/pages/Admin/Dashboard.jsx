@@ -649,7 +649,7 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 px-2 md:px-4">
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-black text-slate-100 uppercase tracking-widest flex items-center gap-3">
-            <LayoutDashboard className="w-8 h-8 text-emerald-400" /> DASHBOARD
+            <LayoutDashboard className="w-8 h-8 text-blue-400" /> DASHBOARD
           </h1>
           <div className="relative group cursor-help mt-1">
             <HelpCircle className="w-5 h-5 text-slate-500 hover:text-slate-300 transition-colors" />

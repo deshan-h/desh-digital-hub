@@ -578,7 +578,7 @@ export default function Customers({ isAdmin }) {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 shrink-0 px-2 md:px-4">
         <div className="flex items-center gap-3 mb-2">
           <h1 className="text-xl font-black text-slate-100 uppercase tracking-widest flex items-center gap-3">
-            <Users className="w-8 h-8 text-emerald-400" /> CUSTOMERS
+            <Users className="w-8 h-8 text-purple-400" /> CUSTOMERS
           </h1>
           <div className="relative group cursor-help mt-1">
             <HelpCircle className="w-5 h-5 text-slate-500 hover:text-slate-300 transition-colors" />

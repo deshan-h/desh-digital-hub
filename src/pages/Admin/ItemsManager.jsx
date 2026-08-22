@@ -429,7 +429,7 @@ export default function ItemsManager() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 shrink-0 mb-4 px-2 md:px-4">
         <div className="flex items-center gap-3 mb-2">
           <h1 className="text-xl font-black text-slate-100 uppercase tracking-widest flex items-center gap-3">
-            <Tags className="w-8 h-8 text-emerald-400" />
+            <Tags className="w-8 h-8 text-amber-400" />
             ITEMS & PRICES MANAGER
           </h1>
           <div className="relative group cursor-help mt-1">

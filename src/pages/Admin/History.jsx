@@ -207,7 +207,7 @@ const sendWhatsAppSale = (sale) => {
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 shrink-0 mb-4 px-2 md:px-4">
         <div className="flex items-center gap-3 mb-2">
           <h1 className="text-xl font-black text-slate-100 uppercase tracking-widest flex items-center gap-3">
-            <FileText className="w-8 h-8 text-indigo-400" />
+            <FileText className="w-8 h-8 text-emerald-400" />
             HISTORY REPORT
           </h1>
           <div className="relative group cursor-help mt-1">

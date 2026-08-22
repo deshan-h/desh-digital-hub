@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, ShoppingCart, History, LogOut, Menu, Wrench, UserCog, User, ChevronDown, Users, Wallet, RefreshCw, Tags, Contact, Settings, TrendingUp, Clock } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, History, LogOut, Menu, Wrench, UserCog, User, ChevronDown, Users, Wallet, RefreshCw, Tags, Contact, Settings, TrendingUp, Clock, ChevronRight, ChevronLeft } from 'lucide-react';
 
 export default function AdminLayout({ 
   children, 
@@ -46,92 +46,127 @@ export default function AdminLayout({
     <div className="flex h-screen bg-slate-900 overflow-hidden text-slate-200 selection:bg-emerald-500/30 selection:text-white print:hidden">
 
       {/* Sidebar */}
-      <div className={`${isSidebarOpen ? 'w-[72px]' : 'hidden'} bg-slate-950/40 backdrop-blur-3xl border-r border-white/5 flex flex-col justify-between shrink-0 transition-all duration-300 z-40 shadow-2xl relative`}>
+      <div className={`${isSidebarOpen ? 'w-64' : 'w-[72px]'} bg-slate-950/40 backdrop-blur-3xl border-r border-white/5 flex flex-col justify-between shrink-0 transition-all duration-300 z-40 shadow-2xl relative hidden sm:flex`}>
         <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent opacity-50 pointer-events-none"></div>
         <div className="relative z-10">
-          <nav className="p-3 space-y-3 mt-4">
+          
+          {/* Toggle Button */}
+          <div className="h-[52px] flex items-center justify-end px-4 mt-4 border-b border-white/5 pb-4">
+            <button
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-1.5 rounded-lg bg-slate-800/50 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+            >
+              {isSidebarOpen ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+            </button>
+          </div>
+
+          <nav className="p-3 space-y-3 mt-2">
               <button
                 onClick={() => setActiveTab('dashboard')}
-                className={`group relative w-full flex items-center justify-center p-3 rounded-xl transition-all duration-300 ${activeTab === 'dashboard' ? 'bg-emerald-500/15 text-emerald-400 shadow-[inset_3px_0_0_0_#10b981] ring-1 ring-emerald-500/20' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}
+                className={`group relative w-full flex items-center ${isSidebarOpen ? 'justify-start px-4' : 'justify-center'} py-3 rounded-xl transition-all duration-300 ${activeTab === 'dashboard' ? 'bg-blue-500/15 text-blue-400 shadow-[inset_3px_0_0_0_#3b82f6] ring-1 ring-blue-500/20' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}
               >
-                <LayoutDashboard className="w-[22px] h-[22px]" />
-                <div className="absolute left-16 hidden group-hover:block bg-slate-900/95 backdrop-blur-xl text-slate-100 text-xs font-semibold px-4 py-2 rounded-lg border border-white/10 whitespace-nowrap z-50 shadow-[0_8px_30px_rgb(0,0,0,0.3)]">
-                  Dashboard
-                </div>
+                <LayoutDashboard className="w-[22px] h-[22px] shrink-0 text-blue-400" />
+                {isSidebarOpen && <span className="ml-3 font-semibold text-sm whitespace-nowrap">Dashboard</span>}
+                {!isSidebarOpen && (
+                  <div className="absolute left-16 hidden group-hover:block bg-slate-900/95 backdrop-blur-xl text-slate-100 text-xs font-semibold px-4 py-2 rounded-lg border border-white/10 whitespace-nowrap z-50 shadow-[0_8px_30px_rgb(0,0,0,0.3)]">
+                    Dashboard
+                  </div>
+                )}
               </button>
 
               <button
                 onClick={() => setActiveTab('pos')}
-                className={`group relative w-full flex items-center justify-center p-3 rounded-xl transition-all duration-300 ${activeTab === 'pos' ? 'bg-emerald-500/15 text-emerald-400 shadow-[inset_3px_0_0_0_#10b981] ring-1 ring-emerald-500/20' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}
+                className={`group relative w-full flex items-center ${isSidebarOpen ? 'justify-start px-4' : 'justify-center'} py-3 rounded-xl transition-all duration-300 ${activeTab === 'pos' ? 'bg-cyan-500/15 text-cyan-400 shadow-[inset_3px_0_0_0_#06b6d4] ring-1 ring-cyan-500/20' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}
               >
-                <ShoppingCart className="w-[22px] h-[22px]" />
-                <div className="absolute left-16 hidden group-hover:block bg-slate-900/95 backdrop-blur-xl text-slate-100 text-xs font-semibold px-4 py-2 rounded-lg border border-white/10 whitespace-nowrap z-50 shadow-[0_8px_30px_rgb(0,0,0,0.3)]">
-                Point of Sale
-              </div>
-            </button>
+                <ShoppingCart className="w-[22px] h-[22px] shrink-0 text-cyan-400" />
+                {isSidebarOpen && <span className="ml-3 font-semibold text-sm whitespace-nowrap">Point of Sale</span>}
+                {!isSidebarOpen && (
+                  <div className="absolute left-16 hidden group-hover:block bg-slate-900/95 backdrop-blur-xl text-slate-100 text-xs font-semibold px-4 py-2 rounded-lg border border-white/10 whitespace-nowrap z-50 shadow-[0_8px_30px_rgb(0,0,0,0.3)]">
+                    Point of Sale
+                  </div>
+                )}
+              </button>
 
             <button
               onClick={() => setActiveTab('repairs')}
-              className={`group relative w-full flex items-center justify-center p-3 rounded-xl transition-all duration-300 ${activeTab === 'repairs' ? 'bg-emerald-500/15 text-emerald-400 shadow-[inset_3px_0_0_0_#10b981] ring-1 ring-emerald-500/20' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}
+              className={`group relative w-full flex items-center ${isSidebarOpen ? 'justify-start px-4' : 'justify-center'} py-3 rounded-xl transition-all duration-300 ${activeTab === 'repairs' ? 'bg-orange-500/15 text-orange-400 shadow-[inset_3px_0_0_0_#f97316] ring-1 ring-orange-500/20' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}
             >
-              <Wrench className="w-[22px] h-[22px]" />
-              <div className="absolute left-16 hidden group-hover:block bg-slate-900/95 backdrop-blur-xl text-slate-100 text-xs font-semibold px-4 py-2 rounded-lg border border-white/10 whitespace-nowrap z-50 shadow-[0_8px_30px_rgb(0,0,0,0.3)]">
-                PC Repairs
-              </div>
+              <Wrench className="w-[22px] h-[22px] shrink-0 text-orange-400" />
+              {isSidebarOpen && <span className="ml-3 font-semibold text-sm whitespace-nowrap">PC Repairs</span>}
+              {!isSidebarOpen && (
+                <div className="absolute left-16 hidden group-hover:block bg-slate-900/95 backdrop-blur-xl text-slate-100 text-xs font-semibold px-4 py-2 rounded-lg border border-white/10 whitespace-nowrap z-50 shadow-[0_8px_30px_rgb(0,0,0,0.3)]">
+                  PC Repairs
+                </div>
+              )}
             </button>
 
             <button
               onClick={() => setActiveTab('customers')}
-              className={`group relative w-full flex items-center justify-center p-3 rounded-xl transition-all duration-300 ${activeTab === 'customers' ? 'bg-emerald-500/15 text-emerald-400 shadow-[inset_3px_0_0_0_#10b981] ring-1 ring-emerald-500/20' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}
+              className={`group relative w-full flex items-center ${isSidebarOpen ? 'justify-start px-4' : 'justify-center'} py-3 rounded-xl transition-all duration-300 ${activeTab === 'customers' ? 'bg-purple-500/15 text-purple-400 shadow-[inset_3px_0_0_0_#a855f7] ring-1 ring-purple-500/20' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}
             >
-              <Users className="w-[22px] h-[22px]" />
-              <div className="absolute left-16 hidden group-hover:block bg-slate-900/95 backdrop-blur-xl text-slate-100 text-xs font-semibold px-4 py-2 rounded-lg border border-white/10 whitespace-nowrap z-50 shadow-[0_8px_30px_rgb(0,0,0,0.3)]">
-                Customers
-              </div>
+              <Users className="w-[22px] h-[22px] shrink-0 text-purple-400" />
+              {isSidebarOpen && <span className="ml-3 font-semibold text-sm whitespace-nowrap">Customers</span>}
+              {!isSidebarOpen && (
+                <div className="absolute left-16 hidden group-hover:block bg-slate-900/95 backdrop-blur-xl text-slate-100 text-xs font-semibold px-4 py-2 rounded-lg border border-white/10 whitespace-nowrap z-50 shadow-[0_8px_30px_rgb(0,0,0,0.3)]">
+                  Customers
+                </div>
+              )}
             </button>
 
 
 
             <button
               onClick={() => setActiveTab('expenses')}
-              className={`group relative w-full flex items-center justify-center p-3 rounded-xl transition-all duration-300 ${activeTab === 'expenses' ? 'bg-red-500/15 text-red-400 shadow-[inset_3px_0_0_0_#ef4444] ring-1 ring-red-500/20' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}
+              className={`group relative w-full flex items-center ${isSidebarOpen ? 'justify-start px-4' : 'justify-center'} py-3 rounded-xl transition-all duration-300 ${activeTab === 'expenses' ? 'bg-rose-500/15 text-rose-400 shadow-[inset_3px_0_0_0_#f43f5e] ring-1 ring-rose-500/20' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}
             >
-              <Wallet className="w-[22px] h-[22px]" />
-              <div className="absolute left-16 hidden group-hover:block bg-slate-900/95 backdrop-blur-xl text-slate-100 text-xs font-semibold px-4 py-2 rounded-lg border border-white/10 whitespace-nowrap z-50 shadow-[0_8px_30px_rgb(0,0,0,0.3)]">
-                Shop Expenses
-              </div>
+              <Wallet className="w-[22px] h-[22px] shrink-0 text-rose-400" />
+              {isSidebarOpen && <span className="ml-3 font-semibold text-sm whitespace-nowrap">Shop Expenses</span>}
+              {!isSidebarOpen && (
+                <div className="absolute left-16 hidden group-hover:block bg-slate-900/95 backdrop-blur-xl text-slate-100 text-xs font-semibold px-4 py-2 rounded-lg border border-white/10 whitespace-nowrap z-50 shadow-[0_8px_30px_rgb(0,0,0,0.3)]">
+                  Shop Expenses
+                </div>
+              )}
             </button>
 
             {isAdmin && (
               <button
                 onClick={() => setActiveTab('items')}
-                className={`group relative w-full flex items-center justify-center p-3 rounded-xl transition-all duration-300 ${activeTab === 'items' ? 'bg-emerald-500/15 text-emerald-400 shadow-[inset_3px_0_0_0_#10b981] ring-1 ring-emerald-500/20' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}
+                className={`group relative w-full flex items-center ${isSidebarOpen ? 'justify-start px-4' : 'justify-center'} py-3 rounded-xl transition-all duration-300 ${activeTab === 'items' ? 'bg-amber-500/15 text-amber-400 shadow-[inset_3px_0_0_0_#f59e0b] ring-1 ring-amber-500/20' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}
               >
-                <Tags className="w-[22px] h-[22px]" />
-                <div className="absolute left-16 hidden group-hover:block bg-slate-900/95 backdrop-blur-xl text-slate-100 text-xs font-semibold px-4 py-2 rounded-lg border border-white/10 whitespace-nowrap z-50 shadow-[0_8px_30px_rgb(0,0,0,0.3)]">
-                  Items & Prices
-                </div>
+                <Tags className="w-[22px] h-[22px] shrink-0 text-amber-400" />
+                {isSidebarOpen && <span className="ml-3 font-semibold text-sm whitespace-nowrap">Items & Prices</span>}
+                {!isSidebarOpen && (
+                  <div className="absolute left-16 hidden group-hover:block bg-slate-900/95 backdrop-blur-xl text-slate-100 text-xs font-semibold px-4 py-2 rounded-lg border border-white/10 whitespace-nowrap z-50 shadow-[0_8px_30px_rgb(0,0,0,0.3)]">
+                    Items & Prices
+                  </div>
+                )}
               </button>
             )}
 
             <button
               onClick={() => setActiveTab('history')}
-              className={`group relative w-full flex items-center justify-center p-3 rounded-xl transition-all duration-300 ${activeTab === 'history' ? 'bg-emerald-500/15 text-emerald-400 shadow-[inset_3px_0_0_0_#10b981] ring-1 ring-emerald-500/20' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}
+              className={`group relative w-full flex items-center ${isSidebarOpen ? 'justify-start px-4' : 'justify-center'} py-3 rounded-xl transition-all duration-300 ${activeTab === 'history' ? 'bg-emerald-500/15 text-emerald-400 shadow-[inset_3px_0_0_0_#10b981] ring-1 ring-emerald-500/20' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}
             >
-              <History className="w-[22px] h-[22px]" />
-              <div className="absolute left-16 hidden group-hover:block bg-slate-900/95 backdrop-blur-xl text-slate-100 text-xs font-semibold px-4 py-2 rounded-lg border border-white/10 whitespace-nowrap z-50 shadow-[0_8px_30px_rgb(0,0,0,0.3)]">
-                Sales History
-              </div>
+              <History className="w-[22px] h-[22px] shrink-0 text-emerald-400" />
+              {isSidebarOpen && <span className="ml-3 font-semibold text-sm whitespace-nowrap">Sales History</span>}
+              {!isSidebarOpen && (
+                <div className="absolute left-16 hidden group-hover:block bg-slate-900/95 backdrop-blur-xl text-slate-100 text-xs font-semibold px-4 py-2 rounded-lg border border-white/10 whitespace-nowrap z-50 shadow-[0_8px_30px_rgb(0,0,0,0.3)]">
+                  Sales History
+                </div>
+              )}
             </button>
             
             <button
               onClick={() => setActiveTab('settings')}
-              className={`group relative w-full flex items-center justify-center p-3 rounded-xl transition-all duration-300 ${activeTab === 'settings' ? 'bg-emerald-500/15 text-emerald-400 shadow-[inset_3px_0_0_0_#10b981] ring-1 ring-emerald-500/20' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}
+              className={`group relative w-full flex items-center ${isSidebarOpen ? 'justify-start px-4' : 'justify-center'} py-3 rounded-xl transition-all duration-300 ${activeTab === 'settings' ? 'bg-slate-500/15 text-slate-300 shadow-[inset_3px_0_0_0_#94a3b8] ring-1 ring-slate-500/20' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}
             >
-              <Settings className="w-[22px] h-[22px]" />
-              <div className="absolute left-16 hidden group-hover:block bg-slate-900/95 backdrop-blur-xl text-slate-100 text-xs font-semibold px-4 py-2 rounded-lg border border-white/10 whitespace-nowrap z-50 shadow-[0_8px_30px_rgb(0,0,0,0.3)]">
-                Settings
-              </div>
+              <Settings className="w-[22px] h-[22px] shrink-0 text-slate-300" />
+              {isSidebarOpen && <span className="ml-3 font-semibold text-sm whitespace-nowrap">Settings</span>}
+              {!isSidebarOpen && (
+                <div className="absolute left-16 hidden group-hover:block bg-slate-900/95 backdrop-blur-xl text-slate-100 text-xs font-semibold px-4 py-2 rounded-lg border border-white/10 whitespace-nowrap z-50 shadow-[0_8px_30px_rgb(0,0,0,0.3)]">
+                  Settings
+                </div>
+              )}
             </button>
           </nav>
         </div>

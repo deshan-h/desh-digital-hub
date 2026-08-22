@@ -51,7 +51,7 @@ export default function Admin() {
     const saved = localStorage.getItem('chartData');
     return saved ? JSON.parse(saved) : [];
   });
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [totalPendingDues, setTotalPendingDues] = useState(() => {
     const saved = localStorage.getItem('totalPendingDues');
     return saved ? JSON.parse(saved) : 0;
