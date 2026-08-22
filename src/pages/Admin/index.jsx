@@ -590,6 +590,10 @@ export default function Admin() {
               pendingOrders={pendingOrders}
               showPendingOrdersModal={showPendingOrdersModal}
               setShowPendingOrdersModal={setShowPendingOrdersModal}
+              todaySalesSum={salesHistory
+                .filter(s => s.timestamp && parseTimestamp(s.timestamp).toDateString() === new Date().toDateString())
+                .reduce((sum, s) => sum + Number(s.amount), 0)}
+              totalPendingDues={totalPendingDues}
             />
           )}
           {activeTab === 'customers' && <Customers isAdmin={isAdmin} />}

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { ShoppingCart, Minus, Plus, Trash2, Printer, MessageCircle, Search, Package, RefreshCw, Save, Clock } from 'lucide-react';
+import { ShoppingCart, Minus, Plus, Trash2, Printer, MessageCircle, Search, Package, RefreshCw, Save, Clock, TrendingUp, TrendingDown, Star } from 'lucide-react';
 import * as Icons from 'lucide-react';
 import { FcPackage, FcPrint, FcTemplate, FcDocument, FcRules, FcImageFile, FcDataBackup, FcCommandLine, FcSettings, FcGlobe } from 'react-icons/fc';
 import { notify } from '../../utils/toast';
@@ -21,12 +21,18 @@ const ICON_MAP = {
 };
 
 // Memoized Components for Performance
-const POSItem = React.memo(({ item, addToCart }) => (
+const POSItem = React.memo(({ item, addToCart, isFavorite, onToggleFavorite }) => (
   <button
     onClick={() => addToCart(item)}
-    className="relative group bg-slate-900 border border-slate-800 flex flex-col text-left transition-colors hover:border-emerald-500/40 rounded-xl h-28 w-full shadow-none overflow-hidden"
+    className="relative group bg-slate-900 border border-slate-800 flex flex-col text-left transition-colors hover:border-emerald-500/40 rounded-xl h-24 w-full shadow-none overflow-hidden"
   >
-    <div className="flex-1 p-3.5 flex items-start z-10">
+    <div 
+      className="absolute top-2 right-2 p-1.5 z-20 hover:bg-slate-800 rounded-full transition-colors"
+      onClick={(e) => onToggleFavorite(e, item)}
+    >
+      <Star className={`w-[14px] h-[14px] transition-colors ${isFavorite ? 'text-yellow-400 fill-yellow-400' : 'text-slate-600 hover:text-yellow-400'}`} />
+    </div>
+    <div className="flex-1 p-3.5 flex items-start z-10 pr-8">
       <span className="font-semibold text-slate-200 text-[13px] leading-tight line-clamp-2">{item.name}</span>
     </div>
     <div className="bg-slate-950 w-full px-3.5 py-2 border-t border-slate-800 mt-auto z-10 transition-colors">
@@ -38,7 +44,9 @@ const POSItem = React.memo(({ item, addToCart }) => (
 ));
 
 const CategoryTab = React.memo(({ cat, isActive, onClick }) => {
-  const CatIcon = ICON_MAP[cat.category === 'Online Services' ? 'Globe' : (cat.icon || 'Package')] || FcPackage;
+  let CatIcon = ICON_MAP[cat.category === 'Online Services' ? 'Globe' : (cat.icon || 'Package')] || FcPackage;
+  if (cat.category === 'Favorites') CatIcon = Star;
+
   return (
     <button
       onClick={onClick}
@@ -49,7 +57,7 @@ const CategoryTab = React.memo(({ cat, isActive, onClick }) => {
       }`}
     >
       <div className="z-10 w-full h-full relative flex flex-col items-center">
-        {CatIcon && <CatIcon className={`w-6 h-6 mt-0.5 shrink-0 drop-shadow-sm`} />}
+        {CatIcon && <CatIcon className={`w-6 h-6 mt-0.5 shrink-0 drop-shadow-sm ${cat.category === 'Favorites' ? 'text-yellow-400 fill-yellow-400' : ''}`} />}
         <div className="flex-1 w-full flex items-center justify-center mt-1">
           <span className={`text-[10px] font-extrabold tracking-widest uppercase text-center leading-tight ${isActive ? 'text-emerald-400' : 'text-slate-100'}`}>
             {cat.category}
@@ -197,7 +205,9 @@ export default function POS({
   refreshPOSData,
   pendingOrders = [],
   showPendingOrdersModal,
-  setShowPendingOrdersModal
+  setShowPendingOrdersModal,
+  todaySalesSum = 0,
+  totalPendingDues = 0
 }) {
   const topCustomers = useMemo(() => {
     if (salesHistory && salesHistory.length > 0) {
@@ -232,6 +242,68 @@ export default function POS({
       return cached ? JSON.parse(cached) : [];
     }
   }, [salesHistory]);
+
+  const yesterdaySalesSum = useMemo(() => {
+    if (!salesHistory) return 0;
+    let ySum = 0;
+    
+    const now = new Date();
+    const yesterdayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    const yesterdayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    salesHistory.forEach(sale => {
+      let d = new Date();
+      if (typeof sale.timestamp?.toDate === 'function') d = sale.timestamp.toDate();
+      else if (sale.timestamp?.seconds) d = new Date(sale.timestamp.seconds * 1000);
+      else if (sale.timestamp) d = new Date(sale.timestamp);
+      
+      if (d >= yesterdayStart && d < yesterdayEnd) {
+        ySum += Number(sale.amount || 0);
+      }
+    });
+
+    return ySum;
+  }, [salesHistory]);
+
+  const categoryScrollRef = React.useRef(null);
+  
+  const scrollCategories = useCallback((direction) => {
+    if (categoryScrollRef.current) {
+      const scrollAmount = direction === 'left' ? -300 : 300;
+      categoryScrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  }, []);
+
+  const [favoriteItemIds, setFavoriteItemIds] = useState(() => {
+    const saved = localStorage.getItem('posFavorites');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const toggleFavorite = useCallback((e, item) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setFavoriteItemIds(prev => {
+      const newFavs = prev.includes(item.id) 
+        ? prev.filter(id => id !== item.id)
+        : [...prev, item.id];
+      localStorage.setItem('posFavorites', JSON.stringify(newFavs));
+      return newFavs;
+    });
+  }, []);
+
+  const displayCategories = useMemo(() => {
+    const allItems = posCategories.flatMap(c => c.items || []);
+    const favItems = allItems.filter(item => favoriteItemIds.includes(item.id));
+    
+    const favCategory = {
+      id: 'favorites',
+      category: 'Favorites',
+      icon: 'Star',
+      items: favItems
+    };
+
+    return [favCategory, ...posCategories];
+  }, [posCategories, favoriteItemIds]);
 
   const [activeCategoryIndex, setActiveCategoryIndex] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
@@ -340,7 +412,7 @@ export default function POS({
     }, 250);
   };
 
-  const activeCategory = posCategories[activeCategoryIndex] || null;
+  const activeCategory = displayCategories[activeCategoryIndex] || null;
 
   // Optimize filtering to not run on every cart update
   const filteredItems = useMemo(() => {
@@ -351,7 +423,7 @@ export default function POS({
           )
         )
       : (activeCategory ? activeCategory.items : []);
-  }, [posCategories, activeCategoryIndex, searchQuery]);
+  }, [posCategories, activeCategory, searchQuery]);
 
   // Stable callbacks for child components
   const handleAddToCart = useCallback((item) => {
@@ -372,11 +444,11 @@ export default function POS({
       {/* Left Area (Search + Items + Categories) */}
       <div className="flex-1 flex flex-col relative overflow-hidden bg-slate-950">
         
-        <div className="z-10 relative flex flex-col h-full p-6">
+        <div className="z-10 relative flex flex-col h-full px-6 pt-2 pb-6">
         
         {/* Top Bar: Search and Refresh */}
-        <div className="flex mb-6 gap-3 items-center">
-          <div className={`flex relative transition-all duration-300 h-10 ${isSearchExpanded ? 'w-full max-w-2xl' : 'w-10'}`}>
+        <div className="flex mb-12 gap-3 items-center">
+          <div className={`flex relative transition-all duration-300 h-10 ${isSearchExpanded ? 'w-full max-w-[320px]' : 'w-10'}`}>
             {!isSearchExpanded ? (
               <button 
                 onClick={() => setIsSearchExpanded(true)}
@@ -393,7 +465,7 @@ export default function POS({
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   autoFocus
-                  className="pl-11 pr-10 py-5 bg-slate-900 border border-slate-800 focus-visible:ring-emerald-500/40 rounded-xl text-sm w-full text-slate-200 placeholder:text-slate-500 transition-colors focus:outline-none"
+                  className="pl-11 pr-10 h-10 bg-slate-900 border border-slate-800 focus-visible:ring-emerald-500/40 rounded-full text-sm w-full text-slate-200 placeholder:text-slate-500 transition-colors focus:outline-none shadow-inner"
                 />
                 {searchQuery && (
                   <button onClick={() => setSearchQuery('')} className="absolute right-12 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-200 z-10 p-1 bg-slate-800/80 rounded-full hover:bg-slate-700 transition-colors">
@@ -440,6 +512,45 @@ export default function POS({
             <RefreshCw className="w-[18px] h-[18px]" />
           </button>
 
+          {/* Today's Sales, Pending Dues, and Pending Orders */}
+          {!isSearchExpanded && (
+            <div className="hidden lg:flex items-center px-4 h-10 bg-slate-900 border border-slate-800 rounded-full shadow-inner cursor-default">
+            <div className="flex items-center gap-2" title={`Today's Sales (Yesterday: Rs ${yesterdaySalesSum.toFixed(2)})`}>
+              {todaySalesSum < yesterdaySalesSum ? (
+                <TrendingDown className="w-[16px] h-[16px] text-red-500" />
+              ) : (
+                <TrendingUp className="w-[16px] h-[16px] text-emerald-500" />
+              )}
+              <span className="text-sm font-black tracking-wide text-emerald-400">
+                Rs {(todaySalesSum || 0).toFixed(2)}
+              </span>
+            </div>
+            
+            <div className="w-px h-4 bg-slate-700 mx-3"></div>
+
+            <div className="flex items-center gap-2" title="Pending Dues">
+              <Clock className="w-[16px] h-[16px] text-red-400" />
+              <span className="text-sm font-black text-red-400 tracking-wide">Rs {(totalPendingDues || 0).toFixed(2)}</span>
+            </div>
+
+            {pendingOrders && pendingOrders.length > 0 && (
+              <>
+                <div className="w-px h-4 bg-slate-700 mx-3"></div>
+                <div 
+                  className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" 
+                  title="Pending Orders"
+                  onClick={() => setShowPendingOrdersModal(true)}
+                >
+                  <Package className="w-[16px] h-[16px] text-orange-500" />
+                  <span className="text-sm font-black text-orange-400 tracking-wide">
+                    {pendingOrders.length} Pending (Rs {pendingOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0).toFixed(2)})
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+          )}
+
           {/* Custom Item Button */}
           <button
             onClick={() => handleAddToCart({
@@ -459,32 +570,62 @@ export default function POS({
         {/* Middle Area: Items Grid (Background Icon Removed for Performance) */}
         <div className="flex-1 overflow-y-auto mb-6 pr-2 relative" style={{ scrollbarWidth: 'thin' }}>
           
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 relative z-10">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 relative z-10">
             {filteredItems.map((item) => (
-              <POSItem key={`${item.id}-${item.name}`} item={item} addToCart={handleAddToCart} />
+              <POSItem 
+                key={`${item.id}-${item.name}`} 
+                item={item} 
+                addToCart={handleAddToCart} 
+                isFavorite={favoriteItemIds.includes(item.id)}
+                onToggleFavorite={toggleFavorite}
+              />
             ))}
           </div>
           {filteredItems.length === 0 && (
-            <div className="text-center text-slate-500 mt-10">No items found for "{searchQuery}"</div>
+            <div className="text-center text-slate-500 mt-10">
+              {activeCategory?.category === 'Favorites' 
+                ? "No favorites yet. Click the star icon on any item to add it here." 
+                : `No items found for "${searchQuery}"`}
+            </div>
           )}
         </div>
 
         {/* Bottom Area: Category Tabs */}
-        <div className="flex overflow-x-auto gap-3 pb-2 snap-x snap-mandatory no-scrollbar" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-          {posCategories.map((cat, idx) => (
-            <CategoryTab 
-              key={idx} 
-              cat={cat} 
-              isActive={activeCategoryIndex === idx} 
-              onClick={() => {
-                setActiveCategoryIndex(idx);
-                setSearchQuery('');
-              }}
-            />
-          ))}
+        <div className="relative group/slider mt-2 flex items-center">
+          <button 
+            onClick={() => scrollCategories('left')}
+            className="absolute left-0 -ml-3 z-20 w-8 h-8 bg-slate-800/80 backdrop-blur border border-slate-700 rounded-full flex items-center justify-center text-slate-300 opacity-0 group-hover/slider:opacity-100 transition-all duration-300 hover:bg-slate-700 hover:text-white shadow-xl hover:scale-110"
+          >
+            <Icons.ChevronLeft className="w-5 h-5" />
+          </button>
+          
+          <div 
+            ref={categoryScrollRef}
+            className="flex overflow-x-auto gap-3 pb-2 snap-x snap-mandatory no-scrollbar flex-1 w-full scroll-smooth" 
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
+            {displayCategories.map((cat, idx) => (
+              <CategoryTab 
+                key={idx} 
+                cat={cat} 
+                isActive={activeCategoryIndex === idx} 
+                onClick={() => {
+                  setActiveCategoryIndex(idx);
+                  setSearchQuery('');
+                }}
+              />
+            ))}
           </div>
+
+          <button 
+            onClick={() => scrollCategories('right')}
+            className="absolute right-0 -mr-3 z-20 w-8 h-8 bg-slate-800/80 backdrop-blur border border-slate-700 rounded-full flex items-center justify-center text-slate-300 opacity-0 group-hover/slider:opacity-100 transition-all duration-300 hover:bg-slate-700 hover:text-white shadow-xl hover:scale-110"
+          >
+            <Icons.ChevronRight className="w-5 h-5" />
+          </button>
         </div>
       </div>
+    </div>
 
       {/* Cart Panel */}
       <div className="w-full lg:w-[420px] bg-slate-950 border-l border-slate-800 p-6 flex flex-col shrink-0 z-20">
