@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useDeferredValue } from 'react';
 import { ShoppingCart, Minus, Plus, Trash2, Printer, MessageCircle, Search, Package, RefreshCw, Save, Clock, TrendingUp, TrendingDown, Star } from 'lucide-react';
 import * as Icons from 'lucide-react';
 import { FcPackage, FcPrint, FcTemplate, FcDocument, FcRules, FcImageFile, FcDataBackup, FcCommandLine, FcSettings, FcGlobe } from 'react-icons/fc';
@@ -6,6 +6,7 @@ import { notify } from '../../utils/toast';
 import { generateInvoiceHtml } from '../../utils/invoiceTemplate';
 import { collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../config/firebase';
+import DeleteConfirmModal from '../../components/DeleteConfirmModal';
 
 const ICON_MAP = {
   'Package': FcPackage,
@@ -103,8 +104,32 @@ const CartItem = React.memo(({ item, updateCartItem, removeFromCart }) => (
   </div>
 ));
 
+const POSItemsGrid = React.memo(({ filteredItems, handleAddToCart, favoriteItemIds, toggleFavorite, activeCategory, searchQuery }) => (
+  <div className="flex-1 overflow-y-auto mb-6 pr-2 relative" style={{ scrollbarWidth: 'thin' }}>
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 relative z-10">
+      {filteredItems.map((item) => (
+        <POSItem 
+          key={`${item.id}-${item.name}`} 
+          item={item} 
+          addToCart={handleAddToCart} 
+          isFavorite={favoriteItemIds.includes(item.id)}
+          onToggleFavorite={toggleFavorite}
+        />
+      ))}
+    </div>
+    {filteredItems.length === 0 && (
+      <div className="text-center text-slate-500 mt-10">
+        {activeCategory?.category === 'Favorites' 
+          ? "No favorites yet. Click the star icon on any item to add it here." 
+          : `No items found for "${searchQuery}"`}
+      </div>
+    )}
+  </div>
+));
+
 const CustomerInput = React.memo(({ customerName, setCustomerName, customersList, whatsappNumber, setWhatsappNumber, isCredit }) => {
   const [localVal, setLocalVal] = useState(customerName);
+  const deferredLocalVal = useDeferredValue(localVal);
   const [showDropdown, setShowDropdown] = useState(false);
 
   useEffect(() => {
@@ -119,7 +144,19 @@ const CustomerInput = React.memo(({ customerName, setCustomerName, customersList
     }
   };
 
-  const filteredCustomers = customersList.filter(c => c.name.toLowerCase().includes(localVal.toLowerCase()));
+  const filteredCustomers = useMemo(() => {
+    const searchVal = deferredLocalVal.toLowerCase().trim();
+    if (!searchVal) return customersList.slice(0, 30);
+    
+    const results = [];
+    for (let i = 0; i < customersList.length; i++) {
+      if (customersList[i].name.toLowerCase().includes(searchVal)) {
+        results.push(customersList[i]);
+        if (results.length >= 30) break;
+      }
+    }
+    return results;
+  }, [customersList, deferredLocalVal]);
 
   return (
     <div className="flex-1 relative">
@@ -164,11 +201,11 @@ const CustomerInput = React.memo(({ customerName, setCustomerName, customersList
       </div>
       
       {showDropdown && filteredCustomers.length > 0 && (
-        <div className="absolute z-50 mt-2 w-full max-h-60 overflow-y-auto bg-slate-900 border border-slate-700 rounded-xl shadow-2xl custom-scrollbar py-1">
+        <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto bg-slate-900 border border-slate-700 rounded-lg shadow-2xl custom-scrollbar py-0.5">
           {filteredCustomers.map((c, idx) => (
             <div 
               key={idx}
-              className="px-5 py-3 hover:bg-slate-800 cursor-pointer text-slate-200 font-bold border-b border-slate-800/50 last:border-0 flex items-center justify-between"
+              className="px-3 py-1.5 hover:bg-slate-800 cursor-pointer text-slate-200 text-sm font-semibold border-b border-slate-800/50 last:border-0 flex items-center justify-between transition-colors"
               onMouseDown={(e) => {
                 e.preventDefault(); // Prevents onBlur from firing before we set the value
                 setLocalVal(c.name);
@@ -176,8 +213,8 @@ const CustomerInput = React.memo(({ customerName, setCustomerName, customersList
                 setShowDropdown(false);
               }}
             >
-              <span>{c.name}</span>
-              {c.phone && <span className="text-slate-500 text-xs font-normal bg-slate-950 px-2 py-0.5 rounded-md border border-slate-800">{c.phone}</span>}
+              <span className="truncate pr-2">{c.name}</span>
+              {c.phone && <span className="text-slate-500 text-[11px] font-medium bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800/80 shrink-0">{c.phone}</span>}
             </div>
           ))}
         </div>
@@ -210,38 +247,20 @@ export default function POS({
   totalPendingDues = 0
 }) {
   const topCustomers = useMemo(() => {
-    if (salesHistory && salesHistory.length > 0) {
-      const customerTotals = {};
-      const now = new Date();
-      const currentMonth = now.getMonth();
-      const currentYear = now.getFullYear();
-
-      salesHistory.forEach(sale => {
-        if (sale.timestamp && sale.customerName && sale.customerName.trim() !== '') {
-          let d = new Date();
-          if (typeof sale.timestamp.toDate === 'function') d = sale.timestamp.toDate();
-          else if (sale.timestamp.seconds) d = new Date(sale.timestamp.seconds * 1000);
-          else d = new Date(sale.timestamp);
-
-          if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
-            const name = sale.customerName.trim();
-            customerTotals[name] = (customerTotals[name] || 0) + Number(sale.amount || 0);
-          }
-        }
-      });
-      
-      const tops = Object.entries(customerTotals)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 7)
-        .map(([name]) => name);
-        
-      localStorage.setItem('topCustomersThisMonth', JSON.stringify(tops));
-      return tops;
-    } else {
-      const cached = localStorage.getItem('topCustomersThisMonth');
-      return cached ? JSON.parse(cached) : [];
+    // Always prefer the freshest data from local storage, as it is instantly 
+    // updated by the Customers tab when stars are toggled.
+    const cached = localStorage.getItem('favoriteCustomers');
+    if (cached) {
+      return JSON.parse(cached);
     }
-  }, [salesHistory]);
+    // Fallback if local storage is empty
+    if (customersList && customersList.length > 0) {
+      const favorites = customersList.filter(c => c.mostVisited).map(c => c.name);
+      localStorage.setItem('favoriteCustomers', JSON.stringify(favorites));
+      return favorites;
+    }
+    return [];
+  }, [customersList]);
 
   const yesterdaySalesSum = useMemo(() => {
     if (!salesHistory) return 0;
@@ -318,6 +337,7 @@ export default function POS({
   const [showSavePendingModal, setShowSavePendingModal] = useState(false);
   const [pendingNote, setPendingNote] = useState('');
   const [pendingLoading, setPendingLoading] = useState(false);
+  const [pendingToDelete, setPendingToDelete] = useState(null);
 
   const currentCustomerArrears = useMemo(() => {
     if (!customerName || customerName.trim() === '') return 0;
@@ -376,14 +396,20 @@ export default function POS({
     }
   };
   
-  const handleDeletePending = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this pending order?")) return;
+  const handleDeletePending = (id) => {
+    setPendingToDelete(id);
+  };
+
+  const confirmDeletePending = async () => {
+    if (!pendingToDelete) return;
     try {
-      await deleteDoc(doc(db, 'pos_pending_orders', id));
+      await deleteDoc(doc(db, 'pos_pending_orders', pendingToDelete));
       notify.success("Pending order deleted");
     } catch (e) {
       console.error(e);
       notify.error("Failed to delete");
+    } finally {
+      setPendingToDelete(null);
     }
   };
 
@@ -568,27 +594,14 @@ export default function POS({
         </div>
 
         {/* Middle Area: Items Grid (Background Icon Removed for Performance) */}
-        <div className="flex-1 overflow-y-auto mb-6 pr-2 relative" style={{ scrollbarWidth: 'thin' }}>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 relative z-10">
-            {filteredItems.map((item) => (
-              <POSItem 
-                key={`${item.id}-${item.name}`} 
-                item={item} 
-                addToCart={handleAddToCart} 
-                isFavorite={favoriteItemIds.includes(item.id)}
-                onToggleFavorite={toggleFavorite}
-              />
-            ))}
-          </div>
-          {filteredItems.length === 0 && (
-            <div className="text-center text-slate-500 mt-10">
-              {activeCategory?.category === 'Favorites' 
-                ? "No favorites yet. Click the star icon on any item to add it here." 
-                : `No items found for "${searchQuery}"`}
-            </div>
-          )}
-        </div>
+        <POSItemsGrid 
+          filteredItems={filteredItems}
+          handleAddToCart={handleAddToCart}
+          favoriteItemIds={favoriteItemIds}
+          toggleFavorite={toggleFavorite}
+          activeCategory={activeCategory}
+          searchQuery={searchQuery}
+        />
 
         {/* Bottom Area: Category Tabs */}
         <div className="relative group/slider mt-2 flex items-center">
@@ -714,7 +727,9 @@ export default function POS({
                 {/* Top Customers Quick Add */}
                 {topCustomers.length > 0 && (
                   <div className="flex flex-col gap-3">
-                    <span className="text-sm uppercase tracking-wider font-bold text-slate-500">Quick Select (Top 7 This Month)</span>
+                    <span className="text-sm uppercase tracking-wider font-bold text-slate-500 flex items-center gap-2">
+                      <Star className="w-4 h-4 text-yellow-500 fill-yellow-500/20" /> Quick Select (Favorites)
+                    </span>
                     <div className="flex flex-wrap gap-2">
                       {topCustomers.map((name, idx) => (
                         <button
@@ -966,6 +981,14 @@ export default function POS({
           </div>
         </div>
       )}
+
+      <DeleteConfirmModal 
+        isOpen={!!pendingToDelete} 
+        onClose={() => setPendingToDelete(null)} 
+        onConfirm={confirmDeletePending}
+        title="Delete Pending Order?"
+        message="Are you sure you want to delete this pending order? This action cannot be undone."
+      />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../config/firebase';
-import { Search, Plus, Trash2, Wallet, PackageOpen, DollarSign, Calendar } from 'lucide-react';
+import { Search, Plus, Trash2, Wallet, PackageOpen, DollarSign, Calendar, HelpCircle, ChevronUp, RefreshCw } from 'lucide-react';
 import { notify } from '../../utils/toast';
 import DeleteConfirmModal from '../../components/DeleteConfirmModal';
 
@@ -9,6 +9,7 @@ export default function Expenses({ isAdmin }) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isAddFormOpen, setIsAddFormOpen] = useState(false);
 
   // Form State
   const [itemName, setItemName] = useState('');
@@ -93,109 +94,163 @@ export default function Expenses({ isAdmin }) {
 
   const totalExpenses = records.reduce((sum, r) => sum + r.amount, 0);
 
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+
+  const thisMonthExpenses = records.reduce((sum, r) => {
+    if (r.timestamp) {
+      const date = r.timestamp.toDate();
+      if (date.getMonth() === currentMonth && date.getFullYear() === currentYear) {
+        return sum + r.amount;
+      }
+    }
+    return sum;
+  }, 0);
+
   return (
-    <div className="p-4 md:p-6 space-y-6 w-full relative z-10 h-full flex flex-col">
+    <div className="p-4 space-y-4 w-full relative z-10 h-full flex flex-col">
       <div className="absolute inset-0 bg-gradient-to-br from-red-900/10 via-transparent to-orange-900/10 pointer-events-none -z-10 rounded-3xl"></div>
       
       {/* Header & Stats */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 shrink-0">
-        <div>
-          <h1 className="text-3xl font-black text-white tracking-tight mb-2">Shop Expenses</h1>
-          <p className="text-slate-400 font-medium">Record money spent on shop supplies and inventory</p>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 shrink-0 px-2 md:px-4">
+        <div className="flex items-center gap-3 mb-2">
+          <h1 className="text-xl font-black text-slate-100 uppercase tracking-widest flex items-center gap-3">
+            <Wallet className="w-8 h-8 text-red-400" /> EXPENSES
+          </h1>
+          <div className="relative group cursor-help mt-1">
+            <HelpCircle className="w-5 h-5 text-slate-500 hover:text-slate-300 transition-colors" />
+            <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 w-max max-w-xs px-3 py-2 bg-slate-800/95 backdrop-blur text-slate-200 text-sm font-medium rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all shadow-xl border border-slate-700 z-50">
+              Record money spent on shop supplies and inventory
+            </div>
+          </div>
         </div>
         
-        <div className="bg-gradient-to-br from-slate-900/90 to-slate-950/90 backdrop-blur-xl border border-white/10 p-5 rounded-2xl flex items-center gap-5 shadow-[0_8px_30px_rgb(0,0,0,0.4)] relative overflow-hidden group">
-          <div className="absolute -right-6 -top-6 w-24 h-24 bg-red-500/10 rounded-full blur-2xl group-hover:bg-red-500/20 transition-all duration-500"></div>
-          <div className="p-3.5 bg-gradient-to-br from-red-500/20 to-red-900/40 rounded-xl border border-red-500/20 shadow-inner">
-            <Wallet className="w-6 h-6 text-red-400 drop-shadow-[0_0_8px_rgba(248,113,113,0.5)]" />
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          <button 
+            onClick={() => setIsAddFormOpen(!isAddFormOpen)}
+            className={`w-10 h-10 shrink-0 flex items-center justify-center rounded-lg border transition-all shadow-sm ${
+              isAddFormOpen 
+                ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' 
+                : 'bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/20 hover:border-red-500/40'
+            }`}
+            title={isAddFormOpen ? 'Close Form' : 'Add New Expense'}
+          >
+            {isAddFormOpen ? <ChevronUp className="w-4 h-4" /> : <Plus className="w-5 h-5" />}
+          </button>
+          
+          <button 
+            onClick={fetchRecords}
+            className="w-10 h-10 shrink-0 flex items-center justify-center rounded-lg bg-slate-800/40 border border-slate-700/60 text-slate-400 hover:bg-slate-700 hover:text-slate-200 hover:border-slate-600 transition-all shadow-sm"
+            title="Refresh Table"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+
+          {/* Compact This Month Expenses Widget */}
+          <div className="h-10 justify-center bg-slate-900/80 backdrop-blur-xl border border-orange-500/20 px-3 rounded-lg flex items-center gap-2 shadow-sm relative overflow-hidden group hidden sm:flex">
+            <div className="absolute -right-4 -top-4 w-12 h-12 bg-orange-500/10 rounded-full blur-lg group-hover:bg-orange-500/20 transition-all"></div>
+            <div className="p-1 bg-orange-500/10 rounded md:hidden lg:block">
+              <Calendar className="w-3.5 h-3.5 text-orange-400" />
+            </div>
+            <div className="flex flex-col relative z-10">
+              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-0.5">This Month</span>
+              <span className="text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-400 leading-none tracking-tight">Rs {thisMonthExpenses.toFixed(2)}</span>
+            </div>
           </div>
-          <div className="relative z-10">
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Total Expenses</p>
-            <p className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-orange-400">Rs {totalExpenses.toFixed(2)}</p>
+
+          {/* Compact Total Expenses Widget */}
+          <div className="h-10 justify-center bg-slate-900/80 backdrop-blur-xl border border-red-500/20 px-3 rounded-lg flex items-center gap-2 shadow-sm relative overflow-hidden group">
+            <div className="absolute -right-4 -top-4 w-12 h-12 bg-red-500/10 rounded-full blur-lg group-hover:bg-red-500/20 transition-all"></div>
+            <div className="p-1 bg-red-500/10 rounded md:hidden lg:block">
+              <Wallet className="w-3.5 h-3.5 text-red-400" />
+            </div>
+            <div className="flex flex-col relative z-10">
+              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-0.5">Total Expenses</span>
+              <span className="text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-orange-400 leading-none tracking-tight">Rs {totalExpenses.toFixed(2)}</span>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
+      <div className="flex flex-col gap-4 flex-1 min-h-0">
         
-        {/* Left Column: Form */}
-        <div className="lg:col-span-1 h-full min-h-0">
-          <div className="h-full flex flex-col min-h-0 bg-gradient-to-b from-slate-900/80 to-slate-950/80 backdrop-blur-2xl border border-white/10 rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.5)] relative">
-            <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-red-500/50 to-transparent"></div>
-            <h2 className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-orange-400 mb-6 flex items-center gap-2 drop-shadow-sm shrink-0">
-              <Plus className="w-5 h-5 text-red-400" /> Add New Expense
-            </h2>
-            
-            <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar" style={{ scrollbarWidth: 'thin', scrollbarColor: '#ef4444 transparent' }}>
-              <form onSubmit={handleSubmit} className="space-y-6 pb-2">
-              
-              {/* Quick Select Buttons */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Quick Select</label>
-                <div className="flex flex-wrap gap-2">
-                  {quickItems.map(item => (
-                    <button
-                      key={item}
-                      type="button"
-                      onClick={() => setItemName(item)}
-                      className="px-3 py-1.5 rounded-lg text-[13px] font-bold border transition-all bg-slate-950/50 border-slate-800 text-slate-400 hover:text-cyan-400 hover:border-cyan-500/50"
-                    >
-                      {item}
-                    </button>
-                  ))}
-                </div>
+        {/* Top Panel: Form */}
+        {isAddFormOpen && (
+        <div className="shrink-0 bg-gradient-to-b from-slate-900/80 to-slate-950/80 backdrop-blur-2xl border border-white/10 rounded-3xl p-5 shadow-[0_8px_30px_rgb(0,0,0,0.5)] relative animate-in slide-in-from-top-4 fade-in duration-300">
+          <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-red-500/50 to-transparent"></div>
+          <h2 className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-orange-400 mb-4 flex items-center gap-2 drop-shadow-sm shrink-0">
+            <Plus className="w-5 h-5 text-red-400" /> Add New Expense
+          </h2>
+          
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-end">
+            <div className="col-span-1 md:col-span-2 xl:col-span-4 mb-2">
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Quick Select</label>
+              <div className="flex flex-wrap gap-2">
+                {quickItems.map(item => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => setItemName(item)}
+                    className="px-3 py-1.5 rounded-lg text-[13px] font-bold border transition-all bg-slate-950/50 border-slate-800 text-slate-400 hover:text-red-400 hover:border-red-500/50"
+                  >
+                    {item}
+                  </button>
+                ))}
               </div>
+            </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Item Name / Description *</label>
-                <div className="relative">
-                  <PackageOpen className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                  <input
-                    type="text"
-                    required
-                    value={itemName}
-                    onChange={(e) => setItemName(e.target.value)}
-                    className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-10 py-3 text-slate-200 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 transition-all text-sm"
-                    placeholder="e.g. A4 Bundle"
-                  />
-                </div>
+            <div className="col-span-1 md:col-span-2 xl:col-span-2">
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Item Name / Description *</label>
+              <div className="relative">
+                <PackageOpen className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input
+                  type="text"
+                  required
+                  value={itemName}
+                  onChange={(e) => setItemName(e.target.value)}
+                  className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-10 py-3 text-slate-200 focus:outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/50 transition-all text-sm"
+                  placeholder="e.g. A4 Bundle"
+                />
               </div>
+            </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Amount (Rs) *</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-sm">Rs.</span>
-                  <input
-                    type="number"
-                    required
-                    min="0"
-                    step="0.01"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-10 py-3 text-slate-200 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 transition-all text-sm"
-                    placeholder="0.00"
-                  />
-                </div>
+            <div className="col-span-1 xl:col-span-1">
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Amount (Rs) *</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-sm">Rs.</span>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  step="0.01"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-10 py-3 text-slate-200 focus:outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/50 transition-all text-sm"
+                  placeholder="0.00"
+                />
               </div>
+            </div>
 
+            <div className="col-span-1 xl:col-span-1 flex items-center justify-end">
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full mt-6 bg-red-600 hover:bg-red-500 text-white font-bold py-3.5 rounded-xl transition-all shadow-[0_0_15px_rgba(220,38,38,0.3)] hover:shadow-[0_0_25px_rgba(220,38,38,0.5)] disabled:opacity-50"
+                className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-[0_0_15px_rgba(220,38,38,0.3)] hover:shadow-[0_0_25px_rgba(220,38,38,0.5)] disabled:opacity-50"
               >
                 {isSubmitting ? 'Recording...' : 'Record Expense'}
               </button>
-              </form>
             </div>
-          </div>
+          </form>
         </div>
+        )}
 
-        {/* Right Column: List */}
-        <div className="lg:col-span-2 h-full min-h-0">
+        {/* Bottom Area: List */}
+        <div className="flex-1 h-full min-h-0">
           <div className="h-full flex flex-col min-h-0 bg-gradient-to-b from-slate-900/60 to-slate-950/60 backdrop-blur-xl border border-white/5 rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.3)] relative">
             <div className="absolute top-0 right-0 w-64 h-64 bg-red-500/5 rounded-full blur-[80px] pointer-events-none"></div>
             
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 relative z-10">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 relative z-10">
               <h2 className="text-lg font-black text-slate-100 tracking-wide">Recent Expenses</h2>
               <div className="relative w-full sm:w-64">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
@@ -204,7 +259,7 @@ export default function Expenses({ isAdmin }) {
                   placeholder="Search item..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full bg-slate-950/80 border border-slate-700/50 rounded-full px-9 py-2 text-slate-200 focus:outline-none focus:border-cyan-500/50 text-sm"
+                  className="w-full bg-slate-950 border border-slate-700/50 rounded-xl px-9 py-2 text-slate-200 focus:outline-none focus:border-red-500/50 text-sm"
                 />
               </div>
             </div>
@@ -219,44 +274,44 @@ export default function Expenses({ isAdmin }) {
                 <p>No expenses recorded yet.</p>
               </div>
             ) : (
-              <div className="flex-1 overflow-y-auto pr-2 space-y-3" style={{ scrollbarWidth: 'thin', scrollbarColor: '#ef4444 transparent' }}>
-                {filteredRecords.map(record => (
-                  <div key={record.id} className="bg-slate-950/40 border border-white/5 rounded-2xl p-4 hover:bg-slate-800/40 transition-colors flex flex-col sm:flex-row sm:items-center gap-4">
-                    
-                    <div className="flex-1">
-                      <h3 className="text-slate-200 font-bold text-base flex items-center gap-2">
-                        {record.itemName}
-                      </h3>
-                      <div className="text-xs text-slate-500 mt-2 flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5" /> 
+              <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar bg-slate-900/40 rounded-2xl border border-white/5">
+                {/* Table Header */}
+                <div className="hidden lg:grid grid-cols-12 gap-4 px-4 py-4 border-b border-white/10 text-xs font-bold text-slate-400 uppercase tracking-wider bg-slate-950/80 sticky top-0 z-10 items-center">
+                  <div className="col-span-5">Item Name</div>
+                  <div className="col-span-3">Date & Time</div>
+                  <div className="col-span-3 text-right">Amount</div>
+                  <div className="col-span-1 text-center">Action</div>
+                </div>
+
+                <div className="divide-y divide-white/5">
+                  {filteredRecords.map(record => (
+                    <div key={record.id} className="grid grid-cols-1 lg:grid-cols-12 gap-4 px-4 py-3 items-center hover:bg-slate-800/40 transition-colors">
+                      <div className="col-span-1 lg:col-span-5 flex items-center">
+                        <h3 className="text-slate-200 font-bold text-[14px] truncate">{record.itemName}</h3>
+                      </div>
+                      <div className="col-span-1 lg:col-span-3 flex items-center text-slate-400 text-[13px] truncate">
+                        <Calendar className="w-3.5 h-3.5 mr-2" />
                         {record.timestamp ? new Date(record.timestamp.toDate()).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Just now'}
                       </div>
-                    </div>
-
-                    <div className="flex items-center gap-4 justify-between sm:justify-end border-t border-white/5 sm:border-0 pt-3 sm:pt-0">
-                      <div className="text-left sm:text-right">
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Amount</p>
-                        <p className="text-lg font-black text-red-400">Rs {record.amount.toFixed(2)}</p>
+                      <div className="col-span-1 lg:col-span-3 flex items-center justify-end text-red-400 font-black text-[14px]">
+                        Rs {record.amount.toFixed(2)}
                       </div>
-
-                      <div className="flex gap-2">
+                      <div className="col-span-1 flex justify-end lg:justify-center">
                         {isAdmin && (
                           <button
                             onClick={() => handleDelete(record.id)}
-                            className="p-2 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition-all ml-4"
+                            className="p-1.5 rounded-lg text-red-500/50 hover:bg-red-500/10 hover:text-red-400 transition-colors"
                             title="Delete Expense"
                           >
-                            <Trash2 className="w-5 h-5" />
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         )}
                       </div>
                     </div>
-
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
-
           </div>
         </div>
 

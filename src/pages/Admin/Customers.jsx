@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../config/firebase';
-import { Search, Plus, Trash2, CheckCircle, Clock, User, Phone, MapPin, DollarSign, RotateCcw, ChevronDown, ChevronUp, Filter, Edit, X, RefreshCw } from 'lucide-react';
+import { Search, Plus, Trash2, CheckCircle, Clock, User, Phone, MapPin, DollarSign, RotateCcw, ChevronDown, ChevronUp, Filter, Edit, X, RefreshCw, Star, HelpCircle, Users } from 'lucide-react';
 import { notify } from '../../utils/toast';
 import DeleteConfirmModal from '../../components/DeleteConfirmModal';
 
@@ -9,7 +9,9 @@ export default function Customers({ isAdmin }) {
   const [records, setRecords] = useState([]);
   const [directoryRecords, setDirectoryRecords] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchCustomer, setSearchCustomer] = useState('');
+  const [searchArea, setSearchArea] = useState('');
+  const [searchPhone, setSearchPhone] = useState('');
   const [showOnlyDues, setShowOnlyDues] = useState(false);
   const [isAddFormOpen, setIsAddFormOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -42,7 +44,7 @@ export default function Customers({ isAdmin }) {
   // Reset pagination when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, showOnlyDues]);
+  }, [searchCustomer, searchArea, searchPhone, showOnlyDues]);
 
   useEffect(() => {
     fetchRecords();
@@ -282,6 +284,59 @@ export default function Customers({ isAdmin }) {
     }
   };
 
+  const toggleFavorite = async (group, e) => {
+    e.stopPropagation();
+    try {
+      let targetId = group.directoryId;
+      const isNowFavorite = !group.mostVisited;
+
+      if (!targetId) {
+        // If customer doesn't exist in the directory yet, create it
+        const newDoc = await addDoc(collection(db, 'customers'), {
+          name: group.name,
+          phone: group.phone || '',
+          area: group.area || '',
+          mostVisited: true,
+          timestamp: serverTimestamp()
+        });
+        targetId = newDoc.id;
+        notify.success('Added to favorites');
+      } else {
+        await updateDoc(doc(db, 'customers', targetId), {
+          mostVisited: isNowFavorite
+        });
+        notify.success(isNowFavorite ? 'Added to favorites' : 'Removed from favorites');
+      }
+
+      // Update local storage immediately for POS modal
+      let favs = JSON.parse(localStorage.getItem('favoriteCustomers') || '[]');
+      if (isNowFavorite && !favs.includes(group.name)) {
+        favs.push(group.name);
+      } else if (!isNowFavorite) {
+        favs = favs.filter(n => n !== group.name);
+      }
+      localStorage.setItem('favoriteCustomers', JSON.stringify(favs));
+
+      // Also update customersList in local storage to keep global state in sync
+      const savedCustomers = localStorage.getItem('customersList');
+      if (savedCustomers) {
+        let list = JSON.parse(savedCustomers);
+        const idx = list.findIndex(c => c.id === targetId);
+        if (idx !== -1) {
+          list[idx].mostVisited = isNowFavorite;
+        } else {
+          list.push({ id: targetId, name: group.name, phone: group.phone, area: group.area, mostVisited: isNowFavorite });
+        }
+        localStorage.setItem('customersList', JSON.stringify(list));
+      }
+
+      fetchRecords();
+    } catch (error) {
+      console.error("Error toggling favorite:", error);
+      notify.error("Failed to update favorite status.");
+    }
+  };
+
   const allGrouped = React.useMemo(() => {
     const acc = {};
     
@@ -290,18 +345,22 @@ export default function Customers({ isAdmin }) {
       const nameKey = record.name?.trim().toLowerCase() || 'unknown';
       if (!acc[nameKey]) {
         acc[nameKey] = {
+          directoryId: record.id,
           nameKey,
           name: record.name,
           phone: record.phone,
           area: record.area,
+          mostVisited: record.mostVisited || false,
           totalPending: 0,
           totalPaid: 0,
           records: [], // dues records
           hasPending: false
         };
       } else {
+        if (!acc[nameKey].directoryId) acc[nameKey].directoryId = record.id;
         if (!acc[nameKey].phone && record.phone) acc[nameKey].phone = record.phone;
         if (!acc[nameKey].area && record.area) acc[nameKey].area = record.area;
+        if (!acc[nameKey].mostVisited && record.mostVisited) acc[nameKey].mostVisited = record.mostVisited;
       }
     });
 
@@ -346,15 +405,17 @@ export default function Customers({ isAdmin }) {
   }, [records, directoryRecords]);
 
   const filteredGroups = React.useMemo(() => {
-    const searchLower = searchTerm.toLowerCase();
+    const searchCustomerLower = searchCustomer.toLowerCase();
+    const searchAreaLower = searchArea.toLowerCase();
+    const searchPhoneLower = searchPhone.toLowerCase();
+    
     const filtered = allGrouped.filter(group => {
-      const matchesSearch = (
-        (group.name?.toLowerCase() || '').includes(searchLower) ||
-        (group.phone || '').includes(searchLower) ||
-        (group.area?.toLowerCase() || '').includes(searchLower)
-      );
+      const matchCustomer = (group.name?.toLowerCase() || '').includes(searchCustomerLower);
+      const matchArea = (group.area?.toLowerCase() || '').includes(searchAreaLower);
+      const matchPhone = (group.phone || '').includes(searchPhoneLower);
+      
       if (showOnlyDues && !group.hasPending) return false;
-      return matchesSearch;
+      return matchCustomer && matchArea && matchPhone;
     });
 
     return filtered.sort((a, b) => {
@@ -363,15 +424,26 @@ export default function Customers({ isAdmin }) {
       if (a.totalPending !== b.totalPending) return b.totalPending - a.totalPending;
       return (a.name || '').localeCompare(b.name || '');
     });
-  }, [allGrouped, searchTerm, showOnlyDues]);
+  }, [allGrouped, searchCustomer, searchArea, searchPhone, showOnlyDues]);
 
   const renderGroup = (group) => {
     return (
       <div key={group.nameKey} className={`bg-slate-950/40 border-b border-white/5 transition-all flex flex-col ${!group.hasPending ? 'opacity-70 hover:opacity-100' : ''}`}>
         {/* Table Row */}
         <div className="grid grid-cols-12 gap-4 px-4 py-2.5 items-center">
+          {/* Col 0: Most Visited Star (col-span-1) */}
+          <div className="col-span-1 flex justify-center items-center">
+            <button 
+              onClick={(e) => toggleFavorite(group, e)}
+              className="p-1.5 rounded-lg hover:bg-slate-800 transition-colors"
+              title={group.mostVisited ? 'Remove from favorites' : 'Add to favorites'}
+            >
+              <Star className={`w-4 h-4 transition-colors ${group.mostVisited ? 'text-yellow-500 fill-yellow-500' : 'text-slate-600 hover:text-yellow-500/50'}`} />
+            </button>
+          </div>
+
           {/* Col 1: Customer Name (col-span-4 lg:col-span-3) */}
-          <div className="col-span-5 lg:col-span-3 flex items-center gap-3">
+          <div className="col-span-4 lg:col-span-3 flex items-center gap-3">
             <h3 className="text-slate-200 font-bold text-[14px] truncate">{group.name}</h3>
           </div>
 
@@ -422,8 +494,8 @@ export default function Customers({ isAdmin }) {
               )}
             </div>
 
-            {/* Col 3: Phone (col-span-3) */}
-            <div className="hidden lg:flex col-span-3 items-center text-slate-400 text-[13px] truncate" onClick={() => {
+            {/* Col 3: Phone (col-span-2) */}
+            <div className="hidden lg:flex lg:col-span-2 items-center text-slate-400 text-[13px] truncate" onClick={() => {
                 setEditingRecordId(group.nameKey);
                 setEditingField('phone');
                 setEditingValue(group.phone || '');
@@ -469,7 +541,6 @@ export default function Customers({ isAdmin }) {
               )}
             </div>
 
-
           {/* Col 4: Is Due (Clickable) */}
           <div className="col-span-3 lg:col-span-3 flex items-center justify-end">
             <button 
@@ -499,48 +570,70 @@ export default function Customers({ isAdmin }) {
   }, 0);
 
   return (
-    <div className="p-4 md:p-6 space-y-6 w-full relative z-10 h-full flex flex-col">
+    <div className="p-4 space-y-4 w-full relative z-10 h-full flex flex-col">
       <div className="absolute inset-0 bg-gradient-to-br from-cyan-900/10 via-transparent to-red-900/10 pointer-events-none -z-10 rounded-3xl"></div>
       
       {/* Header & Stats */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 shrink-0">
-        <div>
-          <h1 className="text-3xl font-black text-white tracking-tight mb-2">Customers</h1>
-          <p className="text-slate-400 font-medium">Manage customer dues and pending payments</p>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 shrink-0 px-2 md:px-4">
+        <div className="flex items-center gap-3 mb-2">
+          <h1 className="text-xl font-black text-slate-100 uppercase tracking-widest flex items-center gap-3">
+            <Users className="w-8 h-8 text-emerald-400" /> CUSTOMERS
+          </h1>
+          <div className="relative group cursor-help mt-1">
+            <HelpCircle className="w-5 h-5 text-slate-500 hover:text-slate-300 transition-colors" />
+            <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 w-max max-w-xs px-3 py-2 bg-slate-800/95 backdrop-blur text-slate-200 text-sm font-medium rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all shadow-xl border border-slate-700 z-50">
+              Manage customer dues and pending payments
+            </div>
+          </div>
         </div>
         
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+        <div className="flex items-center gap-2 w-full md:w-auto">
           <button 
             onClick={() => setIsAddFormOpen(!isAddFormOpen)}
-            className="flex-1 md:flex-none justify-center bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 text-cyan-400 font-bold py-3.5 px-6 rounded-2xl flex items-center gap-2 transition-all shadow-sm"
+            className={`w-10 h-10 shrink-0 flex items-center justify-center rounded-lg border transition-all shadow-sm ${
+              isAddFormOpen 
+                ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' 
+                : 'bg-cyan-500/10 border-cyan-500/20 text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-500/40'
+            }`}
+            title={isAddFormOpen ? 'Close Form' : 'Add New Record'}
           >
-            {isAddFormOpen ? <ChevronUp className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
-            {isAddFormOpen ? 'Close Form' : 'Add New Record'}
+            {isAddFormOpen ? <ChevronUp className="w-4 h-4" /> : <Plus className="w-5 h-5" />}
           </button>
+          
           <button 
             onClick={fetchRecords}
-            className="flex-1 md:flex-none justify-center bg-slate-800/30 hover:bg-slate-700/40 border border-slate-600/30 text-slate-300 font-medium py-3.5 px-4 rounded-2xl flex items-center gap-2 transition-all shadow-sm"
+            className="w-10 h-10 shrink-0 flex items-center justify-center rounded-lg bg-slate-800/40 border border-slate-700/60 text-slate-400 hover:bg-slate-700 hover:text-slate-200 hover:border-slate-600 transition-all shadow-sm"
             title="Refresh Table"
           >
-            <RefreshCw className="w-5 h-5" />
-            Refresh
+            <RefreshCw className="w-4 h-4" />
+          </button>
+
+          <button 
+            onClick={() => setIsFilterOpen(!isFilterOpen)}
+            className={`w-10 h-10 shrink-0 flex items-center justify-center rounded-lg border transition-all shadow-sm relative ${isFilterOpen ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400' : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:bg-slate-700 hover:text-slate-200 hover:border-slate-600'}`}
+            title="Filters"
+          >
+            <Filter className="w-4 h-4" />
+            {(showOnlyDues || searchCustomer || searchArea || searchPhone) && (
+              <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-cyan-500"></span>
+            )}
           </button>
 
           {/* Compact Total Pending Widget */}
-          <div className="flex-1 md:flex-none justify-center bg-slate-900/80 backdrop-blur-xl border border-red-500/20 py-3 px-5 rounded-2xl flex items-center gap-3 shadow-[0_8px_30px_rgb(0,0,0,0.4)] relative overflow-hidden group">
-            <div className="absolute -right-4 -top-4 w-16 h-16 bg-red-500/10 rounded-full blur-xl group-hover:bg-red-500/20 transition-all"></div>
-            <div className="p-1.5 bg-red-500/10 rounded-lg">
-              <DollarSign className="w-5 h-5 text-red-400 drop-shadow-[0_0_8px_rgba(248,113,113,0.5)]" />
+          <div className="h-10 justify-center bg-slate-900/80 backdrop-blur-xl border border-red-500/20 px-3 rounded-lg flex items-center gap-2 shadow-sm relative overflow-hidden group">
+            <div className="absolute -right-4 -top-4 w-12 h-12 bg-red-500/10 rounded-full blur-lg group-hover:bg-red-500/20 transition-all"></div>
+            <div className="p-1 bg-red-500/10 rounded md:hidden lg:block">
+              <DollarSign className="w-3.5 h-3.5 text-red-400" />
             </div>
             <div className="flex flex-col relative z-10">
-              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Total Pending</span>
-              <span className="text-[17px] font-black text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-orange-400 leading-none tracking-tight">Rs {totalPending.toFixed(2)}</span>
+              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-0.5">Total Pending</span>
+              <span className="text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-orange-400 leading-none tracking-tight">Rs {totalPending.toFixed(2)}</span>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="flex flex-col gap-6 flex-1 min-h-0">
+      <div className="flex flex-col gap-4 flex-1 min-h-0">
         
         {/* Top Panel: Form */}
         {isAddFormOpen && (
@@ -657,36 +750,42 @@ export default function Customers({ isAdmin }) {
         <div className="flex-1 h-full min-h-0">
           <div className="h-full flex flex-col min-h-0 bg-gradient-to-b from-slate-900/60 to-slate-950/60 backdrop-blur-xl border border-white/5 rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.3)] relative">
             <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/5 rounded-full blur-[80px] pointer-events-none"></div>
-            
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 relative z-10">
-              <h2 className="text-lg font-black text-slate-100 tracking-wide">Customer Directory</h2>
-              
-              <button 
-                onClick={() => setIsFilterOpen(!isFilterOpen)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all border shadow-sm ${isFilterOpen ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400' : 'bg-slate-900/50 border-white/5 text-slate-400 hover:text-slate-200'}`}
-              >
-                <Filter className="w-4 h-4" /> Filters
-                {(showOnlyDues || searchTerm) && (
-                  <span className="w-2 h-2 rounded-full bg-cyan-500 ml-1"></span>
-                )}
-              </button>
-            </div>
 
             {/* Collapsible Filters */}
             {isFilterOpen && (
-              <div className="bg-slate-900/50 border border-white/10 rounded-2xl p-4 mb-6 flex flex-col sm:flex-row gap-4 items-center animate-in slide-in-from-top-2 fade-in duration-200 relative z-10">
-                <div className="relative w-full sm:w-80">
+              <div className="bg-slate-900/50 border border-white/10 rounded-2xl p-4 mb-6 grid grid-cols-1 md:grid-cols-4 gap-4 items-center animate-in slide-in-from-top-2 fade-in duration-200 relative z-10">
+                <div className="relative w-full">
                   <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                   <input
                     type="text"
-                    placeholder="Search name, phone, area..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Customer Name"
+                    value={searchCustomer}
+                    onChange={(e) => setSearchCustomer(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700/50 rounded-xl px-9 py-2.5 text-slate-200 focus:outline-none focus:border-cyan-500/50 text-sm"
+                  />
+                </div>
+                <div className="relative w-full">
+                  <MapPin className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <input
+                    type="text"
+                    placeholder="Area"
+                    value={searchArea}
+                    onChange={(e) => setSearchArea(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700/50 rounded-xl px-9 py-2.5 text-slate-200 focus:outline-none focus:border-cyan-500/50 text-sm"
+                  />
+                </div>
+                <div className="relative w-full">
+                  <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <input
+                    type="text"
+                    placeholder="Phone"
+                    value={searchPhone}
+                    onChange={(e) => setSearchPhone(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-700/50 rounded-xl px-9 py-2.5 text-slate-200 focus:outline-none focus:border-cyan-500/50 text-sm"
                   />
                 </div>
                 
-                <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-slate-300 whitespace-nowrap bg-slate-950 px-4 py-2.5 rounded-xl border border-slate-700/50 hover:border-cyan-500/30 transition-colors flex-1 sm:flex-none">
+                <label className="flex items-center justify-center gap-2 cursor-pointer text-sm font-semibold text-slate-300 whitespace-nowrap bg-slate-950 px-4 py-2.5 rounded-xl border border-slate-700/50 hover:border-cyan-500/30 transition-colors w-full">
                   <input
                     type="checkbox"
                     checked={showOnlyDues}
@@ -710,11 +809,12 @@ export default function Customers({ isAdmin }) {
             ) : (
               <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar bg-slate-900/40 rounded-2xl border border-white/5">
                 {/* Table Header */}
-                <div className="hidden lg:grid grid-cols-12 gap-4 px-4 py-4 border-b border-white/10 text-xs font-bold text-slate-400 uppercase tracking-wider bg-slate-950/80 sticky top-0 z-10">
+                <div className="hidden lg:grid grid-cols-12 gap-4 px-4 py-4 border-b border-white/10 text-xs font-bold text-slate-400 uppercase tracking-wider bg-slate-950/80 sticky top-0 z-10 items-center">
+                  <div className="col-span-1 flex justify-center text-yellow-500"><Star className="w-4 h-4 fill-yellow-500/20" /></div>
                   <div className="col-span-3">Customer</div>
                   <div className="col-span-3">Area</div>
-                  <div className="col-span-3">Phone</div>
-                  <div className="col-span-3 text-right">Is Due</div>
+                  <div className="col-span-2">Phone</div>
+                  <div className="col-span-3 text-right">Due Status</div>
                 </div>
 
                 <div className="divide-y divide-white/5">

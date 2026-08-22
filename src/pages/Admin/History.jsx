@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { format } from 'date-fns';
-import { Trash2, ShoppingCart, Search, Filter, User, History as HistoryIcon, Printer, MessageCircle, ChevronDown, ChevronUp, Calendar, X, FileText } from 'lucide-react';
+import { Calendar, Search, Filter, Download, ArrowRight, Printer, AlertTriangle, FileText, ChevronDown, ChevronUp, Package, Wrench, X, RefreshCw, Smartphone, Monitor, Battery, CheckCircle, Clock, Trash2, HelpCircle, ShoppingCart, User, History as HistoryIcon, MessageCircle } from 'lucide-react';
 import { generateInvoiceHtml } from '../../utils/invoiceTemplate';
 
 export default function History({ salesHistory, fetchSales, handleDeleteSale, user, posCategories = [], isAdmin }) {
@@ -203,20 +203,31 @@ const sendWhatsAppSale = (sale) => {
   };
 
   return (
-    <div className="p-6 animate-in fade-in slide-in-from-bottom-4 duration-500 h-[calc(100vh-64px)] overflow-y-auto custom-scrollbar flex flex-col">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4 shrink-0">
-        <div className="flex items-center gap-3">
-          <FileText className="w-6 h-6 text-indigo-400" />
-          <h2 className="text-2xl font-black text-white uppercase tracking-widest">History Report</h2>
+    <div className="p-4 space-y-4 w-full relative z-10 h-[calc(100vh-64px)] overflow-y-auto custom-scrollbar flex flex-col">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 shrink-0 mb-4 px-2 md:px-4">
+        <div className="flex items-center gap-3 mb-2">
+          <h1 className="text-xl font-black text-slate-100 uppercase tracking-widest flex items-center gap-3">
+            <FileText className="w-8 h-8 text-indigo-400" />
+            HISTORY REPORT
+          </h1>
+          <div className="relative group cursor-help mt-1">
+            <HelpCircle className="w-5 h-5 text-slate-500 hover:text-slate-300 transition-colors" />
+            <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 w-max max-w-xs px-3 py-2 bg-slate-800/95 backdrop-blur text-slate-200 text-sm font-medium rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all shadow-xl border border-slate-700 z-50">
+              View all sales and repair history
+            </div>
+          </div>
         </div>
         
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2 w-full md:w-auto">
           <button 
             onClick={() => setIsFiltersOpen(!isFiltersOpen)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all border shadow-sm ${isFiltersOpen ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/50' : 'bg-slate-900/80 text-slate-300 border-slate-700 hover:bg-slate-800'}`}
+            className={`w-10 h-10 shrink-0 flex items-center justify-center rounded-lg border transition-all shadow-sm relative ${isFiltersOpen ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-400' : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:bg-slate-700 hover:text-slate-200 hover:border-slate-600'}`}
+            title="Filters"
           >
-            <Filter className="w-4 h-4" /> FILTERS
-            {isFiltersOpen ? <ChevronUp className="w-4 h-4 ml-1" /> : <ChevronDown className="w-4 h-4 ml-1" />}
+            <Filter className="w-4 h-4" />
+            {(invoiceSearch || customerSearch || descriptionSearch || userSearch || minAmount || maxAmount || statusFilter !== 'ALL' || categoryFilter !== 'ALL' || startDate || endDate) && (
+              <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-indigo-500"></span>
+            )}
           </button>
         </div>
       </div>
@@ -425,26 +436,26 @@ const sendWhatsAppSale = (sale) => {
                         </span>
                       </td>
                       <td className="px-5 py-3 whitespace-nowrap">
-                        <div className="text-sm font-bold text-slate-200">{dateStr}</div>
-                        <div className="text-[11px] text-slate-500 font-semibold">{timeStr}</div>
+                        <div className="text-xs font-bold text-slate-200">{dateStr}</div>
+                        <div className="text-[10px] text-slate-500 font-semibold">{timeStr}</div>
                       </td>
                       <td className="px-5 py-3 whitespace-nowrap">
                         {sale.customerName ? (
-                          <div className="text-sm font-bold text-slate-200">{sale.customerName}</div>
+                          <div className="text-xs font-bold text-slate-200">{sale.customerName}</div>
                         ) : (
-                          <div className="text-sm font-semibold text-slate-500">-</div>
+                          <div className="text-xs font-semibold text-slate-500">-</div>
                         )}
                       </td>
                       <td className="px-5 py-3">
-                        <div className="text-sm font-bold text-slate-200 line-clamp-2">{sale.description}</div>
+                        <div className="text-xs font-bold text-slate-200 line-clamp-2">{sale.description}</div>
                       </td>
                       <td className="px-5 py-3 whitespace-nowrap">
-                        <span className="text-xs font-bold text-slate-400 flex items-center gap-1.5">
+                        <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
                            <User className="w-3 h-3" /> {userName}
                         </span>
                       </td>
                       <td className="px-5 py-3 text-right whitespace-nowrap">
-                        <div className="text-sm font-black text-slate-100">Rs. {Number(sale.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                        <div className="text-xs font-black text-slate-100">Rs. {Number(sale.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                         {isAdmin && (
                           <div className="text-[10px] font-black text-emerald-400/80 mt-0.5">
                             Inc: Rs. {income.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

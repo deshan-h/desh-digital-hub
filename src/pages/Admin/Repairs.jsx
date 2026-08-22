@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, getDocs, updateDoc, doc, serverTimestamp, query, orderBy, addDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { format } from 'date-fns';
-import { Search, Plus, Wrench, X, Check, Save, PlusCircle, Trash2, Calculator, Printer, Edit, Send } from 'lucide-react';
+import { Search, Plus, Wrench, X, Check, Save, PlusCircle, Trash2, Calculator, Printer, Edit, Send, HelpCircle } from 'lucide-react';
 import logo from '../../assets/logo.webp';
 import { notify } from '../../utils/toast';
 import DeleteConfirmModal from '../../components/DeleteConfirmModal';
@@ -662,15 +662,20 @@ export default function Repairs({ user, fetchSales }) {
   };
 
   return (
-    <div className="p-6 h-[calc(100vh-64px)] overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="p-4 space-y-4 w-full relative z-10 h-[calc(100vh-64px)] overflow-y-auto custom-scrollbar flex flex-col">
 
       {/* Header */}
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h2 className="text-3xl font-extrabold text-white flex items-center gap-3">
-            <Wrench className="w-8 h-8 text-emerald-500" /> PC Repairs
-          </h2>
-          <p className="text-slate-400 mt-1">Manage active and past repair jobs.</p>
+      <div className="flex justify-between items-center mb-4 px-2 md:px-4">
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-black text-slate-100 uppercase tracking-widest flex items-center gap-3">
+            <Wrench className="w-8 h-8 text-emerald-500" /> PC REPAIRS
+          </h1>
+          <div className="relative group cursor-help mt-1">
+            <HelpCircle className="w-5 h-5 text-slate-500 hover:text-slate-300 transition-colors" />
+            <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 w-max max-w-xs px-3 py-2 bg-slate-800/95 backdrop-blur text-slate-200 text-sm font-medium rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all shadow-xl border border-slate-700 z-50">
+              Manage active and past repair jobs.
+            </div>
+          </div>
         </div>
         <button
           onClick={() => openJobModal()}
@@ -680,7 +685,7 @@ export default function Repairs({ user, fetchSales }) {
         </button>
       </div>
 
-      <div className="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-xl mt-6">
+      <div className="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-xl mt-0">
         <div className="px-6 py-4 border-b border-slate-800/80 flex justify-between items-center bg-slate-900/50">
           <h3 className="text-lg font-bold text-slate-200">Active & Past Jobs</h3>
           <button onClick={fetchData} className="text-xs font-semibold text-emerald-400 hover:text-emerald-300">Refresh</button>

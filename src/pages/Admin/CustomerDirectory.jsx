@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../config/firebase';
-import { Search, Plus, Trash2, User, Phone, MapPin } from 'lucide-react';
+import { Search, Plus, Trash2, User, Phone, MapPin, HelpCircle } from 'lucide-react';
 import { notify } from '../../utils/toast';
 import DeleteConfirmModal from '../../components/DeleteConfirmModal';
 
@@ -116,20 +116,25 @@ export default function CustomerDirectory({ isAdmin }) {
   }
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto pb-32">
+    <div className="p-4 max-w-[1600px] mx-auto pb-32">
       
       {/* Header section */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-        <div>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+        <div className="flex items-center gap-3">
           <h1 className="text-3xl font-extrabold text-slate-100 tracking-tight flex items-center gap-3">
             <User className="w-8 h-8 text-emerald-400" />
             Customer Directory
           </h1>
-          <p className="text-slate-400 mt-2 font-medium">Manage your shop's customers and their contact info.</p>
+          <div className="relative group cursor-help mt-1">
+            <HelpCircle className="w-5 h-5 text-slate-500 hover:text-slate-300 transition-colors" />
+            <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 w-max max-w-xs px-3 py-2 bg-slate-800/95 backdrop-blur text-slate-200 text-sm font-medium rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all shadow-xl border border-slate-700 z-50">
+              Manage your shop's customers and their contact info.
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         
         {/* Left Column: Form */}
         <div className="lg:col-span-1">
@@ -217,9 +222,10 @@ export default function CustomerDirectory({ isAdmin }) {
               <div className="min-w-[700px]">
                 {/* Header */}
                 <div className="grid grid-cols-12 gap-4 px-6 py-4 bg-slate-950/50 border-b border-slate-800 text-xs font-bold text-slate-400 uppercase tracking-wider">
-                  <div className="col-span-4">Customer Name</div>
-                  <div className="col-span-3">Phone</div>
-                  <div className="col-span-4">Area</div>
+                  <div className="col-span-3">Customer Name</div>
+                  <div className="col-span-2">Phone</div>
+                  <div className="col-span-3">Area</div>
+                  <div className="col-span-3">Most Visited</div>
                   <div className="col-span-1 text-right">Actions</div>
                 </div>
 
@@ -232,18 +238,23 @@ export default function CustomerDirectory({ isAdmin }) {
                       <div key={record.id} className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-slate-800/20 transition-colors">
                         
                         {/* Name */}
-                        <div className="col-span-4">
+                        <div className="col-span-3">
                           <div className="font-bold text-slate-200 text-sm">{record.name}</div>
                         </div>
 
                         {/* Phone */}
-                        <div className="col-span-3 text-slate-300 text-sm">
+                        <div className="col-span-2 text-slate-300 text-sm">
                           {record.phone || '-'}
                         </div>
 
                         {/* Area */}
-                        <div className="col-span-4 text-slate-300 text-sm">
+                        <div className="col-span-3 text-slate-300 text-sm">
                           {record.area || '-'}
+                        </div>
+
+                        {/* Most Visited */}
+                        <div className="col-span-3 text-slate-300 text-sm">
+                          {record.mostVisited || '-'}
                         </div>
 
                         {/* Actions */}

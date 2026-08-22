@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { notify } from '../../utils/toast';
-import { Save, Plus, Trash2, GripVertical, Info } from 'lucide-react';
+import { Save, Plus, Trash2, GripVertical, Info, HelpCircle, Settings as SettingsIcon } from 'lucide-react';
 import Loader from '../../components/Loader';
 
 export default function Settings({ isAdmin }) {
@@ -86,25 +86,34 @@ export default function Settings({ isAdmin }) {
   }
 
   return (
-    <div className="p-4 md:p-6 lg:p-8 max-w-4xl mx-auto w-full pb-24">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-black text-slate-100 tracking-tight">System Settings</h1>
-          <p className="text-slate-400 text-sm mt-1">Manage public website configurations and announcements.</p>
+    <div className="p-4 space-y-4 w-full relative z-10 h-full flex flex-col pb-24 overflow-y-auto custom-scrollbar">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 shrink-0 mb-4 px-2 md:px-4">
+        <div className="flex items-center gap-3 mb-2">
+          <h1 className="text-xl font-black text-slate-100 uppercase tracking-widest flex items-center gap-3">
+            <SettingsIcon className="w-8 h-8 text-emerald-400" /> SYSTEM SETTINGS
+          </h1>
+          <div className="relative group cursor-help mt-1">
+            <HelpCircle className="w-5 h-5 text-slate-500 hover:text-slate-300 transition-colors" />
+            <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 w-max max-w-xs px-3 py-2 bg-slate-800/95 backdrop-blur text-slate-200 text-sm font-medium rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all shadow-xl border border-slate-700 z-50">
+              Manage public website configurations and announcements.
+            </div>
+          </div>
         </div>
         
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-6 py-2.5 rounded-xl transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:shadow-[0_0_25px_rgba(16,185,129,0.5)] disabled:opacity-50 disabled:cursor-not-allowed shrink-0 w-full md:w-auto justify-center"
-        >
-          {saving ? (
-            <div className="w-5 h-5 border-2 border-slate-950/20 border-t-slate-950 rounded-full animate-spin"></div>
-          ) : (
-            <Save className="w-5 h-5" />
-          )}
-          {saving ? 'Saving...' : 'Save Settings'}
-        </button>
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="w-10 h-10 shrink-0 flex items-center justify-center rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/40 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Save Settings"
+          >
+            {saving ? (
+              <div className="w-4 h-4 border-2 border-emerald-400/20 border-t-emerald-400 rounded-full animate-spin"></div>
+            ) : (
+              <Save className="w-5 h-5" />
+            )}
+          </button>
+        </div>
       </div>
 
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">

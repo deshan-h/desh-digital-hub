@@ -6,7 +6,7 @@ import { db } from '../../config/firebase';
 import { notify } from '../../utils/toast';
 import DeleteConfirmModal from '../../components/DeleteConfirmModal';
 import { 
-  Tags, Plus, Edit2, Trash2, Save, X, Printer, Layers, FileText, Image as ImageIcon, Download, Code, Settings, Package, FileDown, ArrowUp, ArrowDown, MoveUp, MoveDown 
+  Tags, Plus, Edit2, Trash2, Save, X, Printer, Layers, FileText, Image as ImageIcon, Download, Code, Settings, Package, FileDown, ArrowUp, ArrowDown, MoveUp, MoveDown, HelpCircle 
 } from 'lucide-react';
 import * as Icons from 'lucide-react';
 import jsPDF from 'jspdf';
@@ -425,46 +425,56 @@ export default function ItemsManager() {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
-      <div className="flex justify-between items-center bg-slate-900/50 p-6 rounded-2xl border border-white/5">
-        <div>
-          <h2 className="text-2xl font-black text-slate-100 flex items-center gap-3">
-            <Tags className="w-6 h-6 text-emerald-400" />
-            Items & Prices Manager
-          </h2>
-          <p className="text-sm text-slate-400 mt-1">Manage POS categories, items and their real-time prices.</p>
+    <div className="p-4 space-y-4 w-full relative z-10 h-full flex flex-col">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 shrink-0 mb-4 px-2 md:px-4">
+        <div className="flex items-center gap-3 mb-2">
+          <h1 className="text-xl font-black text-slate-100 uppercase tracking-widest flex items-center gap-3">
+            <Tags className="w-8 h-8 text-emerald-400" />
+            ITEMS & PRICES MANAGER
+          </h1>
+          <div className="relative group cursor-help mt-1">
+            <HelpCircle className="w-5 h-5 text-slate-500 hover:text-slate-300 transition-colors" />
+            <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 w-max max-w-xs px-3 py-2 bg-slate-800/95 backdrop-blur text-slate-200 text-sm font-medium rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all shadow-xl border border-slate-700 z-50">
+              Manage POS categories, items and their real-time prices.
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={handleExportPDF}
-            className="px-4 py-2 bg-red-900/40 hover:bg-red-800 text-red-200 rounded-xl font-bold transition-all border border-red-500/30 flex items-center gap-2"
-          >
-            <FileDown className="w-4 h-4" /> Export PDF
-          </button>
-          
-          <button 
-            onClick={handleExportCSV}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-bold transition-all border border-white/10 flex items-center gap-2"
-          >
-            <FileDown className="w-4 h-4" /> Export CSV
-          </button>
-          
-          <button 
-            onClick={() => setIsAddingCategory(true)}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold transition-all flex items-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
-          >
-            <Plus className="w-4 h-4" /> Add Category
-          </button>
-
+        
+        <div className="flex items-center gap-2 w-full md:w-auto">
           {categories.length === 0 && (
             <button 
               onClick={handleMigrate}
               disabled={isMigrating}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold transition-all disabled:opacity-50 flex items-center gap-2"
+              className="w-10 h-10 shrink-0 flex items-center justify-center rounded-lg bg-slate-800/40 border border-slate-700/60 text-slate-400 hover:bg-slate-700 hover:text-slate-200 hover:border-slate-600 transition-all shadow-sm"
+              title={isMigrating ? 'Migrating...' : 'Default Items'}
             >
-              {isMigrating ? 'Migrating...' : 'Default Items'}
+              <Download className="w-4 h-4" />
             </button>
           )}
+          
+          <button 
+            onClick={handleExportCSV}
+            className="w-10 h-10 shrink-0 flex items-center justify-center rounded-lg bg-slate-800/40 border border-slate-700/60 text-slate-400 hover:bg-slate-700 hover:text-slate-200 hover:border-slate-600 transition-all shadow-sm"
+            title="Export CSV"
+          >
+            <FileText className="w-4 h-4" />
+          </button>
+
+          <button 
+            onClick={handleExportPDF}
+            className="w-10 h-10 shrink-0 flex items-center justify-center rounded-lg bg-red-900/40 hover:bg-red-800 text-red-300 border border-red-500/30 transition-all shadow-sm"
+            title="Export PDF"
+          >
+            <FileDown className="w-4 h-4" />
+          </button>
+          
+          <button 
+            onClick={() => setIsAddingCategory(true)}
+            className="w-10 h-10 shrink-0 flex items-center justify-center rounded-lg bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/40 transition-all shadow-sm"
+            title="Add Category"
+          >
+            <Plus className="w-5 h-5" />
+          </button>
         </div>
       </div>
 

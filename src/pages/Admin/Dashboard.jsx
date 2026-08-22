@@ -6,7 +6,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { 
   TrendingUp, TrendingDown, Activity, Wrench, ShoppingBag, 
   PlusCircle, Clock, CheckCircle2, AlertCircle, ShoppingCart, Users, RefreshCw, PieChart as PieChartIcon,
-  ChevronDown, ChevronRight, Zap, Target, ArrowRight, UserX, AlertTriangle, ShieldAlert, Package
+  ChevronDown, ChevronRight, Zap, Target, ArrowRight, UserX, AlertTriangle, ShieldAlert, Package, HelpCircle, LayoutDashboard
 } from 'lucide-react';
 import { FcPackage, FcPrint, FcTemplate, FcDocument, FcRules, FcImageFile, FcDataBackup, FcCommandLine, FcSettings } from 'react-icons/fc';
 
@@ -646,13 +646,20 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
   }
 
   return (
-    <div className="p-6 lg:p-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+    <div className="p-4 space-y-4 w-full relative z-10 h-full flex flex-col pb-24 overflow-y-auto custom-scrollbar">
       
       {/* HEADER SECTION */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-black text-slate-100 tracking-tight">Dashboard Overview</h2>
-          <p className="text-slate-400 text-sm mt-1">Here's what's happening at your store today.</p>
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 px-2 md:px-4">
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-black text-slate-100 uppercase tracking-widest flex items-center gap-3">
+            <LayoutDashboard className="w-8 h-8 text-emerald-400" /> DASHBOARD
+          </h1>
+          <div className="relative group cursor-help mt-1">
+            <HelpCircle className="w-5 h-5 text-slate-500 hover:text-slate-300 transition-colors" />
+            <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 w-max max-w-xs px-3 py-2 bg-slate-800/95 backdrop-blur text-slate-200 text-sm font-medium rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all shadow-xl border border-slate-700 z-50">
+              Here's what's happening at your store today.
+            </div>
+          </div>
         </div>
         <div className="flex items-center">
           <div className="flex items-center bg-slate-900/50 backdrop-blur-md border border-white/10 rounded-full px-5 py-2 shadow-lg">
@@ -671,7 +678,7 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
       </div>
 
       {/* SUMMARY CARDS */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 lg:gap-6 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 lg:gap-4 mb-4">
         {/* Card 1: Today */}
         <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-3xl p-4 relative overflow-hidden group hover:bg-slate-900/80 transition-all shadow-xl">
           <div className="absolute -right-4 -top-4 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl group-hover:bg-emerald-500/20 transition-all"></div>
@@ -760,7 +767,7 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
       </div>
 
       {/* WIDGET: SALES VS INCOME */}
-      <div className="grid grid-cols-1 gap-6 mb-6">
+      <div className="grid grid-cols-1 gap-4 mb-4">
         <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-lg flex flex-col h-[380px]">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <div className="flex flex-col gap-3">
@@ -825,9 +832,9 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
 
       {/* CHARTS */}
       {/* ROW 3: Donut, Top Customers, Fast Moving Items */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
         {/* Revenue by Category Donut */}
-        <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-5 shadow-lg flex flex-col h-[360px]">
+        <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-4 shadow-lg flex flex-col h-[360px]">
           <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest mb-2 flex items-center justify-between">
             Revenue By Category
             <PieChartIcon className="w-4 h-4 text-indigo-400" />
