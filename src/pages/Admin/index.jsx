@@ -22,7 +22,6 @@ const Repairs = lazy(() => import('./Repairs'));
 const Customers = lazy(() => import('./Customers'));
 const Expenses = lazy(() => import('./Expenses'));
 const ItemsManager = lazy(() => import('./ItemsManager'));
-const CustomerDirectory = lazy(() => import('./CustomerDirectory'));
 const Settings = lazy(() => import('./Settings'));
 
 const parseTimestamp = (ts) => {
@@ -597,7 +596,6 @@ export default function Admin() {
             />
           )}
           {activeTab === 'customers' && <Customers isAdmin={isAdmin} />}
-          {activeTab === 'customer_directory' && <CustomerDirectory isAdmin={isAdmin} />}
           {activeTab === 'expenses' && <Expenses isAdmin={isAdmin} />}
           {activeTab === 'history' && <History salesHistory={salesHistory} fetchSales={fetchSales} handleDeleteSale={handleDeleteSale} user={user} posCategories={posCategories} isAdmin={isAdmin} />}
           {activeTab === 'repairs' && <Repairs user={user} fetchSales={fetchSales} />}

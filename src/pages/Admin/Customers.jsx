@@ -78,8 +78,8 @@ export default function Customers({ isAdmin }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name || !amount) {
-      notify.error("Name and Amount are required.");
+    if (!name) {
+      notify.error("Customer Name is required.");
       return;
     }
     

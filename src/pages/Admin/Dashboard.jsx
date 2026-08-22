@@ -9,6 +9,7 @@ import {
   ChevronDown, ChevronRight, Zap, Target, ArrowRight, UserX, AlertTriangle, ShieldAlert, Package, HelpCircle, LayoutDashboard
 } from 'lucide-react';
 import { FcPackage, FcPrint, FcTemplate, FcDocument, FcRules, FcImageFile, FcDataBackup, FcCommandLine, FcSettings } from 'react-icons/fc';
+import { motion } from 'framer-motion';
 
 const ICON_MAP = {
   'Package': FcPackage,
@@ -680,7 +681,7 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
       {/* SUMMARY CARDS */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 lg:gap-4 mb-4">
         {/* Card 1: Today */}
-        <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-3xl p-4 relative overflow-hidden group hover:bg-slate-900/80 transition-all shadow-xl">
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-5%" }} transition={{ duration: 0.4, delay: 0.1 }} className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-3xl p-4 relative overflow-hidden group hover:bg-slate-900/80 transition-all shadow-xl">
           <div className="absolute -right-4 -top-4 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl group-hover:bg-emerald-500/20 transition-all"></div>
           <div className="flex justify-between items-start mb-2 relative z-10">
             <h3 className="text-slate-300 text-xs font-bold uppercase tracking-widest flex items-center gap-1.5">
@@ -695,10 +696,10 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
               </div>
             )}
           </div>
-        </div>
+        </motion.div>
 
         {/* Card 2: This Week */}
-        <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-3xl p-4 relative overflow-hidden group hover:bg-slate-900/80 transition-all shadow-xl">
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-5%" }} transition={{ duration: 0.4, delay: 0.2 }} className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-3xl p-4 relative overflow-hidden group hover:bg-slate-900/80 transition-all shadow-xl">
           <div className="absolute -right-4 -top-4 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl group-hover:bg-indigo-500/20 transition-all"></div>
           <div className="flex justify-between items-start mb-2 relative z-10">
             <h3 className="text-slate-300 text-xs font-bold uppercase tracking-widest flex items-center gap-1.5">
@@ -708,10 +709,10 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
           <div className="relative z-10">
             <h3 className="text-xl lg:text-2xl font-black text-slate-100"><span className="text-xs lg:text-sm font-bold text-slate-500">Rs.</span> {weekSalesTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</h3>
           </div>
-        </div>
+        </motion.div>
 
         {/* Card 3: This Month */}
-        <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-3xl p-4 relative overflow-hidden group hover:bg-slate-900/80 transition-all shadow-xl">
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-5%" }} transition={{ duration: 0.4, delay: 0.3 }} className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-3xl p-4 relative overflow-hidden group hover:bg-slate-900/80 transition-all shadow-xl">
           <div className="absolute -right-4 -top-4 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl group-hover:bg-blue-500/20 transition-all"></div>
           <div className="flex justify-between items-start mb-2 relative z-10">
             <h3 className="text-slate-300 text-xs font-bold uppercase tracking-widest flex items-center gap-1.5">
@@ -724,10 +725,10 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
               {revenueGrowth >= 0 ? '+' : ''}{Math.abs(revenueGrowth).toFixed(1)}%
             </div>
           </div>
-        </div>
+        </motion.div>
 
         {/* Card 4: Total All-Time */}
-        <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-3xl p-4 relative overflow-hidden group hover:bg-slate-900/80 transition-all shadow-xl">
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-5%" }} transition={{ duration: 0.4, delay: 0.4 }} className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-3xl p-4 relative overflow-hidden group hover:bg-slate-900/80 transition-all shadow-xl">
           <div className="absolute -right-4 -top-4 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl group-hover:bg-purple-500/20 transition-all"></div>
           <div className="flex justify-between items-start mb-2 relative z-10">
             <h3 className="text-slate-300 text-xs font-bold uppercase tracking-widest flex items-center gap-1.5">
@@ -737,10 +738,10 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
           <div className="relative z-10">
             <h3 className="text-xl lg:text-2xl font-black text-slate-100"><span className="text-xs lg:text-sm font-bold text-slate-500">Rs.</span> {totalSalesTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</h3>
           </div>
-        </div>
+        </motion.div>
 
         {/* Card 5: Pending Dues */}
-        <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-3xl p-4 relative overflow-hidden group hover:bg-slate-900/80 transition-all shadow-xl">
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-5%" }} transition={{ duration: 0.4, delay: 0.5 }} className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-3xl p-4 relative overflow-hidden group hover:bg-slate-900/80 transition-all shadow-xl">
           <div className="absolute -right-4 -top-4 w-32 h-32 bg-orange-500/10 rounded-full blur-3xl group-hover:bg-orange-500/20 transition-all"></div>
           <div className="flex justify-between items-start mb-2 relative z-10">
             <h3 className="text-slate-300 text-xs font-bold uppercase tracking-widest flex items-center gap-1.5">
@@ -750,10 +751,10 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
           <div className="relative z-10">
             <h3 className="text-xl lg:text-2xl font-black text-orange-400"><span className="text-xs lg:text-sm font-bold text-orange-700/50">Rs.</span> {totalPendingDues?.toLocaleString('en-US', { maximumFractionDigits: 0 }) || 0}</h3>
           </div>
-        </div>
+        </motion.div>
         
         {/* Card 6: Monthly Expenses */}
-        <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-3xl p-4 relative overflow-hidden group hover:bg-slate-900/80 transition-all shadow-xl">
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-5%" }} transition={{ duration: 0.4, delay: 0.6 }} className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-3xl p-4 relative overflow-hidden group hover:bg-slate-900/80 transition-all shadow-xl">
           <div className="absolute -right-4 -top-4 w-32 h-32 bg-red-500/10 rounded-full blur-3xl group-hover:bg-red-500/20 transition-all"></div>
           <div className="flex justify-between items-start mb-2 relative z-10">
             <h3 className="text-slate-300 text-xs font-bold uppercase tracking-widest flex items-center gap-1.5">
@@ -763,12 +764,12 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
           <div className="relative z-10">
             <h3 className="text-xl lg:text-2xl font-black text-red-400"><span className="text-xs lg:text-sm font-bold text-red-700/50">Rs.</span> {monthExpensesTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</h3>
           </div>
-        </div>
+        </motion.div>
       </div>
 
       {/* WIDGET: SALES VS INCOME */}
       <div className="grid grid-cols-1 gap-4 mb-4">
-        <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-lg flex flex-col h-[380px]">
+        <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-5%" }} transition={{ duration: 0.5, delay: 0.1 }} className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-lg flex flex-col h-[380px]">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <div className="flex flex-col gap-3">
               <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest">Sales vs Income ({revenueTimeFilter === 'week' ? 'This Week' : revenueTimeFilter === 'lastMonth' ? 'Last Month' : 'This Month'})</h3>
@@ -827,14 +828,14 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
               </ComposedChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </motion.div>
       </div>
 
       {/* CHARTS */}
       {/* ROW 3: Donut, Top Customers, Fast Moving Items */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
         {/* Revenue by Category Donut */}
-        <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-4 shadow-lg flex flex-col h-[360px]">
+        <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-5%" }} transition={{ duration: 0.5, delay: 0.1 }} className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-4 shadow-lg flex flex-col h-[360px]">
           <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest mb-2 flex items-center justify-between">
             Revenue By Category
             <PieChartIcon className="w-4 h-4 text-indigo-400" />
@@ -890,10 +891,10 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
                </div>
              ))}
           </div>
-        </div>
+        </motion.div>
 
         {/* Premium Top 5 Customers */}
-        <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-5 shadow-lg flex flex-col h-[360px]">
+        <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-5%" }} transition={{ duration: 0.5, delay: 0.2 }} className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-5 shadow-lg flex flex-col h-[360px]">
           <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest mb-4 flex items-center justify-between">
             Top Spenders
             <Users className="w-4 h-4 text-emerald-400" />
@@ -920,10 +921,10 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
                ))
             )}
           </div>
-        </div>
+        </motion.div>
 
         {/* Fast-Moving Items */}
-        <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-5 shadow-lg flex flex-col h-[360px]">
+        <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-5%" }} transition={{ duration: 0.5, delay: 0.3 }} className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-5 shadow-lg flex flex-col h-[360px]">
           <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest mb-4 flex items-center justify-between">
             Fast-Moving Items
             <Zap className="w-4 h-4 text-yellow-400" />
@@ -947,13 +948,13 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
                ))
             )}
           </div>
-        </div>
+        </motion.div>
       </div>
 
       {/* ROW 4: Peak Hours Heatmap & Monthly Overview */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Peak Hours (Bar Chart) */}
-        <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-lg flex flex-col h-[360px]">
+        <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-5%" }} transition={{ duration: 0.5, delay: 0.1 }} className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-lg flex flex-col h-[360px]">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest">Peak Hours Heatmap (This Month)</h3>
           </div>
@@ -979,10 +980,10 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </motion.div>
 
         {/* Combined Monthly Financials Chart */}
-        <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-lg flex flex-col h-[360px]">
+        <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-5%" }} transition={{ duration: 0.5, delay: 0.2 }} className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-lg flex flex-col h-[360px]">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest">Monthly Overview ({currentYear})</h3>
             <div className="flex gap-4 text-[10px] font-semibold uppercase">
@@ -1003,11 +1004,11 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </motion.div>
       </div>
 
         {/* Advanced Income by Category (This Month vs Last Month) */}
-        <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-lg lg:col-span-2 flex flex-col">
+        <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-5%" }} transition={{ duration: 0.5, delay: 0.1 }} className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-lg lg:col-span-2 flex flex-col">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest flex items-center gap-2">
               <PieChartIcon className="w-5 h-5 text-indigo-400" /> Income Breakdown Comparison
@@ -1103,12 +1104,12 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
               </tbody>
             </table>
           </div>
-        </div>
+        </motion.div>
 
       {/* ROW 2: Alerts & Pipeline (Moved to Bottom) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
         {/* High Risk Debtors */}
-        <div className="bg-red-950/20 backdrop-blur-md border border-red-500/20 rounded-2xl p-5 shadow-lg flex flex-col h-[320px]">
+        <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-5%" }} transition={{ duration: 0.5, delay: 0.1 }} className="bg-red-950/20 backdrop-blur-md border border-red-500/20 rounded-2xl p-5 shadow-lg flex flex-col h-[320px]">
           <h3 className="text-sm font-bold text-red-100 uppercase tracking-widest mb-4 flex items-center justify-between">
             High-Risk Debtors
             <AlertTriangle className="w-4 h-4 text-red-400" />
@@ -1142,10 +1143,10 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
                })
             )}
           </div>
-        </div>
+        </motion.div>
 
         {/* Active Pending Orders Pipeline */}
-        <div className="bg-orange-950/20 backdrop-blur-md border border-orange-500/20 rounded-2xl p-5 shadow-lg flex flex-col h-[320px]">
+        <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-5%" }} transition={{ duration: 0.5, delay: 0.2 }} className="bg-orange-950/20 backdrop-blur-md border border-orange-500/20 rounded-2xl p-5 shadow-lg flex flex-col h-[320px]">
           <h3 className="text-sm font-bold text-orange-100 uppercase tracking-widest mb-4 flex items-center justify-between">
             Active Pending Orders
             <Package className="w-4 h-4 text-orange-400" />
@@ -1172,7 +1173,7 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
                ))
             )}
           </div>
-        </div>
+        </motion.div>
       </div>
 
     </div>
