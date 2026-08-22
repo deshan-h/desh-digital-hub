@@ -9,6 +9,10 @@ export default function CustomerDirectory({ isAdmin }) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 20;
 
   // Form State
   const [name, setName] = useState('');
@@ -96,6 +100,12 @@ export default function CustomerDirectory({ isAdmin }) {
       (record.area?.toLowerCase().includes(searchLower))
     );
   });
+
+  const totalPages = Math.ceil(filteredRecords.length / ITEMS_PER_PAGE);
+  const paginatedRecords = filteredRecords.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   if (loading) {
     return (
@@ -196,7 +206,7 @@ export default function CustomerDirectory({ isAdmin }) {
                   type="text"
                   placeholder="Search customers by name, phone or area..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                   className="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded-xl pl-10 pr-4 py-3.5 focus:outline-none focus:border-emerald-500/50 transition-all text-sm"
                 />
               </div>
@@ -215,10 +225,10 @@ export default function CustomerDirectory({ isAdmin }) {
 
                 {/* Rows */}
                 <div className="divide-y divide-slate-800/50">
-                  {filteredRecords.length === 0 ? (
+                  {paginatedRecords.length === 0 ? (
                     <div className="text-center text-slate-500 py-12">No customers found.</div>
                   ) : (
-                    filteredRecords.map((record) => (
+                    paginatedRecords.map((record) => (
                       <div key={record.id} className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-slate-800/20 transition-colors">
                         
                         {/* Name */}
@@ -255,6 +265,34 @@ export default function CustomerDirectory({ isAdmin }) {
                 </div>
               </div>
             </div>
+
+            {/* PAGINATION CONTROLS */}
+            {filteredRecords.length > 0 && (
+              <div className="border-t border-slate-800 p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="text-xs font-bold text-slate-400">
+                  Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, filteredRecords.length)} of {filteredRecords.length} customers
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-900 text-slate-300 text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-800 transition-colors"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-xs font-bold text-slate-200">
+                    Page {currentPage} of {totalPages || 1}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages || totalPages === 0}
+                    className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-900 text-slate-300 text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-800 transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
 
           </div>
         </div>

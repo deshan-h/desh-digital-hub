@@ -782,33 +782,6 @@ export default function POS({
 
                 <div className="flex-1"></div> {/* Spacer */}
 
-                {/* Options: Print, WhatsApp */}
-                <div className="flex gap-4 h-14 mt-6">
-                  <button
-                    onClick={handlePrint}
-                    className="px-6 bg-slate-800 hover:bg-slate-700 text-slate-200 transition-all rounded-xl flex items-center justify-center border border-slate-700 shadow-md font-bold gap-2"
-                    title="Print Bill"
-                  >
-                    <Printer className="w-5 h-5" /> Print
-                  </button>
-                  <div className="relative flex-1">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-base">+94</span>
-                    <input
-                      type="text"
-                      placeholder="WhatsApp Number"
-                      value={whatsappNumber}
-                      onChange={(e) => setWhatsappNumber(e.target.value)}
-                      className="w-full h-full text-base bg-slate-950 border border-slate-800 text-slate-200 rounded-xl pl-14 pr-4 focus:outline-none focus:border-emerald-500/50 transition-all shadow-inner"
-                    />
-                  </div>
-                  <button
-                    onClick={sendWhatsAppBill}
-                    className="px-6 bg-emerald-900/30 hover:bg-emerald-800/50 border border-emerald-500/30 text-emerald-400 transition-all rounded-xl flex items-center justify-center shadow-md font-bold gap-2"
-                    title="Send to WhatsApp"
-                  >
-                    <MessageCircle className="w-5 h-5" /> Send
-                  </button>
-                </div>
               </div>
 
               {/* Right Column: Payment & Summary */}

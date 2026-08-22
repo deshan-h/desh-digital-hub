@@ -86,19 +86,11 @@ export default function AdminLayout({
             >
               <Users className="w-[22px] h-[22px]" />
               <div className="absolute left-16 hidden group-hover:block bg-slate-900/95 backdrop-blur-xl text-slate-100 text-xs font-semibold px-4 py-2 rounded-lg border border-white/10 whitespace-nowrap z-50 shadow-[0_8px_30px_rgb(0,0,0,0.3)]">
-                Customer Accounts
+                Customers
               </div>
             </button>
 
-            <button
-              onClick={() => setActiveTab('customer_directory')}
-              className={`group relative w-full flex items-center justify-center p-3 rounded-xl transition-all duration-300 ${activeTab === 'customer_directory' ? 'bg-emerald-500/15 text-emerald-400 shadow-[inset_3px_0_0_0_#10b981] ring-1 ring-emerald-500/20' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}
-            >
-              <Contact className="w-[22px] h-[22px]" />
-              <div className="absolute left-16 hidden group-hover:block bg-slate-900/95 backdrop-blur-xl text-slate-100 text-xs font-semibold px-4 py-2 rounded-lg border border-white/10 whitespace-nowrap z-50 shadow-[0_8px_30px_rgb(0,0,0,0.3)]">
-                Customer Directory
-              </div>
-            </button>
+
 
             <button
               onClick={() => setActiveTab('expenses')}

@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { AreaChart, Area, BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ReferenceDot, Label, LabelList } from 'recharts';
+import { AreaChart, Area, BarChart, Bar, LineChart, Line, ComposedChart, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ReferenceDot, Label, LabelList } from 'recharts';
 import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { formatDistanceToNow } from 'date-fns';
 import { 
   TrendingUp, TrendingDown, Activity, Wrench, ShoppingBag, 
   PlusCircle, Clock, CheckCircle2, AlertCircle, ShoppingCart, Users, RefreshCw, PieChart as PieChartIcon,
-  ChevronDown, ChevronRight
+  ChevronDown, ChevronRight, Zap, Target, ArrowRight, UserX, AlertTriangle, ShieldAlert, Package
 } from 'lucide-react';
 import { FcPackage, FcPrint, FcTemplate, FcDocument, FcRules, FcImageFile, FcDataBackup, FcCommandLine, FcSettings } from 'react-icons/fc';
 
@@ -57,7 +57,7 @@ const BarCustomTooltip = ({ active, payload, label }) => {
   return null;
 };
 
-export default function Dashboard({ salesHistory, setActiveTab, posCategories = [], totalPendingDues = 0, fetchSales, fetchCustomerDues }) {
+export default function Dashboard({ salesHistory, setActiveTab, posCategories = [], totalPendingDues = 0, fetchSales, fetchCustomerDues, pendingOrders = [], customerDuesList = [] }) {
   const [repairs, setRepairs] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -181,6 +181,33 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
   const monthNetProfit = monthIncomeTotal - monthExpensesTotal; // If still needed for charts
 
   const totalOrders = salesHistory.length;
+
+  // -- MOM GROWTH CALCULATIONS --
+  const revenueGrowth = lastMonthSalesTotal === 0 ? 100 : ((monthSalesTotal - lastMonthSalesTotal) / lastMonthSalesTotal) * 100;
+  const incomeGrowth = lastMonthIncomeTotal === 0 ? 100 : ((monthIncomeTotal - lastMonthIncomeTotal) / lastMonthIncomeTotal) * 100;
+
+  // -- HIGH RISK DEBTORS --
+  const highRiskDebtors = customerDuesList.filter(due => {
+    if (due.status !== 'Pending') return false;
+    // Check if debt is older than 14 days or amount is very high
+    const dDate = parseTimestamp(due.timestamp || due.date);
+    const ageDays = (today - dDate) / (1000 * 60 * 60 * 24);
+    return ageDays > 14 || Number(due.amount || 0) > 5000;
+  }).sort((a, b) => Number(b.amount || 0) - Number(a.amount || 0));
+
+  // -- FAST MOVING ITEMS --
+  const itemCounts = {};
+  monthSales.forEach(sale => {
+    if (!sale.isRepair) {
+      (sale.cartItems || []).forEach(item => {
+        itemCounts[item.name] = (itemCounts[item.name] || 0) + Number(item.qty || 1);
+      });
+    }
+  });
+  const fastMovingItems = Object.keys(itemCounts)
+    .map(name => ({ name, qty: itemCounts[name] }))
+    .sort((a, b) => b.qty - a.qty)
+    .slice(0, 5);
 
   // -- REPAIR METRICS --
   const activeRepairs = repairs.filter(r => r.status === 'Pending' || r.status === 'In Progress');
@@ -374,6 +401,15 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
     .sort((a, b) => b.thisMonth - a.thisMonth);
 
   const uniqueServices = Array.from(allServicesSet);
+
+  // -- DONUT CHART: REVENUE BY CATEGORY --
+  const donutChartData = Object.keys(comparisonMap)
+    .filter(name => comparisonMap[name].thisMonth > 0)
+    .map(name => ({
+      name,
+      value: comparisonMap[name].thisMonth
+    }))
+    .sort((a, b) => b.value - a.value);
 
   // -- CHART: Repair Status --
   const statusMap = { Pending: 0, 'In Progress': 0, Ready: 0, Delivered: 0, Cancelled: 0 };
@@ -635,126 +671,97 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
       </div>
 
       {/* SUMMARY CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 lg:gap-6 mb-6">
         {/* Card 1: Today */}
-        <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-3xl p-6 relative overflow-hidden group hover:bg-slate-900/80 transition-all shadow-xl">
+        <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-3xl p-4 relative overflow-hidden group hover:bg-slate-900/80 transition-all shadow-xl">
           <div className="absolute -right-4 -top-4 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl group-hover:bg-emerald-500/20 transition-all"></div>
-          <div className="flex justify-between items-start mb-6 relative z-10">
-            <h3 className="text-slate-300 text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-emerald-400" /> Today's Metrics
+          <div className="flex justify-between items-start mb-2 relative z-10">
+            <h3 className="text-slate-300 text-xs font-bold uppercase tracking-widest flex items-center gap-1.5">
+              <TrendingUp className="w-4 h-4 text-emerald-400" /> Today
             </h3>
+          </div>
+          <div className="flex justify-between items-end relative z-10">
+            <h3 className="text-xl lg:text-2xl font-black text-slate-100"><span className="text-xs lg:text-sm font-bold text-slate-500">Rs.</span> {todaySalesTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</h3>
             {todaySalesDiff !== 0 && (
-              <div className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full ${todaySalesDiff > 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
-                {todaySalesDiff > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                Rs. {Math.abs(todaySalesDiff).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+              <div className={`hidden lg:flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${todaySalesDiff > 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+                {todaySalesDiff > 0 ? '+' : '-'} {Math.abs(todaySalesDiff).toLocaleString('en-US', { maximumFractionDigits: 0 })}
               </div>
             )}
-          </div>
-          <div className="grid grid-cols-2 gap-4 relative z-10">
-            <div>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Sales (Revenue)</p>
-              <h3 className="text-xl font-black text-slate-100"><span className="text-sm font-bold text-slate-500">Rs.</span> {todaySalesTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</h3>
-            </div>
-            <div className="border-l border-white/10 pl-4">
-              <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider mb-1">Income (Profit)</p>
-              <h3 className="text-xl font-black text-emerald-400"><span className="text-sm font-bold text-emerald-700/50">Rs.</span> {todayIncomeTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</h3>
-            </div>
           </div>
         </div>
 
         {/* Card 2: This Week */}
-        <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-3xl p-6 relative overflow-hidden group hover:bg-slate-900/80 transition-all shadow-xl">
+        <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-3xl p-4 relative overflow-hidden group hover:bg-slate-900/80 transition-all shadow-xl">
           <div className="absolute -right-4 -top-4 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl group-hover:bg-indigo-500/20 transition-all"></div>
-          <div className="flex justify-between items-start mb-6 relative z-10">
-            <h3 className="text-slate-300 text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-              <Activity className="w-5 h-5 text-indigo-400" /> This Week
+          <div className="flex justify-between items-start mb-2 relative z-10">
+            <h3 className="text-slate-300 text-xs font-bold uppercase tracking-widest flex items-center gap-1.5">
+              <Activity className="w-4 h-4 text-indigo-400" /> This Week
             </h3>
           </div>
-          <div className="grid grid-cols-2 gap-4 relative z-10">
-            <div>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Sales (Revenue)</p>
-              <h3 className="text-xl font-black text-slate-100"><span className="text-sm font-bold text-slate-500">Rs.</span> {weekSalesTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</h3>
-            </div>
-            <div className="border-l border-white/10 pl-4">
-              <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider mb-1">Income (Profit)</p>
-              <h3 className="text-xl font-black text-indigo-400"><span className="text-sm font-bold text-indigo-700/50">Rs.</span> {weekIncomeTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</h3>
-            </div>
+          <div className="relative z-10">
+            <h3 className="text-xl lg:text-2xl font-black text-slate-100"><span className="text-xs lg:text-sm font-bold text-slate-500">Rs.</span> {weekSalesTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</h3>
           </div>
         </div>
 
         {/* Card 3: This Month */}
-        <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-3xl p-6 relative overflow-hidden group hover:bg-slate-900/80 transition-all shadow-xl">
+        <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-3xl p-4 relative overflow-hidden group hover:bg-slate-900/80 transition-all shadow-xl">
           <div className="absolute -right-4 -top-4 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl group-hover:bg-blue-500/20 transition-all"></div>
-          <div className="flex justify-between items-start mb-6 relative z-10">
-            <h3 className="text-slate-300 text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-              <Activity className="w-5 h-5 text-blue-400" /> This Month
+          <div className="flex justify-between items-start mb-2 relative z-10">
+            <h3 className="text-slate-300 text-xs font-bold uppercase tracking-widest flex items-center gap-1.5">
+              <Activity className="w-4 h-4 text-blue-400" /> This Month
             </h3>
           </div>
-          <div className="grid grid-cols-2 gap-4 relative z-10">
-            <div>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Sales (Revenue)</p>
-              <h3 className="text-xl font-black text-slate-100"><span className="text-sm font-bold text-slate-500">Rs.</span> {monthSalesTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</h3>
-            </div>
-            <div className="border-l border-white/10 pl-4">
-              <p className="text-[10px] text-blue-400 font-bold uppercase tracking-wider mb-1">Income (Profit)</p>
-              <h3 className="text-xl font-black text-blue-400"><span className="text-sm font-bold text-blue-700/50">Rs.</span> {monthIncomeTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</h3>
+          <div className="flex justify-between items-end relative z-10">
+            <h3 className="text-xl lg:text-2xl font-black text-slate-100"><span className="text-xs lg:text-sm font-bold text-slate-500">Rs.</span> {monthSalesTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</h3>
+            <div className={`hidden lg:flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${revenueGrowth >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`} title="MoM Revenue Growth">
+              {revenueGrowth >= 0 ? '+' : ''}{Math.abs(revenueGrowth).toFixed(1)}%
             </div>
           </div>
         </div>
 
         {/* Card 4: Total All-Time */}
-        <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-3xl p-6 relative overflow-hidden group hover:bg-slate-900/80 transition-all shadow-xl">
+        <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-3xl p-4 relative overflow-hidden group hover:bg-slate-900/80 transition-all shadow-xl">
           <div className="absolute -right-4 -top-4 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl group-hover:bg-purple-500/20 transition-all"></div>
-          <div className="flex justify-between items-start mb-6 relative z-10">
-            <h3 className="text-slate-300 text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-              <ShoppingCart className="w-5 h-5 text-purple-400" /> Total All-Time
+          <div className="flex justify-between items-start mb-2 relative z-10">
+            <h3 className="text-slate-300 text-xs font-bold uppercase tracking-widest flex items-center gap-1.5">
+              <ShoppingCart className="w-4 h-4 text-purple-400" /> All-Time
             </h3>
           </div>
-          <div className="grid grid-cols-2 gap-4 relative z-10">
-            <div>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Total Sales</p>
-              <h3 className="text-xl font-black text-slate-100"><span className="text-sm font-bold text-slate-500">Rs.</span> {totalSalesTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</h3>
-            </div>
-            <div className="border-l border-white/10 pl-4">
-              <p className="text-[10px] text-purple-400 font-bold uppercase tracking-wider mb-1">Total Income</p>
-              <h3 className="text-xl font-black text-purple-400"><span className="text-sm font-bold text-purple-700/50">Rs.</span> {totalIncomeTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</h3>
-            </div>
+          <div className="relative z-10">
+            <h3 className="text-xl lg:text-2xl font-black text-slate-100"><span className="text-xs lg:text-sm font-bold text-slate-500">Rs.</span> {totalSalesTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</h3>
+          </div>
+        </div>
+
+        {/* Card 5: Pending Dues */}
+        <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-3xl p-4 relative overflow-hidden group hover:bg-slate-900/80 transition-all shadow-xl">
+          <div className="absolute -right-4 -top-4 w-32 h-32 bg-orange-500/10 rounded-full blur-3xl group-hover:bg-orange-500/20 transition-all"></div>
+          <div className="flex justify-between items-start mb-2 relative z-10">
+            <h3 className="text-slate-300 text-xs font-bold uppercase tracking-widest flex items-center gap-1.5">
+              <AlertTriangle className="w-4 h-4 text-orange-400" /> Total Dues
+            </h3>
+          </div>
+          <div className="relative z-10">
+            <h3 className="text-xl lg:text-2xl font-black text-orange-400"><span className="text-xs lg:text-sm font-bold text-orange-700/50">Rs.</span> {totalPendingDues?.toLocaleString('en-US', { maximumFractionDigits: 0 }) || 0}</h3>
+          </div>
+        </div>
+        
+        {/* Card 6: Monthly Expenses */}
+        <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-3xl p-4 relative overflow-hidden group hover:bg-slate-900/80 transition-all shadow-xl">
+          <div className="absolute -right-4 -top-4 w-32 h-32 bg-red-500/10 rounded-full blur-3xl group-hover:bg-red-500/20 transition-all"></div>
+          <div className="flex justify-between items-start mb-2 relative z-10">
+            <h3 className="text-slate-300 text-xs font-bold uppercase tracking-widest flex items-center gap-1.5">
+              <TrendingDown className="w-4 h-4 text-red-400" /> Expenses
+            </h3>
+          </div>
+          <div className="relative z-10">
+            <h3 className="text-xl lg:text-2xl font-black text-red-400"><span className="text-xs lg:text-sm font-bold text-red-700/50">Rs.</span> {monthExpensesTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</h3>
           </div>
         </div>
       </div>
 
-      {/* RECENT SALES & WIDGET: SALES VS INCOME */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        {/* Recent Sales */}
+      {/* WIDGET: SALES VS INCOME */}
+      <div className="grid grid-cols-1 gap-6 mb-6">
         <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-lg flex flex-col h-[380px]">
-          <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest mb-4">Recent Sales</h3>
-          <div className="flex-1 overflow-y-auto pr-2 space-y-4 no-scrollbar">
-            {allActivities.filter(a => a.type === 'SALE').length === 0 ? (
-              <p className="text-slate-500 text-sm text-center mt-10">No recent sales</p>
-            ) : (
-              allActivities.filter(a => a.type === 'SALE').slice(0, 8).map((act, i) => (
-                <div key={i} className="flex gap-3 items-start p-3 rounded-xl bg-slate-800/30 hover:bg-slate-800/50 transition-colors border border-white/5">
-                  <div className="p-2 rounded-lg shrink-0 bg-emerald-500/10 text-emerald-400">
-                    <ShoppingCart className="w-4 h-4" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-bold text-slate-200 truncate">{act.title}</p>
-                    <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      {act.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {act.items} items
-                    </p>
-                  </div>
-                  <div className="text-xs font-black text-emerald-400 whitespace-nowrap mt-1">
-                    Rs {act.amount?.toFixed(2)}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* WIDGET: SALES VS INCOME */}
-        <div className="lg:col-span-2 bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-lg flex flex-col h-[380px]">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <div className="flex flex-col gap-3">
               <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest">Sales vs Income ({revenueTimeFilter === 'week' ? 'This Week' : revenueTimeFilter === 'lastMonth' ? 'Last Month' : 'This Month'})</h3>
@@ -794,71 +801,95 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
               </div>
             </div>
           </div>
-          <div className="flex-1 min-h-0 w-full">
+          <div className="flex-1 min-h-0 w-full mt-4">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={salesIncomeChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <ComposedChart data={salesIncomeChartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#94a3b8" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#94a3b8" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="colorInc" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="colorExp" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.9}/>
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.2}/>
                   </linearGradient>
                 </defs>
-                <XAxis dataKey="date" stroke="#475569" fontSize={11} tickMargin={10} axisLine={false} tickLine={false} />
-                <YAxis stroke="#475569" fontSize={11} tickFormatter={(val) => `Rs${val}`} axisLine={false} tickLine={false} />
-                <Tooltip content={<CustomTooltip />} />
-                <Area type="monotone" dataKey="sales" name="Sales" stroke="#94a3b8" strokeWidth={2} fillOpacity={1} fill="url(#colorSales)" />
-                <Area type="monotone" dataKey="income" name="Income" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorInc)" />
-                <Area type="monotone" dataKey="expenses" name="Expenses" stroke="#ef4444" strokeWidth={3} fillOpacity={1} fill="url(#colorExp)" />
-              </AreaChart>
+                <XAxis dataKey="date" stroke="#475569" fontSize={10} tickLine={false} axisLine={false} />
+                <YAxis yAxisId="left" stroke="#475569" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(val) => `Rs ${val}`} />
+                <YAxis yAxisId="right" orientation="right" stroke="#475569" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(val) => `Rs ${val}`} />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: '#1e293b', opacity: 0.4 }} />
+                <Bar yAxisId="left" dataKey="sales" name="Sales" fill="url(#colorSales)" radius={[4, 4, 0, 0]} maxBarSize={50} />
+                <Line yAxisId="right" type="monotone" dataKey="income" name="Income" stroke="#10b981" strokeWidth={3} dot={{ r: 3, fill: '#10b981', strokeWidth: 2, stroke: '#020617' }} activeDot={{ r: 6, strokeWidth: 0 }} />
+                <Line yAxisId="left" type="monotone" dataKey="expenses" name="Expenses" stroke="#ef4444" strokeWidth={2} strokeDasharray="5 5" dot={false} />
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         </div>
       </div>
 
       {/* CHARTS */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        {/* Main Chart: Daily Order Counts */}
-        <div className="flex flex-col gap-6">
-          <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-lg flex flex-col flex-1">
-            <div className="flex items-center justify-between mb-6 gap-4">
-              <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest">Daily Order Counts (This Month)</h3>
-              <div className="flex items-center gap-1.5 text-xs font-semibold">
-                <div className="w-3 h-3 rounded-sm bg-purple-500"></div> Orders
-              </div>
-            </div>
-            <div className="flex-1 w-full min-h-[200px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={dailyOrdersData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorOrders" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#a855f7" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#a855f7" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="day" stroke="#475569" fontSize={11} tickMargin={10} axisLine={false} tickLine={false} tickFormatter={(val) => `D${val}`} />
-                  <YAxis stroke="#475569" fontSize={11} axisLine={false} tickLine={false} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Area type="monotone" dataKey="orders" name="Orders" stroke="#a855f7" strokeWidth={3} fillOpacity={1} fill="url(#colorOrders)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+      {/* ROW 3: Donut, Top Customers, Fast Moving Items */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        {/* Revenue by Category Donut */}
+        <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-5 shadow-lg flex flex-col h-[360px]">
+          <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest mb-2 flex items-center justify-between">
+            Revenue By Category
+            <PieChartIcon className="w-4 h-4 text-indigo-400" />
+          </h3>
+          <div className="flex-1 min-h-[200px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={donutChartData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={65}
+                  outerRadius={90}
+                  paddingAngle={5}
+                  dataKey="value"
+                  stroke="none"
+                >
+                  {donutChartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS_EXTENDED[index % COLORS_EXTENDED.length]} />
+                  ))}
+                  <Label 
+                    value={`Rs ${monthSalesTotal >= 1000 ? (monthSalesTotal/1000).toFixed(1)+'k' : monthSalesTotal}`} 
+                    position="center" 
+                    fill="#f1f5f9" 
+                    fontSize={20} 
+                    fontWeight="black" 
+                  />
+                </Pie>
+                <Tooltip 
+                  content={({active, payload}) => {
+                    if (active && payload && payload.length) {
+                      return (
+                        <div className="bg-slate-900/90 backdrop-blur-md border border-white/10 p-3 rounded-xl shadow-xl">
+                          <p className="text-slate-300 text-xs font-semibold mb-1">{payload[0].name}</p>
+                          <p className="font-black text-sm" style={{ color: payload[0].payload.fill }}>
+                            Rs {payload[0].value.toFixed(0)}
+                          </p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          {/* Custom Legend */}
+          <div className="grid grid-cols-2 gap-2 mt-2 h-16 overflow-y-auto no-scrollbar">
+             {donutChartData.map((entry, idx) => (
+               <div key={idx} className="flex items-center gap-2 text-[10px]">
+                 <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: COLORS_EXTENDED[idx % COLORS_EXTENDED.length] }}></div>
+                 <span className="text-slate-300 truncate">{entry.name}</span>
+               </div>
+             ))}
           </div>
         </div>
 
-        {/* Top 5 Customers */}
-        <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-5 shadow-lg flex flex-col h-full min-h-[320px]">
+        {/* Premium Top 5 Customers */}
+        <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-5 shadow-lg flex flex-col h-[360px]">
           <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest mb-4 flex items-center justify-between">
-            Top 5 Customers (This Month)
-            <Users className="w-4 h-4 text-indigo-400" />
+            Top Spenders
+            <Users className="w-4 h-4 text-emerald-400" />
           </h3>
           <div className="flex-1 overflow-y-auto pr-1 space-y-2 no-scrollbar">
             {top5Customers.length === 0 ? (
@@ -866,13 +897,13 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
             ) : (
                top5Customers.map((cust, i) => (
                  <div key={i} className="flex gap-3 items-center p-2.5 rounded-xl bg-slate-800/30 hover:bg-slate-800/60 transition-all border border-white/5">
-                   <div className="w-7 h-7 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 flex items-center justify-center font-black text-xs shrink-0 shadow-[0_0_10px_rgba(99,102,241,0.2)]">
-                     {i + 1}
+                   <div className="w-8 h-8 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center font-black text-sm shrink-0 shadow-[0_0_10px_rgba(16,185,129,0.2)]">
+                     #{i + 1}
                    </div>
                    <div className="flex-1 min-w-0">
                      <p className="text-sm font-bold text-slate-200 truncate">{cust.name}</p>
                      <p className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
-                       <ShoppingCart className="w-3 h-3" /> {cust.orderCount} Orders
+                       <ShoppingCart className="w-3 h-3 text-emerald-400/50" /> {cust.orderCount} Orders
                      </p>
                    </div>
                    <div className="text-xs font-black text-emerald-400 whitespace-nowrap bg-emerald-500/10 px-2.5 py-1.5 rounded-lg border border-emerald-500/20">
@@ -884,60 +915,89 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
           </div>
         </div>
 
-
-
-
-
-
-        {/* Combined Monthly Financials Chart */}
-        <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-lg flex flex-col">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest">Monthly Overview ({currentYear})</h3>
-            <div className="flex gap-4 text-xs font-semibold">
-              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-blue-500"></div> POS Income</div>
-              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-teal-500"></div> Repair Profit</div>
-              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-red-500"></div> Expenses</div>
-            </div>
+        {/* Fast-Moving Items */}
+        <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-5 shadow-lg flex flex-col h-[360px]">
+          <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest mb-4 flex items-center justify-between">
+            Fast-Moving Items
+            <Zap className="w-4 h-4 text-yellow-400" />
+          </h3>
+          <div className="flex-1 overflow-y-auto pr-1 space-y-2 no-scrollbar">
+            {fastMovingItems.length === 0 ? (
+               <p className="text-slate-500 text-xs text-center mt-6">No items sold yet</p>
+            ) : (
+               fastMovingItems.map((item, i) => (
+                 <div key={i} className="flex gap-3 items-center p-2.5 rounded-xl bg-slate-800/30 hover:bg-slate-800/60 transition-all border border-white/5">
+                   <div className="w-8 h-8 rounded-full bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 flex items-center justify-center font-black text-xs shrink-0 shadow-[0_0_10px_rgba(234,179,8,0.2)]">
+                     {item.qty}
+                   </div>
+                   <div className="flex-1 min-w-0">
+                     <p className="text-sm font-bold text-slate-200 truncate">{item.name}</p>
+                   </div>
+                   <div className="text-[10px] uppercase font-black text-yellow-400 whitespace-nowrap bg-yellow-500/10 px-2 py-1 rounded-md border border-yellow-500/20">
+                     Top Sold
+                   </div>
+                 </div>
+               ))
+            )}
           </div>
-          <div className="h-[300px] w-full">
+        </div>
+      </div>
+
+      {/* ROW 4: Peak Hours Heatmap & Monthly Overview */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {/* Peak Hours (Bar Chart) */}
+        <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-lg flex flex-col h-[360px]">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest">Peak Hours Heatmap (This Month)</h3>
+          </div>
+          <div className="flex-1 w-full mt-2">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={combinedMonthlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <XAxis dataKey="month" stroke="#475569" fontSize={11} tickMargin={10} axisLine={false} tickLine={false} />
-                <YAxis stroke="#475569" fontSize={11} tickFormatter={(val) => `Rs${val}`} axisLine={false} tickLine={false} />
-                <Tooltip cursor={{fill: '#1e293b'}} content={<CustomTooltip />} />
-                <Bar dataKey="posIncome" name="POS Income" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="repairProfit" name="Repair Profit" fill="#14b8a6" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="expenses" name="Expenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
+              <BarChart data={monthHoursData} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorPeak" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.9}/>
+                    <stop offset="95%" stopColor="#f43f5e" stopOpacity={0.3}/>
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="time" stroke="#475569" fontSize={10} tickMargin={10} axisLine={false} tickLine={false} />
+                <YAxis stroke="#475569" fontSize={10} tickFormatter={(val) => `Rs${val}`} axisLine={false} tickLine={false} />
+                <Tooltip cursor={{fill: '#1e293b', opacity: 0.5}} content={<CustomTooltip />} />
+                <Bar dataKey="revenue" name="Revenue" fill="url(#colorPeak)" radius={[4, 4, 0, 0]} maxBarSize={40}>
+                  {
+                    monthHoursData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={maxTodayData && entry.time === maxTodayData.time ? '#e11d48' : 'url(#colorPeak)'} />
+                    ))
+                  }
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* This Month's Revenue (By Time) */}
-        <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-lg lg:col-span-1 flex flex-col">
-          <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest mb-2">This Month's Revenue (By Time)</h3>
-          <div className="min-h-[300px] w-full mt-4">
+        {/* Combined Monthly Financials Chart */}
+        <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-lg flex flex-col h-[360px]">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest">Monthly Overview ({currentYear})</h3>
+            <div className="flex gap-4 text-[10px] font-semibold uppercase">
+              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div> POS</div>
+              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-teal-500"></div> Repair</div>
+              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-red-500"></div> Exp</div>
+            </div>
+          </div>
+          <div className="flex-1 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={monthHoursData} margin={{ top: 35, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorToday" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="time" stroke="#475569" fontSize={11} tickMargin={10} axisLine={false} tickLine={false} />
-                <YAxis stroke="#475569" fontSize={11} tickFormatter={(val) => `Rs${val}`} axisLine={false} tickLine={false} />
-                <Tooltip content={<CustomTooltip />} />
-                <Area type="monotone" dataKey="revenue" name="Revenue" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorToday)" />
-                {maxTodayData && maxTodayData.revenue > 0 && (
-                  <ReferenceDot x={maxTodayData.time} y={maxTodayData.revenue} r={4} fill="#3b82f6" stroke="#fff" strokeWidth={2}>
-                    <Label value={`High: Rs ${maxTodayData.revenue.toFixed(0)}`} position="top" fill="#e2e8f0" fontSize={11} fontWeight="bold" offset={10} />
-                  </ReferenceDot>
-                )}
-              </AreaChart>
+              <BarChart data={combinedMonthlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <XAxis dataKey="month" stroke="#475569" fontSize={10} tickMargin={10} axisLine={false} tickLine={false} />
+                <YAxis stroke="#475569" fontSize={10} tickFormatter={(val) => `Rs${val}`} axisLine={false} tickLine={false} />
+                <Tooltip cursor={{fill: '#1e293b', opacity: 0.5}} content={<CustomTooltip />} />
+                <Bar dataKey="posIncome" name="POS Income" fill="#3b82f6" radius={[2, 2, 0, 0]} stackId="a" />
+                <Bar dataKey="repairProfit" name="Repair Profit" fill="#14b8a6" radius={[2, 2, 0, 0]} stackId="a" />
+                <Bar dataKey="expenses" name="Expenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
+              </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
+      </div>
 
         {/* Advanced Income by Category (This Month vs Last Month) */}
         <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-lg lg:col-span-2 flex flex-col">
@@ -1038,7 +1098,76 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
           </div>
         </div>
 
+      {/* ROW 2: Alerts & Pipeline (Moved to Bottom) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+        {/* High Risk Debtors */}
+        <div className="bg-red-950/20 backdrop-blur-md border border-red-500/20 rounded-2xl p-5 shadow-lg flex flex-col h-[320px]">
+          <h3 className="text-sm font-bold text-red-100 uppercase tracking-widest mb-4 flex items-center justify-between">
+            High-Risk Debtors
+            <AlertTriangle className="w-4 h-4 text-red-400" />
+          </h3>
+          <div className="flex-1 overflow-y-auto pr-1 space-y-2 no-scrollbar">
+            {highRiskDebtors.length === 0 ? (
+               <p className="text-slate-500 text-xs text-center mt-6 flex flex-col items-center gap-2">
+                 <ShieldAlert className="w-8 h-8 text-emerald-500/50" />
+                 All clear! No high-risk debts.
+               </p>
+            ) : (
+               highRiskDebtors.map((due, i) => {
+                 const dDate = parseTimestamp(due.timestamp || due.date);
+                 const ageDays = Math.floor((today - dDate) / (1000 * 60 * 60 * 24));
+                 return (
+                   <div key={i} className="flex gap-3 items-center p-2.5 rounded-xl bg-red-950/30 hover:bg-red-900/40 transition-all border border-red-500/10">
+                     <div className="w-8 h-8 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 flex items-center justify-center font-black text-xs shrink-0 shadow-[0_0_10px_rgba(239,68,68,0.2)]">
+                       <UserX className="w-4 h-4" />
+                     </div>
+                     <div className="flex-1 min-w-0">
+                       <p className="text-sm font-bold text-slate-200 truncate">{due.name}</p>
+                       <p className="text-[11px] text-red-400/80 mt-0.5 flex items-center gap-1">
+                         <Clock className="w-3 h-3" /> {ageDays} Days Overdue
+                       </p>
+                     </div>
+                     <div className="text-xs font-black text-red-400 whitespace-nowrap bg-red-500/10 px-2.5 py-1.5 rounded-lg border border-red-500/20">
+                       Rs {Number(due.amount || 0).toFixed(0)}
+                     </div>
+                   </div>
+                 );
+               })
+            )}
+          </div>
+        </div>
+
+        {/* Active Pending Orders Pipeline */}
+        <div className="bg-orange-950/20 backdrop-blur-md border border-orange-500/20 rounded-2xl p-5 shadow-lg flex flex-col h-[320px]">
+          <h3 className="text-sm font-bold text-orange-100 uppercase tracking-widest mb-4 flex items-center justify-between">
+            Active Pending Orders
+            <Package className="w-4 h-4 text-orange-400" />
+          </h3>
+          <div className="flex-1 overflow-y-auto pr-1 space-y-2 no-scrollbar">
+            {pendingOrders.length === 0 ? (
+               <p className="text-slate-500 text-xs text-center mt-6">No pending orders</p>
+            ) : (
+               pendingOrders.map((order, i) => (
+                 <div key={i} className="flex gap-3 items-center p-2.5 rounded-xl bg-orange-950/30 hover:bg-orange-900/40 transition-all border border-orange-500/10">
+                   <div className="w-8 h-8 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-400 flex items-center justify-center font-black text-xs shrink-0 shadow-[0_0_10px_rgba(249,115,22,0.2)]">
+                     <Target className="w-4 h-4" />
+                   </div>
+                   <div className="flex-1 min-w-0">
+                     <p className="text-sm font-bold text-slate-200 truncate">{order.customerName}</p>
+                     <p className="text-[11px] text-orange-400/80 mt-0.5 flex items-center gap-1">
+                       <Clock className="w-3 h-3" /> {order.timestamp ? formatDistanceToNow(parseTimestamp(order.timestamp), { addSuffix: true }) : 'Unknown'}
+                     </p>
+                   </div>
+                   <div className="text-xs font-black text-orange-400 whitespace-nowrap bg-orange-500/10 px-2.5 py-1.5 rounded-lg border border-orange-500/20">
+                     Rs {Number(order.totalAmount || 0).toFixed(0)}
+                   </div>
+                 </div>
+               ))
+            )}
+          </div>
+        </div>
       </div>
+
     </div>
   );
 }

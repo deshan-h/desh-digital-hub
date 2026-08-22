@@ -568,14 +568,14 @@ export default function Admin() {
         setShowPendingOrdersModal={setShowPendingOrdersModal}
       >
         <Suspense fallback={<Loader />}>
-          {activeTab === 'dashboard' && <Dashboard salesHistory={salesHistory} setActiveTab={setActiveTab} posCategories={posCategories} totalPendingDues={totalPendingDues} fetchSales={fetchSales} fetchCustomerDues={fetchCustomerDues} />}
+          {activeTab === 'dashboard' && <Dashboard salesHistory={salesHistory} setActiveTab={setActiveTab} posCategories={posCategories} totalPendingDues={totalPendingDues} fetchSales={fetchSales} fetchCustomerDues={fetchCustomerDues} pendingOrders={pendingOrders} customerDuesList={customerDuesList} />}
           {activeTab === 'pos' && (
             <POS 
               cart={cart}
               setCart={setCart}
               addToCart={addToCart}
               updateCartItem={updateCartItem}
-              removeCartItem={removeFromCart}
+              removeFromCart={removeFromCart}
               posCategories={posCategories}
               cartTotal={cartTotal}
               handleCheckout={handleCheckout}
