@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { AreaChart, Area, BarChart, Bar, LineChart, Line, ComposedChart, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ReferenceDot, Label, LabelList } from 'recharts';
+import { AreaChart, Area, BarChart, Bar, LineChart, Line, ComposedChart, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ReferenceDot, Label, LabelList, ReferenceLine } from 'recharts';
 import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { formatDistanceToNow } from 'date-fns';
+import { parseTimestamp } from '../../utils/helpers';
 import { 
   TrendingUp, TrendingDown, Activity, Wrench, ShoppingBag, 
   PlusCircle, Clock, CheckCircle2, AlertCircle, ShoppingCart, Users, RefreshCw, PieChart as PieChartIcon,
@@ -29,12 +30,7 @@ const COLORS_EXTENDED = [
   '#0ea5e9', '#d946ef', '#f43f5e', '#eab308', '#22c55e', '#a855f7', '#06b6d4'
 ];
 
-const parseTimestamp = (ts) => {
-  if (!ts) return new Date();
-  if (typeof ts.toDate === 'function') return ts.toDate();
-  if (ts.seconds) return new Date(ts.seconds * 1000);
-  return new Date(ts);
-};
+
 
 const BarCustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
@@ -825,6 +821,7 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
                 <Bar yAxisId="left" dataKey="sales" name="Sales" fill="url(#colorSales)" radius={[4, 4, 0, 0]} maxBarSize={50} />
                 <Line yAxisId="right" type="monotone" dataKey="income" name="Income" stroke="#10b981" strokeWidth={3} dot={{ r: 3, fill: '#10b981', strokeWidth: 2, stroke: '#020617' }} activeDot={{ r: 6, strokeWidth: 0 }} />
                 <Line yAxisId="left" type="monotone" dataKey="expenses" name="Expenses" stroke="#ef4444" strokeWidth={2} strokeDasharray="5 5" dot={false} />
+                <ReferenceLine y={1000} yAxisId="left" stroke="#f59e0b" strokeWidth={1} strokeDasharray="4 4" label={{ position: 'insideTopLeft', value: 'Daily Target (Rs 1,000)', fill: '#f59e0b', fontSize: 10, fontWeight: 'bold' }} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>

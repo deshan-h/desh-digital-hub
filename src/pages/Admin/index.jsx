@@ -3,6 +3,7 @@ import { signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence
 import { collection, addDoc, getDocs, query, orderBy, serverTimestamp, doc, deleteDoc, where, updateDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../../config/firebase';
 import { format } from 'date-fns';
+import { parseTimestamp } from '../../utils/helpers';
 import logo from '../../assets/logo.webp';
 import { notify } from '../../utils/toast';
 import { syncSaleToExpenseTracker } from '../../utils/expenseTrackerSync';
@@ -24,12 +25,7 @@ const Expenses = lazy(() => import('./Expenses'));
 const ItemsManager = lazy(() => import('./ItemsManager'));
 const Settings = lazy(() => import('./Settings'));
 
-const parseTimestamp = (ts) => {
-  if (!ts) return new Date();
-  if (typeof ts.toDate === 'function') return ts.toDate();
-  if (ts.seconds) return new Date(ts.seconds * 1000);
-  return new Date(ts);
-};
+
 
 export default function Admin() {
   const [user, setUser] = useState(null);

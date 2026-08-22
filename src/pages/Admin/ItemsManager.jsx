@@ -6,9 +6,9 @@ import { db } from '../../config/firebase';
 import { notify } from '../../utils/toast';
 import DeleteConfirmModal from '../../components/DeleteConfirmModal';
 import { 
-  Tags, Plus, Edit2, Trash2, Save, X, Printer, Layers, FileText, Image as ImageIcon, Download, Code, Settings, Package, FileDown, ArrowUp, ArrowDown, MoveUp, MoveDown, HelpCircle 
+  Tags, Plus, Edit2, Trash2, Save, X, Printer, Layers, FileText, Image as ImageIcon, Download, Code, Settings, Package, FileDown, ArrowUp, ArrowDown, MoveUp, MoveDown, HelpCircle, GripVertical 
 } from 'lucide-react';
-import * as Icons from 'lucide-react';
+
 import jsPDF from 'jspdf';
 import { toPng } from 'html-to-image';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
@@ -620,7 +620,7 @@ export default function ItemsManager() {
                                     {...provided.dragHandleProps} 
                                     className="mr-3 text-slate-600 hover:text-slate-300 cursor-grab active:cursor-grabbing"
                                   >
-                                    <Icons.GripVertical className="w-5 h-5" />
+                                    <GripVertical className="w-5 h-5" />
                                   </div>
                                 )}
                                 
