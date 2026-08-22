@@ -8,6 +8,19 @@
     <meta name="description" content="Desh Digital Hub - Printing & Digital Services" />
     <link rel="apple-touch-icon" href="/pwa-192x192.png" />
     <title>DESH Digital Hub</title>
+    <!-- Single Page Apps for GitHub Pages -->
+    <script type="text/javascript">
+      (function(l) {
+        if (l.search[1] === 'p') {
+          var q = l.search.slice(1).split('&').map(function(s) { return s.replace(/~and~/g, '&') }).join('?');
+          var a = q.split('?');
+          var p = a[0].slice(2);
+          window.history.replaceState(null, null,
+            l.pathname.slice(0, -1) + p + (a[1] ? '?' + a[1] : '') + l.hash
+          );
+        }
+      }(window.location))
+    </script>
   </head>
   <body>
     <div id="root"></div>
