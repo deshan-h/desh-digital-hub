@@ -375,9 +375,11 @@ export default function Customers({ isAdmin }) {
           phone: record.phone,
           area: record.area,
           totalPending: 0,
+          advanceBalance: 0,
           totalPaid: 0,
           records: [],
-          hasPending: false
+          hasPending: false,
+          hasAdvance: false
         };
       }
       acc[nameKey].records.push(record);
@@ -396,9 +398,17 @@ export default function Customers({ isAdmin }) {
     Object.values(acc).forEach(group => {
       if (group.totalPending > 0.01) {
         group.hasPending = true;
+        group.hasAdvance = false;
+        group.advanceBalance = 0;
+      } else if (group.totalPending < -0.01) {
+        group.hasPending = false;
+        group.hasAdvance = true;
+        group.advanceBalance = Math.abs(group.totalPending);
       } else {
         group.hasPending = false;
+        group.hasAdvance = false;
         group.totalPending = 0;
+        group.advanceBalance = 0;
       }
     });
     
@@ -422,7 +432,10 @@ export default function Customers({ isAdmin }) {
     return filtered.sort((a, b) => {
       if (a.hasPending && !b.hasPending) return -1;
       if (!a.hasPending && b.hasPending) return 1;
-      if (a.totalPending !== b.totalPending) return b.totalPending - a.totalPending;
+      if (a.hasPending && b.hasPending) return b.totalPending - a.totalPending;
+      if (a.hasAdvance && !b.hasAdvance) return -1;
+      if (!a.hasAdvance && b.hasAdvance) return 1;
+      if (a.hasAdvance && b.hasAdvance) return b.advanceBalance - a.advanceBalance;
       return (a.name || '').localeCompare(b.name || '');
     });
   }, [allGrouped, searchCustomer, searchArea, searchPhone, showOnlyDues]);
@@ -549,12 +562,14 @@ export default function Customers({ isAdmin }) {
               className={`px-3 py-1.5 rounded-lg border transition-all text-xs font-bold whitespace-nowrap shadow-sm hover:shadow-md ${
                 group.hasPending 
                   ? 'bg-orange-500/10 border-orange-500/30 text-orange-400 hover:bg-orange-500/20' 
-                  : group.records.length > 0 
+                  : group.hasAdvance
                     ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
-                    : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-700'
+                    : group.records.length > 0 
+                      ? 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-700'
+                      : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-700'
               }`}
             >
-              {group.hasPending ? `Due: Rs ${group.totalPending.toFixed(0)}` : group.records.length > 0 ? 'Settled' : 'No History'}
+              {group.hasPending ? `Due: Rs ${group.totalPending.toFixed(0)}` : group.hasAdvance ? `Advance: Rs ${group.advanceBalance.toFixed(0)}` : group.records.length > 0 ? 'Settled' : 'No History'}
             </button>
           </div>
         </div>

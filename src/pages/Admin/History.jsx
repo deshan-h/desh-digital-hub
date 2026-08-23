@@ -2,8 +2,11 @@ import React, { useState, useMemo } from 'react';
 import { format } from 'date-fns';
 import { Calendar, Search, Filter, Download, ArrowRight, Printer, AlertTriangle, FileText, ChevronDown, ChevronUp, Package, Wrench, X, RefreshCw, Smartphone, Monitor, Battery, CheckCircle, Clock, Trash2, HelpCircle, ShoppingCart, User, History as HistoryIcon, MessageCircle } from 'lucide-react';
 import { generateInvoiceHtml } from '../../utils/invoiceTemplate';
+import { notify } from '../../utils/toast';
+import { collection, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { db } from '../../config/firebase';
 
-export default function History({ salesHistory, fetchSales, handleDeleteSale, user, posCategories = [], isAdmin }) {
+export default function History({ salesHistory, fetchSales, handleDeleteSale, user, posCategories = [], isAdmin, customersList = [] }) {
   const [invoiceSearch, setInvoiceSearch] = useState('');
   const [customerSearch, setCustomerSearch] = useState('');
   const [descriptionSearch, setDescriptionSearch] = useState('');
@@ -18,10 +21,32 @@ export default function History({ salesHistory, fetchSales, handleDeleteSale, us
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 20;
 
+  const [whatsappModalData, setWhatsappModalData] = useState(null);
+  const [whatsappNumberInput, setWhatsappNumberInput] = useState('');
+  const [isUpdatingCustomer, setIsUpdatingCustomer] = useState(false);
+
 // Send WhatsApp for a sale
-const sendWhatsAppSale = (sale) => {
-  const number = window.prompt('Enter WhatsApp number (with country code, e.g., 9471xxxxxxx):');
-  if (!number) return;
+const handleOpenWhatsappModal = (sale) => {
+  let customerPhone = sale.customerPhone || '';
+  // Try to find the customer in customersList by name
+  if (!customerPhone && sale.customerName) {
+    const customer = customersList.find(c => c.name.toLowerCase() === sale.customerName.toLowerCase());
+    if (customer && customer.phone) {
+      customerPhone = customer.phone;
+    }
+  }
+
+  // If we found a phone number, send immediately without opening modal
+  if (customerPhone) {
+    proceedSendWhatsapp(sale, customerPhone);
+  } else {
+    // If no phone number, open modal
+    setWhatsappModalData(sale);
+    setWhatsappNumberInput('');
+  }
+};
+
+const proceedSendWhatsapp = async (sale, numberToUse) => {
   let text = '*DESH Digital Hub*\n';
   text += 'Thank you for your business!\n\n';
   text += '*Your Order:*\n';
@@ -35,11 +60,56 @@ const sendWhatsAppSale = (sale) => {
   text += `\n*Total Amount:* Rs. ${sale.amount}\n\n`;
   text += 'For inquiries, call +94(71) 998 9000.';
   const encodedMessage = encodeURIComponent(text);
-  let formattedNumber = number.trim();
+  
+  let formattedNumber = numberToUse.trim().replace(/\D/g, '');
   if (formattedNumber.startsWith('0')) {
-    formattedNumber = formattedNumber.substring(1);
+    formattedNumber = '94' + formattedNumber.substring(1);
+  } else if (!formattedNumber.startsWith('94')) {
+    formattedNumber = '94' + formattedNumber;
   }
+  
   window.open(`https://wa.me/${formattedNumber}?text=${encodedMessage}`, '_blank');
+};
+
+const submitWhatsappModal = async () => {
+  if (!whatsappNumberInput.trim()) {
+    notify.error("Please enter a WhatsApp number");
+    return;
+  }
+  
+  setIsUpdatingCustomer(true);
+  try {
+    const sale = whatsappModalData;
+    
+    // If we have a customerName in the sale, let's update their record in DB
+    if (sale.customerName) {
+      const q = query(collection(db, 'customers'), where('name', '==', sale.customerName));
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        // Update the first matching customer
+        const customerDoc = querySnapshot.docs[0];
+        await updateDoc(doc(db, 'customers', customerDoc.id), {
+          phone: whatsappNumberInput.trim()
+        });
+      }
+    }
+    
+    // Update the sale document itself
+    if (sale.id) {
+      await updateDoc(doc(db, 'sales', sale.id), {
+        customerPhone: whatsappNumberInput.trim()
+      });
+    }
+
+    proceedSendWhatsapp(sale, whatsappNumberInput);
+    setWhatsappModalData(null);
+  } catch (error) {
+    console.error("Error updating customer phone:", error);
+    notify.error("Failed to update customer phone");
+  } finally {
+    setIsUpdatingCustomer(false);
+  }
 };
 
   const itemToCategoryMap = useMemo(() => {
@@ -484,7 +554,7 @@ const sendWhatsAppSale = (sale) => {
                             <Trash2 className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => sendWhatsAppSale(sale)}
+                            onClick={() => handleOpenWhatsappModal(sale)}
                             className="text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10 p-1.5 rounded-lg transition-all"
                             title="Send WhatsApp"
                           >
@@ -546,6 +616,50 @@ const sendWhatsAppSale = (sale) => {
           </div>
         )}
       </div>
+
+      {/* WhatsApp Reminder Modal */}
+      {whatsappModalData && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl">
+            <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+              <h3 className="text-lg font-black text-slate-100 uppercase tracking-wide flex items-center gap-2">
+                <MessageCircle className="w-5 h-5 text-blue-400" /> Send Reminder
+              </h3>
+              <button onClick={() => setWhatsappModalData(null)} className="text-slate-400 hover:text-white transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-slate-400">
+                Send a WhatsApp message for <span className="text-slate-200 font-bold">{whatsappModalData.customerName || whatsappModalData.invoiceNo || 'this order'}</span>.
+              </p>
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">
+                  WhatsApp Number
+                </label>
+                <input
+                  type="text"
+                  autoFocus
+                  value={whatsappNumberInput}
+                  onChange={(e) => setWhatsappNumberInput(e.target.value)}
+                  placeholder="07XXXXXXXX"
+                  className="w-full text-lg bg-slate-950 border border-slate-800 text-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500/50 transition-all"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') submitWhatsappModal();
+                  }}
+                />
+              </div>
+              <button
+                onClick={submitWhatsappModal}
+                disabled={!whatsappNumberInput.trim() || isUpdatingCustomer}
+                className="w-full bg-blue-500 hover:bg-blue-400 text-slate-950 font-black py-3.5 rounded-xl text-sm uppercase tracking-wide transition-all disabled:opacity-50 mt-2 flex justify-center items-center gap-2"
+              >
+                {isUpdatingCustomer ? 'Sending...' : 'Send Message'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

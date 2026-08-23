@@ -303,43 +303,65 @@ export default function Admin() {
 
   const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
 
-  const handleCheckout = async (posCustomerName = '', discount = 0, isCredit = false, cashGivenAmount = '', currentArrears = 0) => {
+  const handleCheckout = async (posCustomerName = '', discount = 0, isCredit = false, cashGivenAmount = '', currentArrears = 0, currentAdvance = 0, keepChangeAsAdvance = false) => {
     if (cart.length === 0) return;
     setCheckoutLoading(true);
 
     const description = cart.map(item => `${item.qty}x ${item.name}`).join(', ');
     const finalTotal = Math.max(0, cartTotal - Number(discount));
+    
+    let billAfterAdvance = Math.max(0, finalTotal - currentAdvance);
+    let amountDeductedFromAdvance = finalTotal - billAfterAdvance;
+    let remainingBill = billAfterAdvance;
+
     const cashInput = cashGivenAmount === '' ? 0 : Number(cashGivenAmount);
     
     // Determine actual cash to apply based on input and credit mode
-    let actualCash = (isCredit && cashGivenAmount === '') ? 0 : (cashGivenAmount === '' ? finalTotal : cashInput);
+    let actualCash = (isCredit && cashGivenAmount === '') ? 0 : (cashGivenAmount === '' ? remainingBill : cashInput);
     
-    let saleAmount = 0;
-    let pendingToAdd = 0;
+    let saleAmount = amountDeductedFromAdvance;
+    let pendingToAdd = amountDeductedFromAdvance;
     let paymentToAdd = 0;
 
     if (isCredit) {
-      // Put whole bill on pending, and whatever cash they gave as payment
-      saleAmount = actualCash;
-      pendingToAdd = finalTotal;
+      // Put whole remaining bill on pending, and whatever cash they gave as payment
+      saleAmount += actualCash;
+      pendingToAdd += remainingBill;
       if (actualCash > 0) {
-        paymentToAdd = actualCash;
+        paymentToAdd += actualCash;
       }
     } else {
-      if (actualCash < finalTotal) {
+      if (actualCash < remainingBill) {
         // They didn't pay enough, force it to be a credit transaction
-        saleAmount = actualCash;
-        pendingToAdd = finalTotal;
+        saleAmount += actualCash;
+        pendingToAdd += remainingBill;
         if (actualCash > 0) {
-          paymentToAdd = actualCash;
+          paymentToAdd += actualCash;
         }
       } else {
         // They paid enough to cover the bill
-        const excess = actualCash - finalTotal;
+        const excess = actualCash - remainingBill;
         const appliedToArrears = Math.min(excess, currentArrears); // Only apply up to what they owe
-        saleAmount = finalTotal + appliedToArrears; // The rest is considered change given back to the customer
+        saleAmount += remainingBill + appliedToArrears; // The rest is considered change given back to the customer
         if (appliedToArrears > 0) {
-          paymentToAdd = appliedToArrears;
+          paymentToAdd += appliedToArrears;
+        }
+        
+        const remainingExcess = excess - appliedToArrears;
+        const unusedAdvance = currentAdvance - amountDeductedFromAdvance;
+        
+        if (keepChangeAsAdvance) {
+          if (remainingExcess > 0) {
+            paymentToAdd += remainingExcess;
+            saleAmount += remainingExcess; // Add the kept change to daily sales as well
+          }
+        } else {
+          // If unchecked, it means they gave the change BACK to the customer.
+          // This includes returning any unused advance they had!
+          if (unusedAdvance > 0) {
+            pendingToAdd += unusedAdvance; // Add a pending record to consume the advance balance
+            saleAmount -= unusedAdvance; // Subtract from today's sales because cash is leaving the drawer
+          }
         }
       }
     }
@@ -377,7 +399,7 @@ export default function Admin() {
         await addDoc(collection(db, 'daily_sales'), {
           amount: saleAmount,
           discount: Number(discount),
-          description: description + (paymentToAdd > 0 ? ` (Incl. Rs ${paymentToAdd.toFixed(2)} Arrears Payment)` : '') + (isCredit ? ` (Partial)` : ''),
+          description: description + (amountDeductedFromAdvance > 0 ? ` (Rs ${amountDeductedFromAdvance.toFixed(2)} from Advance)` : '') + (paymentToAdd > 0 && paymentToAdd <= currentArrears ? ` (Incl. Rs ${paymentToAdd.toFixed(2)} Arrears Payment)` : '') + (keepChangeAsAdvance && (actualCash - remainingBill - Math.min(actualCash - remainingBill, currentArrears)) > 0 ? ` (+ Rs ${(actualCash - remainingBill - Math.min(actualCash - remainingBill, currentArrears)).toFixed(2)} Advance Retained)` : '') + (!keepChangeAsAdvance && (currentAdvance - amountDeductedFromAdvance) > 0 ? ` (Refunded Rs ${(currentAdvance - amountDeductedFromAdvance).toFixed(2)} Advance)` : '') + (isCredit ? ` (Partial)` : ''),
           cartItems: cleanCartItems,
           timestamp: serverTimestamp(),
           userId: user.uid,
@@ -407,7 +429,7 @@ export default function Admin() {
            amount: paymentToAdd,
            status: 'Paid',
            type: 'Payment',
-           description: 'Payment Received',
+           description: 'Payment Received' + (keepChangeAsAdvance && (actualCash - remainingBill - Math.min(actualCash - remainingBill, currentArrears)) > 0 ? ' (Includes Advance)' : ''),
            timestamp: serverTimestamp()
          });
       }
@@ -593,7 +615,7 @@ export default function Admin() {
           )}
           {activeTab === 'customers' && <Customers isAdmin={isAdmin} />}
           {activeTab === 'expenses' && <Expenses isAdmin={isAdmin} />}
-          {activeTab === 'history' && <History salesHistory={salesHistory} fetchSales={fetchSales} handleDeleteSale={handleDeleteSale} user={user} posCategories={posCategories} isAdmin={isAdmin} />}
+          {activeTab === 'history' && <History salesHistory={salesHistory} fetchSales={fetchSales} handleDeleteSale={handleDeleteSale} user={user} posCategories={posCategories} isAdmin={isAdmin} customersList={customersList} />}
           {activeTab === 'repairs' && <Repairs user={user} fetchSales={fetchSales} />}
           {activeTab === 'items' && <ItemsManager posCategories={posCategories} fetchCategories={fetchCategories} />}
           {activeTab === 'settings' && <Settings isAdmin={isAdmin} />}
