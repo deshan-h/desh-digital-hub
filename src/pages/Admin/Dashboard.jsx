@@ -130,7 +130,9 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
   yesterday.setDate(today.getDate() - 1);
 
   const startOfWeek = new Date(today);
-  startOfWeek.setDate(today.getDate() - today.getDay());
+  const dayOfWeek = today.getDay();
+  const distanceToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  startOfWeek.setDate(today.getDate() - distanceToMonday);
   startOfWeek.setHours(0, 0, 0, 0);
 
   const todaySales = salesHistory.filter(s => s.timestamp && parseTimestamp(s.timestamp).toDateString() === today.toDateString());
@@ -168,6 +170,9 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
   const totalSalesTotal = salesHistory.reduce((sum, s) => sum + Number(s.amount || 0), 0);
   const totalIncomeTotal = salesHistory.reduce((sum, s) => sum + getSaleIncome(s), 0);
 
+  const yearSales = salesHistory.filter(s => s.timestamp && parseTimestamp(s.timestamp).getFullYear() === currentYear);
+  const yearIncomeTotal = yearSales.reduce((sum, s) => sum + getSaleIncome(s), 0);
+
   const monthExpensesTotal = monthExpensesList.reduce((sum, e) => sum + Number(e.amount), 0);
   const lastMonthExpensesTotal = lastMonthExpensesList.reduce((sum, e) => sum + Number(e.amount), 0);
   const weekExpensesTotal = expenses.filter(e => {
@@ -183,14 +188,44 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
   const revenueGrowth = lastMonthSalesTotal === 0 ? 100 : ((monthSalesTotal - lastMonthSalesTotal) / lastMonthSalesTotal) * 100;
   const incomeGrowth = lastMonthIncomeTotal === 0 ? 100 : ((monthIncomeTotal - lastMonthIncomeTotal) / lastMonthIncomeTotal) * 100;
 
-  // -- HIGH RISK DEBTORS --
-  const highRiskDebtors = customerDuesList.filter(due => {
-    if (due.status !== 'Pending') return false;
-    // Check if debt is older than 14 days or amount is very high
-    const dDate = parseTimestamp(due.timestamp || due.date);
-    const ageDays = (today - dDate) / (1000 * 60 * 60 * 24);
-    return ageDays > 14 || Number(due.amount || 0) > 5000;
-  }).sort((a, b) => Number(b.amount || 0) - Number(a.amount || 0));
+  // -- CUSTOMER BALANCES & DEBTORS COUNT --
+  const customerBalancesMap = React.useMemo(() => {
+    const balances = {};
+    (customerDuesList || []).forEach(due => {
+      const name = due.name || 'Unknown';
+      if (!balances[name]) {
+        balances[name] = { name, balance: 0, oldestPending: null };
+      }
+      
+      const amt = Number(due.amount || 0);
+      if (due.type === 'Payment') {
+        balances[name].balance -= amt;
+      } else if (due.status === 'Pending') {
+        balances[name].balance += amt;
+        const dDate = parseTimestamp(due.timestamp || due.date);
+        if (!balances[name].oldestPending || dDate < balances[name].oldestPending) {
+          balances[name].oldestPending = dDate;
+        }
+      }
+    });
+    return balances;
+  }, [customerDuesList]);
+
+  // People who owe money (balance > 0)
+  const uniqueDebtorsCount = Object.values(customerBalancesMap).filter(c => c.balance > 0.01).length;
+
+  // -- ACTIVE CUSTOMER BALANCES (DUES & ADVANCES) --
+  const activeCustomerBalances = Object.values(customerBalancesMap)
+    .filter(c => Math.abs(c.balance) > 0.01) // Has due or advance
+    .map(c => {
+      let riskLevel = 'Normal';
+      if (c.balance > 0 && c.oldestPending) {
+        const ageDays = (today - c.oldestPending) / (1000 * 60 * 60 * 24);
+        if (ageDays > 14 || c.balance > 5000) riskLevel = 'High';
+      }
+      return { ...c, riskLevel };
+    })
+    .sort((a, b) => b.balance - a.balance); // Highest due first, advances at bottom
 
   // -- FAST MOVING ITEMS --
   const itemCounts = {};
@@ -744,8 +779,13 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
               <AlertTriangle className="w-4 h-4 text-orange-400" /> Total Dues
             </h3>
           </div>
-          <div className="relative z-10">
+          <div className="flex justify-between items-end relative z-10">
             <h3 className="text-xl lg:text-2xl font-black text-orange-400"><span className="text-xs lg:text-sm font-bold text-orange-700/50">Rs.</span> {totalPendingDues?.toLocaleString('en-US', { maximumFractionDigits: 0 }) || 0}</h3>
+            {uniqueDebtorsCount > 0 && (
+              <div className="hidden lg:flex text-[10px] font-bold text-orange-500/80 bg-orange-500/10 px-2 py-0.5 rounded-md border border-orange-500/20">
+                {uniqueDebtorsCount} {uniqueDebtorsCount === 1 ? 'Customer' : 'Customers'}
+              </div>
+            )}
           </div>
         </motion.div>
         
@@ -763,9 +803,9 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
         </motion.div>
       </div>
 
-      {/* WIDGET: SALES VS INCOME */}
-      <div className="grid grid-cols-1 gap-4 mb-4">
-        <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-5%" }} transition={{ duration: 0.5, delay: 0.1 }} className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-lg flex flex-col h-[380px]">
+      {/* WIDGET: SALES VS INCOME & INCOME SUMMARY */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-4">
+        <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-5%" }} transition={{ duration: 0.5, delay: 0.1 }} className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-lg flex flex-col h-[380px] lg:col-span-3">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <div className="flex flex-col gap-3">
               <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest">Sales vs Income ({revenueTimeFilter === 'week' ? 'This Week' : revenueTimeFilter === 'lastMonth' ? 'Last Month' : 'This Month'})</h3>
@@ -824,6 +864,54 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
                 <ReferenceLine y={1000} yAxisId="left" stroke="#f59e0b" strokeWidth={1} strokeDasharray="4 4" label={{ position: 'insideTopLeft', value: 'Daily Target (Rs 1,000)', fill: '#f59e0b', fontSize: 10, fontWeight: 'bold' }} />
               </ComposedChart>
             </ResponsiveContainer>
+          </div>
+        </motion.div>
+
+        {/* Income Summary Widget */}
+        <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-5%" }} transition={{ duration: 0.5, delay: 0.2 }} className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-lg flex flex-col h-[380px]">
+          <h3 className="text-sm font-bold text-emerald-400 uppercase tracking-widest mb-6 flex items-center justify-between">
+            Income Summary
+            <TrendingUp className="w-4 h-4 text-emerald-400" />
+          </h3>
+          <div className="flex-1 overflow-y-auto no-scrollbar pr-1 flex flex-col gap-1">
+            {(() => {
+              const goals = [
+                { label: 'This Week Income', current: weekIncomeTotal, target: 5000 },
+                { label: 'This Month Income', current: monthIncomeTotal, target: 20000 },
+                { label: 'This Year Income', current: yearIncomeTotal, target: 240000 }
+              ];
+
+              return goals.map((goal, idx) => {
+                const percent = Math.min(100, Math.max(0, (goal.current / goal.target) * 100));
+                const themeColors = [
+                  { bg: 'bg-teal-500/30', fill: 'bg-teal-500/80' },
+                  { bg: 'bg-indigo-500/30', fill: 'bg-indigo-500/80' },
+                  { bg: 'bg-orange-500/30', fill: 'bg-orange-500/80' }
+                ];
+                const theme = themeColors[idx % themeColors.length];
+
+                return (
+                  <div key={idx} className={`relative overflow-hidden rounded-2xl mb-3 flex flex-col justify-center p-4 ${theme.bg}`}>
+                    {/* The Progress Bar Fill */}
+                    <div className={`absolute top-0 left-0 h-full ${theme.fill} transition-all duration-1000 z-0`} style={{ width: `${percent}%` }}></div>
+                    
+                    {/* Content */}
+                    <div className="relative z-10 flex flex-col gap-0.5">
+                      <span className="text-sm font-bold text-white drop-shadow-sm">{goal.label}</span>
+                      <span className="text-[11px] text-white/90 font-medium drop-shadow-sm">
+                        Achieved: Rs {goal.current.toLocaleString('en-US', { maximumFractionDigits: 0 })} / Rs {goal.target.toLocaleString('en-US', { maximumFractionDigits: 0 })} ({percent.toFixed(0)}%)
+                      </span>
+                    </div>
+                  </div>
+                );
+              });
+            })()}
+
+            {/* Total All-Time (Compact) */}
+            <div className="bg-slate-950/40 p-3 rounded-xl border border-white/5 flex items-center justify-between mt-1">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total All-Time</span>
+              <span className="text-sm font-black text-emerald-400">Rs {totalIncomeTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
+            </div>
           </div>
         </motion.div>
       </div>
@@ -1105,35 +1193,37 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
 
       {/* ROW 2: Alerts & Pipeline (Moved to Bottom) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-        {/* High Risk Debtors */}
-        <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-5%" }} transition={{ duration: 0.5, delay: 0.1 }} className="bg-red-950/20 backdrop-blur-md border border-red-500/20 rounded-2xl p-5 shadow-lg flex flex-col h-[320px]">
-          <h3 className="text-sm font-bold text-red-100 uppercase tracking-widest mb-4 flex items-center justify-between">
-            High-Risk Debtors
-            <AlertTriangle className="w-4 h-4 text-red-400" />
+        {/* Customer Balances */}
+        <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-5%" }} transition={{ duration: 0.5, delay: 0.1 }} className="bg-slate-900/40 backdrop-blur-md border border-slate-700/50 rounded-2xl p-5 shadow-lg flex flex-col h-[320px]">
+          <h3 className="text-sm font-bold text-slate-200 uppercase tracking-widest mb-4 flex items-center justify-between">
+            Customer Balances
+            <AlertTriangle className="w-4 h-4 text-orange-400" />
           </h3>
           <div className="flex-1 overflow-y-auto pr-1 space-y-2 no-scrollbar">
-            {highRiskDebtors.length === 0 ? (
+            {activeCustomerBalances.length === 0 ? (
                <p className="text-slate-500 text-xs text-center mt-6 flex flex-col items-center gap-2">
                  <ShieldAlert className="w-8 h-8 text-emerald-500/50" />
-                 All clear! No high-risk debts.
+                 All clear! No active dues or advances.
                </p>
             ) : (
-               highRiskDebtors.map((due, i) => {
-                 const dDate = parseTimestamp(due.timestamp || due.date);
-                 const ageDays = Math.floor((today - dDate) / (1000 * 60 * 60 * 24));
+               activeCustomerBalances.map((customer, i) => {
+                 const isAdvance = customer.balance < 0;
+                 const amt = Math.abs(customer.balance);
+                 const ageDays = customer.oldestPending ? Math.floor((today - customer.oldestPending) / (1000 * 60 * 60 * 24)) : 0;
+                 
                  return (
-                   <div key={i} className="flex gap-3 items-center p-2.5 rounded-xl bg-red-950/30 hover:bg-red-900/40 transition-all border border-red-500/10">
-                     <div className="w-8 h-8 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 flex items-center justify-center font-black text-xs shrink-0 shadow-[0_0_10px_rgba(239,68,68,0.2)]">
+                   <div key={i} className={`flex gap-3 items-center p-2.5 rounded-xl transition-all border ${isAdvance ? 'bg-emerald-950/20 hover:bg-emerald-950/40 border-emerald-500/10' : customer.riskLevel === 'High' ? 'bg-red-950/30 hover:bg-red-900/40 border-red-500/10' : 'bg-orange-950/20 hover:bg-orange-900/30 border-orange-500/10'}`}>
+                     <div className={`w-8 h-8 rounded-full border flex items-center justify-center font-black text-xs shrink-0 ${isAdvance ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : customer.riskLevel === 'High' ? 'bg-red-500/10 border-red-500/30 text-red-400 shadow-[0_0_10px_rgba(239,68,68,0.2)]' : 'bg-orange-500/10 border-orange-500/30 text-orange-400'}`}>
                        <UserX className="w-4 h-4" />
                      </div>
                      <div className="flex-1 min-w-0">
-                       <p className="text-sm font-bold text-slate-200 truncate">{due.name}</p>
-                       <p className="text-[11px] text-red-400/80 mt-0.5 flex items-center gap-1">
-                         <Clock className="w-3 h-3" /> {ageDays} Days Overdue
+                       <p className="text-sm font-bold text-slate-200 truncate">{customer.name}</p>
+                       <p className={`text-[11px] mt-0.5 flex items-center gap-1 ${isAdvance ? 'text-emerald-400/80' : customer.riskLevel === 'High' ? 'text-red-400/80' : 'text-orange-400/80'}`}>
+                         <Clock className="w-3 h-3" /> {isAdvance ? 'Advance Payment' : `${ageDays} Days Overdue`}
                        </p>
                      </div>
-                     <div className="text-xs font-black text-red-400 whitespace-nowrap bg-red-500/10 px-2.5 py-1.5 rounded-lg border border-red-500/20">
-                       Rs {Number(due.amount || 0).toFixed(0)}
+                     <div className={`text-xs font-black whitespace-nowrap px-2.5 py-1.5 rounded-lg border ${isAdvance ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' : customer.riskLevel === 'High' ? 'text-red-400 bg-red-500/10 border-red-500/20' : 'text-orange-400 bg-orange-500/10 border-orange-500/20'}`}>
+                       Rs {amt.toFixed(0)}
                      </div>
                    </div>
                  );

@@ -216,22 +216,26 @@ export default function Admin() {
   async function fetchCustomerDues() {
     try {
       const snap = await getDocs(collection(db, 'customer_dues'));
-      let total = 0;
       const duesList = [];
+      const balances = {};
+      
       snap.forEach(doc => {
         const data = doc.data();
-        // Include both Pending debts and Payments in the dues list
         if (data.status === 'Pending' || data.type === 'Payment') {
-          if (data.type === 'Payment') {
-            total -= Number(data.amount || 0);
-          } else if (data.status === 'Pending') {
-            total += Number(data.amount || 0);
-          }
           duesList.push({ id: doc.id, ...data });
+          
+          const name = data.name || 'Unknown';
+          if (!balances[name]) balances[name] = 0;
+          if (data.type === 'Payment') balances[name] -= Number(data.amount || 0);
+          else if (data.status === 'Pending') balances[name] += Number(data.amount || 0);
         }
       });
-      // Prevent floating point negative dust
-      total = Math.max(0, total);
+      
+      let total = 0;
+      Object.values(balances).forEach(b => {
+        if (b > 0.01) total += b;
+      });
+      
       setTotalPendingDues(total);
       localStorage.setItem('totalPendingDues', JSON.stringify(total));
       setCustomerDuesList(duesList);
