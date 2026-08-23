@@ -10,6 +10,7 @@ export default function Customers({ isAdmin }) {
   const [records, setRecords] = useState([]);
   const [directoryRecords, setDirectoryRecords] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showSettledCustomers, setShowSettledCustomers] = useState(false);
   const [searchCustomer, setSearchCustomer] = useState('');
   const [searchArea, setSearchArea] = useState('');
   const [searchPhone, setSearchPhone] = useState('');
@@ -440,9 +441,16 @@ export default function Customers({ isAdmin }) {
     });
   }, [allGrouped, searchCustomer, searchArea, searchPhone, showOnlyDues]);
 
+  const { activeCustomers, settledCustomers } = React.useMemo(() => {
+    return {
+      activeCustomers: filteredGroups.filter(g => g.hasPending || g.hasAdvance),
+      settledCustomers: filteredGroups.filter(g => !g.hasPending && !g.hasAdvance)
+    };
+  }, [filteredGroups]);
+
   const renderGroup = (group) => {
     return (
-      <div key={group.nameKey} className={`bg-slate-950/40 border-b border-white/5 transition-all flex flex-col ${!group.hasPending ? 'opacity-70 hover:opacity-100' : ''}`}>
+      <div key={group.nameKey} className={`bg-slate-950/40 border-b border-white/5 transition-all flex flex-col hover:bg-slate-900/50`}>
         {/* Table Row */}
         <div className="grid grid-cols-12 gap-4 px-4 py-2.5 items-center">
           {/* Col 0: Most Visited Star (col-span-1) */}
@@ -721,7 +729,7 @@ export default function Customers({ isAdmin }) {
               <div className="flex-1 flex justify-center items-center">
                 <div className="w-8 h-8 border-2 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin"></div>
               </div>
-            ) : filteredGroups.length === 0 ? (
+            ) : activeCustomers.length === 0 && settledCustomers.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center text-slate-500 py-12">
                 <User className="w-12 h-12 mb-3 opacity-20" />
                 <p>No customers found.</p>
@@ -738,13 +746,34 @@ export default function Customers({ isAdmin }) {
                 </div>
 
                 <div className="divide-y divide-white/5">
-                  {filteredGroups.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map(renderGroup)}
+                  {activeCustomers.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map(renderGroup)}
+                  
+                  {settledCustomers.length > 0 && (
+                    <div className="p-4 border-t border-white/5">
+                      <button 
+                        onClick={() => setShowSettledCustomers(!showSettledCustomers)}
+                        className="w-full flex items-center justify-between p-3 bg-slate-800/40 hover:bg-slate-800/80 border border-slate-700 rounded-xl transition-all text-slate-300 font-bold text-sm shadow-sm"
+                      >
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="w-4 h-4 text-slate-500" />
+                          Settled & No History Customers ({settledCustomers.length})
+                        </div>
+                        {showSettledCustomers ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  )}
+                  
+                  {showSettledCustomers && (
+                    <div className="divide-y divide-white/5 border-t border-slate-800 bg-slate-900/30">
+                      {settledCustomers.map(renderGroup)}
+                    </div>
+                  )}
                 </div>
 
-                {filteredGroups.length > ITEMS_PER_PAGE && (
+                {activeCustomers.length > ITEMS_PER_PAGE && (
                   <div className="flex items-center justify-between px-4 py-4 border-t border-white/5 bg-slate-950/50 mt-auto">
                     <span className="text-xs text-slate-500 font-semibold">
-                      Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, filteredGroups.length)} of {filteredGroups.length}
+                      Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, activeCustomers.length)} of {activeCustomers.length} Active
                     </span>
                     <div className="flex gap-2">
                       <button
@@ -755,8 +784,8 @@ export default function Customers({ isAdmin }) {
                         Previous
                       </button>
                       <button
-                        onClick={() => setCurrentPage(p => Math.min(Math.ceil(filteredGroups.length / ITEMS_PER_PAGE), p + 1))}
-                        disabled={currentPage === Math.ceil(filteredGroups.length / ITEMS_PER_PAGE)}
+                        onClick={() => setCurrentPage(p => Math.min(Math.ceil(activeCustomers.length / ITEMS_PER_PAGE), p + 1))}
+                        disabled={currentPage === Math.ceil(activeCustomers.length / ITEMS_PER_PAGE)}
                         className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/50 text-slate-300 text-xs font-bold disabled:opacity-50 hover:bg-slate-700 transition-colors"
                       >
                         Next

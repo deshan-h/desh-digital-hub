@@ -353,7 +353,6 @@ export default function Admin() {
         if (keepChangeAsAdvance) {
           if (remainingExcess > 0) {
             paymentToAdd += remainingExcess;
-            saleAmount += remainingExcess; // Add the kept change to daily sales as well
           }
         } else {
           // If unchecked, it means they gave the change BACK to the customer.
@@ -368,9 +367,8 @@ export default function Admin() {
 
     let finalCustomerName = posCustomerName.trim();
     if (!finalCustomerName) {
-      const todaySalesCount = salesHistory.filter(s => s.timestamp && parseTimestamp(s.timestamp).toDateString() === new Date().toDateString()).length;
-      finalCustomerName = `Customer ${todaySalesCount + 1}`;
-    } else if (!finalCustomerName.startsWith('Customer ')) {
+      finalCustomerName = 'No Name Provided';
+    } else if (finalCustomerName !== 'No Name Provided') {
       // Add to customers collection if not exists
       try {
         const q = query(collection(db, 'customers'), where('name', '==', finalCustomerName));

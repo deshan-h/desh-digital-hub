@@ -150,12 +150,11 @@ export default function POS({
   const handleSavePending = async () => {
     let finalCustomerName = pendingCustomerName.trim();
     if (!finalCustomerName) {
-      notify.error("Please enter or select a customer name");
-      return;
+      finalCustomerName = 'No Name Provided';
     }
     setPendingLoading(true);
 
-    if (!finalCustomerName.startsWith('Customer ')) {
+    if (finalCustomerName !== 'No Name Provided') {
       try {
         const q = query(collection(db, 'customers'), where('name', '==', finalCustomerName));
         const qs = await getDocs(q);
