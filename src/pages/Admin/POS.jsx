@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { ShoppingCart, Plus, Trash2, Search, Package, RefreshCw, Save, Clock, TrendingUp, TrendingDown, Star, ChevronLeft, ChevronRight, X, MessageCircle } from 'lucide-react';
 import { notify } from '../../utils/toast';
 import { generateInvoiceHtml } from '../../utils/invoiceTemplate';
-import { collection, addDoc, deleteDoc, doc, serverTimestamp, query, where, getDocs, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, deleteDoc, doc, serverTimestamp, query, where, getDocs, updateDoc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import DeleteConfirmModal from '../../components/DeleteConfirmModal';
 import { POSItem, CategoryTab, CartItem, POSItemsGrid, CustomerInput } from './POSComponents';
@@ -78,20 +78,54 @@ export default function POS({
   }, []);
 
   const [favoriteItemIds, setFavoriteItemIds] = useState(() => {
+    // Initial sync from local storage for fast render
     const saved = localStorage.getItem('posFavorites');
     return saved ? JSON.parse(saved) : [];
   });
 
-  const toggleFavorite = useCallback((e, item) => {
+  // Fetch true state from DB on mount
+  useEffect(() => {
+    const fetchFavorites = async () => {
+      try {
+        const docRef = doc(db, 'settings', 'pos_favorites');
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+          const dbItems = snap.data().items || [];
+          setFavoriteItemIds(dbItems);
+          localStorage.setItem('posFavorites', JSON.stringify(dbItems));
+        } else {
+          // If DB is empty, migrate local storage to DB
+          const saved = localStorage.getItem('posFavorites');
+          if (saved) {
+            const items = JSON.parse(saved);
+            await setDoc(docRef, { items });
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching POS favorites from DB", err);
+      }
+    };
+    fetchFavorites();
+  }, []);
+
+  const toggleFavorite = useCallback(async (e, item) => {
     e.preventDefault();
     e.stopPropagation();
+    
+    let newFavs = [];
     setFavoriteItemIds(prev => {
-      const newFavs = prev.includes(item.id)
+      newFavs = prev.includes(item.id)
         ? prev.filter(id => id !== item.id)
         : [...prev, item.id];
       localStorage.setItem('posFavorites', JSON.stringify(newFavs));
       return newFavs;
     });
+
+    try {
+      await setDoc(doc(db, 'settings', 'pos_favorites'), { items: newFavs });
+    } catch (err) {
+      console.error("Error saving POS favorites to DB", err);
+    }
   }, []);
 
   const displayCategories = useMemo(() => {
@@ -116,6 +150,7 @@ export default function POS({
   const [customerName, setCustomerName] = useState('');
   const [discount, setDiscount] = useState('');
   const [isCredit, setIsCredit] = useState(false);
+  const [includePreviousArrears, setIncludePreviousArrears] = useState(true);
   const [keepChangeAsAdvance, setKeepChangeAsAdvance] = useState(true);
 
   // Pending Orders State
@@ -127,6 +162,43 @@ export default function POS({
   const [pendingToDelete, setPendingToDelete] = useState(null);
   const [reminderModalData, setReminderModalData] = useState(null);
   const [reminderWhatsapp, setReminderWhatsapp] = useState('');
+  const [showRecentSalesDropdown, setShowRecentSalesDropdown] = useState(false);
+  const [showRecentDuesDropdown, setShowRecentDuesDropdown] = useState(false);
+
+  const [saleToDelete, setSaleToDelete] = useState(null);
+
+  const confirmDeleteSale = async () => {
+    if (!saleToDelete) return;
+    try {
+      await deleteDoc(doc(db, 'daily_sales', saleToDelete));
+      if (refreshPOSData) refreshPOSData();
+      notify.success("Sale deleted successfully!");
+    } catch (err) {
+      console.error("Error deleting sale:", err);
+      notify.error("Failed to delete sale");
+    } finally {
+      setSaleToDelete(null);
+    }
+  };
+
+  const handleDeleteSale = (e, saleId) => {
+    e.stopPropagation();
+    setSaleToDelete(saleId);
+  };
+
+  const handleDeleteDue = async (e, dueId) => {
+    e.stopPropagation();
+    if (window.confirm("Are you sure you want to delete this arrears record? This action cannot be undone.")) {
+      try {
+        await deleteDoc(doc(db, 'customer_dues', dueId));
+        if (refreshPOSData) refreshPOSData();
+        notify.success("Record deleted successfully!");
+      } catch (err) {
+        console.error("Error deleting due record:", err);
+        notify.error("Failed to delete record");
+      }
+    }
+  };
 
   const customerBalance = useMemo(() => {
     if (!customerName || customerName.trim() === '') return 0;
@@ -144,8 +216,38 @@ export default function POS({
       }, 0);
   }, [customerName, customerDuesList]);
 
+  const customerBalances = useMemo(() => {
+    const acc = {};
+    customerDuesList.forEach(due => {
+      const name = due.name?.trim() || 'Unknown';
+      if (!acc[name]) acc[name] = 0;
+      if (due.type === 'Payment') acc[name] -= Number(due.amount || 0);
+      else if (due.status === 'Pending') acc[name] += Number(due.amount || 0);
+    });
+
+    const list = [];
+    Object.keys(acc).forEach(name => {
+      const bal = acc[name];
+      if (bal > 0.01) list.push({ name, type: 'Due', amount: bal });
+      else if (bal < -0.01) list.push({ name, type: 'Advance', amount: Math.abs(bal) });
+    });
+    
+    // Sort by Due highest first, then Advance highest first
+    list.sort((a, b) => {
+      if (a.type === 'Due' && b.type === 'Advance') return -1;
+      if (a.type === 'Advance' && b.type === 'Due') return 1;
+      return b.amount - a.amount;
+    });
+
+    return list;
+  }, [customerDuesList]);
+
   const currentCustomerArrears = Math.max(0, customerBalance);
   const currentCustomerAdvance = Math.max(0, -customerBalance);
+
+  const pendingOrdersSum = useMemo(() => {
+    return pendingOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0);
+  }, [pendingOrders]);
 
   const handleSavePending = async () => {
     let finalCustomerName = pendingCustomerName.trim();
@@ -424,8 +526,12 @@ export default function POS({
 
             {/* Today's Sales, Pending Dues, and Pending Orders */}
             {!isSearchExpanded && (
-              <div className="hidden lg:flex items-center px-4 h-10 bg-slate-900 border border-slate-800 rounded-full shadow-inner cursor-default">
-                <div className="flex items-center gap-2" title={`Today's Sales (Yesterday: Rs ${yesterdaySalesSum.toFixed(2)})`}>
+              <div className="hidden lg:flex items-center px-4 h-10 bg-slate-900 border border-slate-800 rounded-full shadow-inner relative">
+                <div 
+                  className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" 
+                  title={`Today's Sales (Yesterday: Rs ${yesterdaySalesSum.toFixed(2)})`}
+                  onClick={() => setShowRecentSalesDropdown(!showRecentSalesDropdown)}
+                >
                   {todaySalesSum < yesterdaySalesSum ? (
                     <TrendingDown className="w-[16px] h-[16px] text-red-500" />
                   ) : (
@@ -436,13 +542,105 @@ export default function POS({
                   </span>
                 </div>
 
+                {/* Recent Sales Dropdown */}
+                {showRecentSalesDropdown && (
+                  <div className="absolute top-12 left-0 w-80 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col">
+                    <div className="p-3 bg-slate-800 border-b border-slate-700 flex justify-between items-center">
+                      <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">Recent Sales (Today)</span>
+                      <button onClick={() => setShowRecentSalesDropdown(false)} className="text-slate-400 hover:text-red-400">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto no-scrollbar p-2">
+                      {salesHistory
+                        .filter(sale => {
+                          const today = new Date();
+                          let d = new Date();
+                          if (typeof sale.timestamp?.toDate === 'function') d = sale.timestamp.toDate();
+                          else if (sale.timestamp?.seconds) d = new Date(sale.timestamp.seconds * 1000);
+                          return d.toDateString() === today.toDateString();
+                        })
+                        .slice(0, 5)
+                        .map((sale, idx) => (
+                          <div key={idx} className="flex justify-between items-center py-2 px-3 hover:bg-slate-800/50 rounded-lg transition-colors border-b border-slate-800/50 last:border-0">
+                            <div className="flex items-center gap-2 truncate pr-2">
+                              <span className="text-[11px] font-medium text-slate-300 truncate">{sale.customerName || 'No Name Provided'}</span>
+                              <span className="text-[9px] text-slate-500 bg-slate-950 px-1.5 py-0.5 rounded-md shrink-0">{sale.cartItems?.length || 0} items</span>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-[11px] font-black text-emerald-400">Rs {Number(sale.amount || 0).toFixed(0)}</span>
+                              <button
+                                onClick={(e) => handleDeleteSale(e, sale.id)}
+                                className="text-slate-500 hover:text-red-400 p-1 rounded hover:bg-red-500/10 transition-colors"
+                                title="Delete Sale"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                      ))}
+                      {salesHistory.filter(sale => {
+                        const today = new Date();
+                        let d = new Date();
+                        if (typeof sale.timestamp?.toDate === 'function') d = sale.timestamp.toDate();
+                        else if (sale.timestamp?.seconds) d = new Date(sale.timestamp.seconds * 1000);
+                        return d.toDateString() === today.toDateString();
+                      }).length === 0 && (
+                        <div className="p-4 text-center text-xs text-slate-500">No sales recorded today yet.</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {pendingOrders.length > 0 && (
+                  <>
+                    <div className="w-px h-4 bg-slate-700 mx-3"></div>
+                    <div 
+                      className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" 
+                      title={`${pendingOrders.length} Pending Orders`}
+                      onClick={() => setShowPendingOrdersModal(true)}
+                    >
+                      <Package className="w-[16px] h-[16px] text-amber-400" />
+                      <span className="text-sm font-black text-amber-400 tracking-wide">Rs {pendingOrdersSum.toFixed(2)}</span>
+                    </div>
+                  </>
+                )}
+
                 <div className="w-px h-4 bg-slate-700 mx-3"></div>
 
-                <div className="flex items-center gap-2" title="Pending Dues">
+                <div 
+                  className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" 
+                  title="Pending Dues"
+                  onClick={() => setShowRecentDuesDropdown(!showRecentDuesDropdown)}
+                >
                   <Clock className="w-[16px] h-[16px] text-rose-400" />
                   <span className="text-sm font-black text-rose-400 tracking-wide">Rs {(totalPendingDues || 0).toFixed(2)}</span>
                 </div>
 
+                {/* Recent Dues Dropdown */}
+                {showRecentDuesDropdown && (
+                  <div className="absolute top-12 right-0 w-80 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col">
+                    <div className="p-3 bg-slate-800 border-b border-slate-700 flex justify-between items-center">
+                      <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">Customer Balances</span>
+                      <button onClick={() => setShowRecentDuesDropdown(false)} className="text-slate-400 hover:text-red-400">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto no-scrollbar p-2">
+                      {customerBalances.map((item, idx) => (
+                          <div key={idx} className="flex justify-between items-center py-2 px-3 hover:bg-slate-800/50 rounded-lg transition-colors border-b border-slate-800/50 last:border-0">
+                            <span className="text-[11px] font-medium text-slate-300 truncate flex-1 pr-2">{item.name}</span>
+                            <span className={`text-[11px] font-black shrink-0 ${item.type === 'Due' ? 'text-rose-400' : 'text-emerald-400'}`}>
+                              {item.type === 'Advance' ? 'Adv: ' : ''}Rs {item.amount.toFixed(0)}
+                            </span>
+                          </div>
+                      ))}
+                      {customerBalances.length === 0 && (
+                        <div className="p-4 text-center text-xs text-slate-500">No active dues or advances.</div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -724,18 +922,35 @@ export default function POS({
                   )}
                 </div>
 
-                {/* Credit Checkbox */}
-                <div className="flex items-center gap-3 px-2 py-1">
-                  <input
-                    type="checkbox"
-                    id="isCredit"
-                    checked={isCredit}
-                    onChange={(e) => setIsCredit(e.target.checked)}
-                    className="w-5 h-5 rounded border-slate-700 text-emerald-500 focus:ring-emerald-500/50 bg-slate-950 cursor-pointer"
-                  />
-                  <label htmlFor="isCredit" className="text-base font-semibold text-slate-300 cursor-pointer select-none">
-                    Save as Credit Sale (Add to Customer Account)
-                  </label>
+                {/* Credit Toggle */}
+                <div className="flex flex-col gap-4 px-2 py-2">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setIsCredit(!isCredit)}
+                      className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none ${isCredit ? 'bg-emerald-500' : 'bg-slate-700'}`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isCredit ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                    <label className="text-base font-semibold text-slate-300 cursor-pointer select-none" onClick={() => setIsCredit(!isCredit)}>
+                      Save as Credit Sale (Add to Due/Advance Customer)
+                    </label>
+                  </div>
+
+                  {currentCustomerArrears > 0 && (
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setIncludePreviousArrears(!includePreviousArrears)}
+                        className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none ${includePreviousArrears ? 'bg-blue-500' : 'bg-slate-700'}`}
+                      >
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${includePreviousArrears ? 'translate-x-6' : 'translate-x-1'}`} />
+                      </button>
+                      <label className="text-base font-semibold text-slate-300 cursor-pointer select-none" onClick={() => setIncludePreviousArrears(!includePreviousArrears)}>
+                        Add previous arrears to this bill? (Rs {currentCustomerArrears.toFixed(2)})
+                      </label>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex-1"></div> {/* Spacer */}
@@ -769,7 +984,7 @@ export default function POS({
                       let billAfterAdvance = Math.max(0, cartTotal - Number(discount || 0)) - currentCustomerAdvance;
                       billAfterAdvance = Math.max(0, billAfterAdvance); // Bill can't be negative
 
-                      const finalTotal = billAfterAdvance + currentCustomerArrears;
+                      const finalTotal = billAfterAdvance + (includePreviousArrears ? currentCustomerArrears : 0);
                       const cash = cashGiven === '' ? 0 : Number(cashGiven);
                       const diff = cash - finalTotal;
 
@@ -846,30 +1061,57 @@ export default function POS({
                     <span className="text-sm text-slate-400 font-extrabold uppercase tracking-widest mb-1">Final Total</span>
                     <span className="text-4xl font-black text-emerald-400 drop-shadow-sm flex items-baseline gap-2">
                       <span className="text-xl font-bold opacity-75">Rs</span>
-                      {(Math.max(0, cartTotal - Number(discount || 0)) + currentCustomerArrears).toFixed(2)}
+                      {(Math.max(0, cartTotal - Number(discount || 0)) + (includePreviousArrears ? currentCustomerArrears : 0)).toFixed(2)}
                     </span>
                   </div>
 
-                  <button
-                    onClick={async () => {
-                      // Wait, we need to automatically check keepChangeAsAdvance if we default it? 
-                      // Actually, if we don't pass keepChangeAsAdvance, index.jsx naturally keeps the advance if cashGiven is empty.
-                      // Let's pass keepChangeAsAdvance.
-                      const success = await handleCheckout(customerName, discount, isCredit, cashGiven, currentCustomerArrears, currentCustomerAdvance, keepChangeAsAdvance);
-                      if (success) {
-                        setShowPaymentModal(false);
-                        setCashGiven('');
-                        setCustomerName('');
-                        setDiscount('');
-                        setIsCredit(false);
-                        setKeepChangeAsAdvance(false);
-                      }
-                    }}
-                    disabled={cart.length === 0 || checkoutLoading || (!isCredit && cashGiven && Number(cashGiven) < Math.max(0, Math.max(0, cartTotal - Number(discount || 0)) - currentCustomerAdvance) + currentCustomerArrears) || (isCredit && !customerName.trim())}
-                    className={`w-full mt-2 ${isCredit ? 'bg-red-500 hover:bg-red-400' : 'bg-emerald-500 hover:bg-emerald-400'} shadow-md hover:shadow-lg text-slate-950 font-black py-5 disabled:opacity-50 transition-all rounded-2xl flex items-center justify-center text-xl uppercase tracking-wide`}
-                  >
-                    {checkoutLoading ? 'Processing...' : isCredit ? 'Confirm Credit Sale' : 'Confirm Order & Pay'}
-                  </button>
+                  {(() => {
+                    const finalTotalForButton = Math.max(0, Math.max(0, cartTotal - Number(discount || 0)) - currentCustomerAdvance) + (includePreviousArrears ? currentCustomerArrears : 0);
+                    const cashValForButton = cashGiven === '' ? 0 : Number(cashGiven);
+                    const isShortForButton = cashGiven !== '' && cashValForButton < finalTotalForButton;
+                    const isExplicitlyZero = cashGiven !== '' && Number(cashGiven) === 0;
+                    const isCashEmpty = cashGiven === '';
+                    const needsPayment = finalTotalForButton > 0;
+                    
+                    const isButtonDisabled = cart.length === 0 || 
+                                             checkoutLoading || 
+                                             (!isCredit && (isExplicitlyZero || isCashEmpty) && needsPayment) || 
+                                             (!customerName.trim() && (isCredit || isShortForButton));
+                    
+                    let buttonBgClass = 'bg-emerald-500 hover:bg-emerald-400';
+                    let buttonText = 'Confirm Order & Pay';
+
+                    if (checkoutLoading) {
+                      buttonText = 'Processing...';
+                    } else if (isCredit) {
+                      buttonBgClass = 'bg-red-500 hover:bg-red-400';
+                      buttonText = 'Confirm Credit Sale';
+                    } else if (isShortForButton) {
+                      buttonBgClass = 'bg-orange-500 hover:bg-orange-400';
+                      buttonText = 'Confirm Partial & Add to Due';
+                    }
+
+                    return (
+                      <button
+                        onClick={async () => {
+                          const success = await handleCheckout(customerName, discount, isCredit, cashGiven, includePreviousArrears ? currentCustomerArrears : 0, currentCustomerAdvance, keepChangeAsAdvance);
+                          if (success) {
+                            setShowPaymentModal(false);
+                            setCashGiven('');
+                            setCustomerName('');
+                            setDiscount('');
+                            setIsCredit(false);
+                            setKeepChangeAsAdvance(false);
+                            setIncludePreviousArrears(true);
+                          }
+                        }}
+                        disabled={isButtonDisabled}
+                        className={`w-full mt-2 ${buttonBgClass} shadow-md hover:shadow-lg text-slate-950 font-black py-5 disabled:opacity-50 transition-all rounded-2xl flex items-center justify-center text-xl uppercase tracking-wide`}
+                      >
+                        {buttonText}
+                      </button>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
@@ -879,7 +1121,7 @@ export default function POS({
       {/* Save Pending Modal */}
       {showSavePendingModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md overflow-visible shadow-2xl">
             <div className="p-6 border-b border-slate-800 flex justify-between items-center">
               <h3 className="text-xl font-black text-slate-100 uppercase tracking-wide">Save Pending Order</h3>
               <button onClick={() => setShowSavePendingModal(false)} className="text-slate-400 hover:text-white transition-colors">
@@ -916,6 +1158,14 @@ export default function POS({
         onConfirm={confirmDeletePending}
         title="Delete Pending Order?"
         message="Are you sure you want to delete this pending order? This action cannot be undone."
+      />
+
+      <DeleteConfirmModal
+        isOpen={!!saleToDelete}
+        onClose={() => setSaleToDelete(null)}
+        onConfirm={confirmDeleteSale}
+        title="Delete Sale?"
+        message="Are you sure you want to delete this sale? This action cannot be undone and will affect today's sales sum."
       />
 
       {/* WhatsApp Reminder Modal */}

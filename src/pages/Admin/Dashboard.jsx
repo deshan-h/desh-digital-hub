@@ -245,6 +245,47 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
   const activeRepairs = repairs.filter(r => r.status === 'Pending' || r.status === 'In Progress');
   const readyDeliveries = repairs.filter(r => r.status === 'Ready');
 
+  // -- CALENDAR DATA (Current Month) --
+  const calendarDays = React.useMemo(() => {
+    const year = currentYear;
+    const month = currentMonth;
+    const firstDay = new Date(year, month, 1).getDay();
+    const startOffset = (firstDay === 0 ? 6 : firstDay - 1); // Mon=0, Sun=6
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    
+    const days = [];
+    const prevMonthDays = new Date(year, month, 0).getDate();
+    for (let i = startOffset - 1; i >= 0; i--) {
+      days.push({ day: prevMonthDays - i, isCurrentMonth: false });
+    }
+    
+    for (let i = 1; i <= daysInMonth; i++) {
+      const dDate = new Date(year, month, i);
+      const dStr = dDate.toDateString();
+      
+      const daySales = monthSales.filter(s => s.timestamp && parseTimestamp(s.timestamp).toDateString() === dStr);
+      const dayIncome = daySales.reduce((sum, s) => sum + getSaleIncome(s), 0);
+      
+      const dayExpenses = monthExpensesList.filter(e => e.timestamp && parseTimestamp(e.timestamp).toDateString() === dStr);
+      const dayExpTotal = dayExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+      
+      days.push({ 
+        day: i, 
+        isCurrentMonth: true, 
+        income: dayIncome, 
+        expenses: dayExpTotal,
+        isToday: dStr === today.toDateString()
+      });
+    }
+    
+    const totalCells = Math.ceil(days.length / 7) * 7;
+    let nextDay = 1;
+    while (days.length < totalCells) {
+      days.push({ day: nextDay++, isCurrentMonth: false });
+    }
+    return days;
+  }, [currentYear, currentMonth, monthSales, monthExpensesList, today]);
+
   // -- CHART: Sales vs Income (Week/Month toggle) --
   const currentDay = today.getDate();
 
@@ -917,64 +958,54 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
       </div>
 
       {/* CHARTS */}
-      {/* ROW 3: Donut, Top Customers, Fast Moving Items */}
+      {/* ROW 3: Calendar, Top Customers, Fast Moving Items */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-        {/* Revenue by Category Donut */}
+        {/* Income Calendar */}
         <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-5%" }} transition={{ duration: 0.5, delay: 0.1 }} className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-4 shadow-lg flex flex-col h-[360px]">
-          <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest mb-2 flex items-center justify-between">
-            Revenue By Category
-            <PieChartIcon className="w-4 h-4 text-indigo-400" />
+          <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest mb-4 flex items-center justify-between">
+            Income Calendar
+            <Clock className="w-4 h-4 text-emerald-400" />
           </h3>
-          <div className="flex-1 min-h-[200px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={donutChartData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={65}
-                  outerRadius={90}
-                  paddingAngle={5}
-                  dataKey="value"
-                  stroke="none"
-                >
-                  {donutChartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS_EXTENDED[index % COLORS_EXTENDED.length]} />
-                  ))}
-                  <Label 
-                    value={`Rs ${monthSalesTotal >= 1000 ? (monthSalesTotal/1000).toFixed(1)+'k' : monthSalesTotal}`} 
-                    position="center" 
-                    fill="#f1f5f9" 
-                    fontSize={20} 
-                    fontWeight="black" 
-                  />
-                </Pie>
-                <Tooltip 
-                  content={({active, payload}) => {
-                    if (active && payload && payload.length) {
-                      return (
-                        <div className="bg-slate-900/90 backdrop-blur-md border border-white/10 p-3 rounded-xl shadow-xl">
-                          <p className="text-slate-300 text-xs font-semibold mb-1">{payload[0].name}</p>
-                          <p className="font-black text-sm" style={{ color: payload[0].payload.fill }}>
-                            Rs {payload[0].value.toFixed(0)}
-                          </p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          {/* Custom Legend */}
-          <div className="grid grid-cols-2 gap-2 mt-2 h-16 overflow-y-auto no-scrollbar">
-             {donutChartData.map((entry, idx) => (
-               <div key={idx} className="flex items-center gap-2 text-[10px]">
-                 <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: COLORS_EXTENDED[idx % COLORS_EXTENDED.length] }}></div>
-                 <span className="text-slate-300 truncate">{entry.name}</span>
-               </div>
-             ))}
+          <div className="flex-1 overflow-hidden flex flex-col">
+            <div className="grid grid-cols-7 gap-1 mb-2">
+              {['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map(d => (
+                <div key={d} className="text-center text-[9px] font-bold text-slate-500 uppercase tracking-widest">{d}</div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-1 flex-1">
+              {calendarDays.map((d, i) => {
+                if (!d.isCurrentMonth) {
+                  return <div key={i} className="rounded-lg bg-slate-950/20 border border-white/5 opacity-30 flex flex-col items-center justify-start p-1"><span className="text-[10px] text-slate-500">{d.day}</span></div>;
+                }
+                const hasIncome = d.income > 0;
+                const hasExpense = d.expenses > 0;
+                const isHigh = d.income > 1000;
+                
+                let boxClass = 'bg-slate-900/40 border border-white/5';
+                let textClass = 'text-slate-400';
+                
+                if (d.isToday) {
+                  boxClass = 'bg-purple-950/40 border border-purple-500/50';
+                  textClass = 'text-purple-400 font-bold';
+                } else if (isHigh) {
+                  boxClass = 'bg-orange-950/30 border border-orange-500/50';
+                  textClass = 'text-orange-400 font-bold';
+                } else if (hasIncome) {
+                  boxClass = 'bg-blue-950/20 border border-blue-500/30';
+                  textClass = 'text-blue-400 font-bold';
+                }
+
+                return (
+                  <div key={i} className={`rounded-lg flex flex-col items-center justify-between p-1 transition-colors hover:bg-slate-800/80 ${boxClass}`}>
+                    <span className={`text-[10px] font-semibold ${d.isToday ? 'bg-purple-500/20 px-1 rounded' : ''} ${d.isToday ? 'text-purple-300' : 'text-slate-300'}`}>{d.day}</span>
+                    <div className="flex flex-col items-center justify-end w-full h-full gap-0.5 mt-1 pb-0.5">
+                      {hasIncome && <span className={`text-[9px] leading-tight text-center ${textClass}`}>{d.income.toFixed(0)}</span>}
+                      {hasExpense && <span className="text-[8px] leading-tight text-center text-red-500/80 font-bold">-{d.expenses.toFixed(0)}</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </motion.div>
 
@@ -1232,33 +1263,62 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
           </div>
         </motion.div>
 
-        {/* Active Pending Orders Pipeline */}
-        <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-5%" }} transition={{ duration: 0.5, delay: 0.2 }} className="bg-orange-950/20 backdrop-blur-md border border-orange-500/20 rounded-2xl p-5 shadow-lg flex flex-col h-[320px]">
-          <h3 className="text-sm font-bold text-orange-100 uppercase tracking-widest mb-4 flex items-center justify-between">
-            Active Pending Orders
-            <Package className="w-4 h-4 text-orange-400" />
+        {/* Revenue by Category Donut */}
+        <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-5%" }} transition={{ duration: 0.5, delay: 0.2 }} className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-5 shadow-lg flex flex-col h-[320px]">
+          <h3 className="text-sm font-bold text-slate-100 uppercase tracking-widest mb-2 flex items-center justify-between">
+            Revenue By Category
+            <PieChartIcon className="w-4 h-4 text-indigo-400" />
           </h3>
-          <div className="flex-1 overflow-y-auto pr-1 space-y-2 no-scrollbar">
-            {pendingOrders.length === 0 ? (
-               <p className="text-slate-500 text-xs text-center mt-6">No pending orders</p>
-            ) : (
-               pendingOrders.map((order, i) => (
-                 <div key={i} className="flex gap-3 items-center p-2.5 rounded-xl bg-orange-950/30 hover:bg-orange-900/40 transition-all border border-orange-500/10">
-                   <div className="w-8 h-8 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-400 flex items-center justify-center font-black text-xs shrink-0 shadow-[0_0_10px_rgba(249,115,22,0.2)]">
-                     <Target className="w-4 h-4" />
-                   </div>
-                   <div className="flex-1 min-w-0">
-                     <p className="text-sm font-bold text-slate-200 truncate">{order.customerName}</p>
-                     <p className="text-[11px] text-orange-400/80 mt-0.5 flex items-center gap-1">
-                       <Clock className="w-3 h-3" /> {order.timestamp ? formatDistanceToNow(parseTimestamp(order.timestamp), { addSuffix: true }) : 'Unknown'}
-                     </p>
-                   </div>
-                   <div className="text-xs font-black text-orange-400 whitespace-nowrap bg-orange-500/10 px-2.5 py-1.5 rounded-lg border border-orange-500/20">
-                     Rs {Number(order.totalAmount || 0).toFixed(0)}
-                   </div>
-                 </div>
-               ))
-            )}
+          <div className="flex-1 min-h-[160px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={donutChartData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={50}
+                  outerRadius={75}
+                  paddingAngle={5}
+                  dataKey="value"
+                  stroke="none"
+                >
+                  {donutChartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS_EXTENDED[index % COLORS_EXTENDED.length]} />
+                  ))}
+                  <Label 
+                    value={`Rs ${monthSalesTotal >= 1000 ? (monthSalesTotal/1000).toFixed(1)+'k' : monthSalesTotal}`} 
+                    position="center" 
+                    fill="#f1f5f9" 
+                    fontSize={16} 
+                    fontWeight="black" 
+                  />
+                </Pie>
+                <Tooltip 
+                  content={({active, payload}) => {
+                    if (active && payload && payload.length) {
+                      return (
+                        <div className="bg-slate-900/90 backdrop-blur-md border border-white/10 p-3 rounded-xl shadow-xl">
+                          <p className="text-slate-300 text-xs font-semibold mb-1">{payload[0].name}</p>
+                          <p className="font-black text-sm" style={{ color: payload[0].payload.fill }}>
+                            Rs {payload[0].value.toFixed(0)}
+                          </p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          {/* Custom Legend */}
+          <div className="grid grid-cols-2 gap-2 mt-2 h-14 overflow-y-auto no-scrollbar">
+             {donutChartData.map((entry, idx) => (
+               <div key={idx} className="flex items-center gap-2 text-[10px]">
+                 <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: COLORS_EXTENDED[idx % COLORS_EXTENDED.length] }}></div>
+                 <span className="text-slate-300 truncate">{entry.name}</span>
+               </div>
+             ))}
           </div>
         </motion.div>
       </div>

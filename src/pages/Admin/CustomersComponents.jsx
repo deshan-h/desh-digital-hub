@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, User, Phone, MapPin, CheckCircle, RotateCcw, Trash2, Clock, X } from 'lucide-react';
+import { Plus, User, Phone, MapPin, CheckCircle, RotateCcw, Trash2, Clock, X, ChevronDown } from 'lucide-react';
 
 export const AddCustomerForm = ({
   name, setName,
@@ -8,36 +8,89 @@ export const AddCustomerForm = ({
   amount, setAmount,
   status, setStatus,
   isPosArrears, setIsPosArrears,
-  isSubmitting, handleSubmit
-}) => (
+  isSubmitting, handleSubmit,
+  activeCustomersTab, directoryRecords
+}) => {
+  const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
+  const dropdownRef = React.useRef(null);
+
+  React.useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
   <div className="shrink-0 bg-gradient-to-b from-slate-900/80 to-slate-950/80 backdrop-blur-2xl border border-white/10 rounded-3xl p-5 shadow-[0_8px_30px_rgb(0,0,0,0.5)] relative animate-in slide-in-from-top-4 fade-in duration-300">
     <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent"></div>
     <h2 className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-emerald-400 mb-4 flex items-center gap-2 drop-shadow-sm shrink-0">
-      <Plus className="w-5 h-5 text-cyan-400" /> Add New Record
+      <Plus className="w-5 h-5 text-cyan-400" /> {activeCustomersTab === 'all' ? 'Add New Customer' : 'Add New Record'}
     </h2>
     
-    <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-end">
+    <form onSubmit={handleSubmit} className={`grid grid-cols-1 md:grid-cols-2 ${activeCustomersTab === 'dues' ? 'xl:grid-cols-5' : 'xl:grid-cols-4'} gap-4 items-end`}>
       <div>
         <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Customer Name *</label>
         <div className="relative">
-          <User className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-          <input
-            type="text"
-            required
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-10 py-3 text-slate-200 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 transition-all text-sm"
-            placeholder="e.g. Nimal Perera"
-          />
+          <User className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+          {activeCustomersTab === 'dues' ? (
+            <div className="relative w-full" ref={dropdownRef}>
+              <div 
+                className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl pl-10 pr-4 py-3 text-slate-200 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 transition-all text-sm cursor-pointer flex justify-between items-center"
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              >
+                <span className={name ? "text-slate-200 truncate" : "text-slate-500"}>
+                  {name || "Select Customer"}
+                </span>
+                <ChevronDown className="w-4 h-4 text-slate-500 flex-shrink-0" />
+              </div>
+              
+              {isDropdownOpen && (
+                <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto bg-slate-900 border border-slate-700 rounded-xl shadow-2xl custom-scrollbar py-1">
+                  {directoryRecords?.length === 0 ? (
+                    <div className="px-4 py-3 text-sm text-slate-500">No customers found</div>
+                  ) : (
+                    directoryRecords?.map(c => (
+                      <div 
+                        key={c.id} 
+                        className="px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-cyan-400 cursor-pointer transition-colors truncate"
+                        onClick={() => {
+                          setName(c.name);
+                          if (c.phone) setPhone(c.phone);
+                          if (c.area) setArea(c.area);
+                          setIsDropdownOpen(false);
+                        }}
+                      >
+                        {c.name}
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <input
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl pl-10 pr-4 py-3 text-slate-200 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 transition-all text-sm"
+              placeholder="e.g. Nimal Perera"
+            />
+          )}
         </div>
       </div>
 
       <div>
-        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Phone Number</label>
+        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Phone Number *</label>
         <div className="relative">
           <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
           <input
             type="tel"
+            required
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-10 py-3 text-slate-200 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 transition-all text-sm"
@@ -46,78 +99,73 @@ export const AddCustomerForm = ({
         </div>
       </div>
 
-      <div>
-        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Area / Description</label>
-        <div className="relative">
-          <MapPin className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-          <input
-            type="text"
-            value={area}
-            onChange={(e) => setArea(e.target.value)}
-            className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-10 py-3 text-slate-200 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 transition-all text-sm"
-            placeholder="e.g. Melsiripura town"
-          />
+      {activeCustomersTab === 'all' && (
+        <div>
+          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Area / Description</label>
+          <div className="relative">
+            <MapPin className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+            <input
+              type="text"
+              value={area}
+              onChange={(e) => setArea(e.target.value)}
+              className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-10 py-3 text-slate-200 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 transition-all text-sm"
+              placeholder="e.g. Melsiripura town"
+            />
+          </div>
         </div>
-      </div>
+      )}
 
-      <div>
-        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Amount (Rs) - Optional</label>
-        <div className="relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-sm">Rs.</span>
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-10 py-3 text-slate-200 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 transition-all text-sm"
-            placeholder="0.00"
-          />
-        </div>
-      </div>
+      {activeCustomersTab === 'dues' && (
+        <>
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Amount (Rs) *</label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-sm">Rs.</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                required
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-10 py-3 text-slate-200 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 transition-all text-sm"
+                placeholder="0.00"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Arrears Type</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setIsPosArrears(false)}
+                className={`flex-1 py-3 px-2 rounded-xl text-xs font-bold border transition-all ${!isPosArrears ? 'bg-amber-500/10 border-amber-500/50 text-amber-400' : 'bg-slate-950/50 border-slate-800 text-slate-500 hover:text-slate-300'}`}
+              >
+                Other
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsPosArrears(true)}
+                className={`flex-1 py-3 px-2 rounded-xl text-xs font-bold border transition-all ${isPosArrears ? 'bg-cyan-500/10 border-cyan-500/50 text-cyan-400' : 'bg-slate-950/50 border-slate-800 text-slate-500 hover:text-slate-300'}`}
+              >
+                POS Sale
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
-      <div>
-        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Initial Status</label>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setStatus('Pending')}
-            className={`flex-1 py-2.5 rounded-xl text-sm font-bold border transition-all ${status === 'Pending' ? 'bg-orange-500/10 border-orange-500/50 text-orange-400' : 'bg-slate-950/50 border-slate-800 text-slate-500 hover:text-slate-300'}`}
-          >
-            Pending
-          </button>
-          <button
-            type="button"
-            onClick={() => setStatus('Paid')}
-            className={`flex-1 py-2.5 rounded-xl text-sm font-bold border transition-all ${status === 'Paid' ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400' : 'bg-slate-950/50 border-slate-800 text-slate-500 hover:text-slate-300'}`}
-          >
-            Paid
-          </button>
-        </div>
-      </div>
-
-      <div className="col-span-1 md:col-span-2 xl:col-span-4 flex flex-col md:flex-row items-center justify-between gap-4 mt-2">
-        <div className="flex items-center gap-3 bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 cursor-pointer select-none hover:border-cyan-500/30 transition-colors flex-1" onClick={() => setIsPosArrears(!isPosArrears)}>
-          <input
-            type="checkbox"
-            checked={isPosArrears}
-            onChange={(e) => setIsPosArrears(e.target.checked)}
-            className="w-4 h-4 rounded border-slate-700 text-cyan-500 focus:ring-cyan-500/50 bg-slate-900 pointer-events-none"
-          />
-          <span className="text-sm font-semibold text-slate-300">Add to POS Sales when Paid</span>
-        </div>
-
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="w-full md:w-auto md:min-w-[200px] bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-[0_0_15px_rgba(8,145,178,0.3)] hover:shadow-[0_0_25px_rgba(8,145,178,0.5)] disabled:opacity-50"
-        >
-          {isSubmitting ? 'Saving...' : 'Save Record'}
-        </button>
-      </div>
+      <button
+        type="submit"
+        disabled={isSubmitting}
+        className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-[0_0_15px_rgba(8,145,178,0.3)] hover:shadow-[0_0_25px_rgba(8,145,178,0.5)] disabled:opacity-50"
+      >
+        {isSubmitting ? 'Saving...' : 'Save Record'}
+      </button>
     </form>
   </div>
-);
+  );
+};
 
 export const CustomerHistoryModal = ({
   customer, onClose, isAdmin,

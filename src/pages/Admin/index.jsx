@@ -87,6 +87,8 @@ export default function Admin() {
   }, []);
 
   useEffect(() => {
+    let pendingUnsubscribe = null;
+
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
@@ -94,23 +96,31 @@ export default function Admin() {
         fetchCategories();
         fetchCustomerDues();
         fetchCustomersList();
+        
+        // Attach pending orders listener
+        const pendingQ = query(collection(db, 'pos_pending_orders'), orderBy('createdAt', 'desc'));
+        pendingUnsubscribe = onSnapshot(pendingQ, (snapshot) => {
+          const orders = [];
+          snapshot.forEach((doc) => {
+            orders.push({ id: doc.id, ...doc.data() });
+          });
+          setPendingOrders(orders);
+        }, (err) => console.error("Pending orders snapshot error:", err));
+
         setActiveTab('pos');
+      } else {
+        if (pendingUnsubscribe) {
+          pendingUnsubscribe();
+          pendingUnsubscribe = null;
+        }
+        setPendingOrders([]);
       }
       setAuthLoading(false);
     });
 
-    const pendingQ = query(collection(db, 'pos_pending_orders'), orderBy('createdAt', 'desc'));
-    const pendingUnsubscribe = onSnapshot(pendingQ, (snapshot) => {
-      const orders = [];
-      snapshot.forEach((doc) => {
-        orders.push({ id: doc.id, ...doc.data() });
-      });
-      setPendingOrders(orders);
-    });
-
     return () => {
       unsubscribe();
-      pendingUnsubscribe();
+      if (pendingUnsubscribe) pendingUnsubscribe();
     };
   }, []);
 
@@ -605,7 +615,11 @@ export default function Admin() {
               customersList={customersList}
               salesHistory={salesHistory}
               customerDuesList={customerDuesList}
-              refreshPOSData={fetchCategories}
+              refreshPOSData={() => {
+                fetchCategories();
+                fetchSales();
+                fetchCustomerDues();
+              }}
               pendingOrders={pendingOrders}
               showPendingOrdersModal={showPendingOrdersModal}
               setShowPendingOrdersModal={setShowPendingOrdersModal}

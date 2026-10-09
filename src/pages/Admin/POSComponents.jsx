@@ -194,7 +194,10 @@ export const CustomerInput = React.memo(({ customerName, setCustomerName, custom
       </div>
       
       {showDropdown && filteredCustomers.length > 0 && (
-        <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto bg-slate-900 border border-slate-700 rounded-lg shadow-2xl custom-scrollbar py-0.5">
+        <div 
+          className="absolute z-[70] mt-1 w-full max-h-52 overflow-y-auto bg-slate-900 border border-slate-700 rounded-lg shadow-2xl custom-scrollbar py-0.5"
+          style={{ colorScheme: 'dark' }}
+        >
           {filteredCustomers.map((c, idx) => (
             <div 
               key={idx}

@@ -14,7 +14,7 @@ export default function Customers({ isAdmin }) {
   const [searchCustomer, setSearchCustomer] = useState('');
   const [searchArea, setSearchArea] = useState('');
   const [searchPhone, setSearchPhone] = useState('');
-  const [showOnlyDues, setShowOnlyDues] = useState(false);
+  const [activeCustomersTab, setActiveCustomersTab] = useState('dues'); // 'dues' or 'all'
   const [isAddFormOpen, setIsAddFormOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedCustomerForModal, setSelectedCustomerForModal] = useState(null);
@@ -37,16 +37,18 @@ export default function Customers({ isAdmin }) {
   const [area, setArea] = useState('');
   const [amount, setAmount] = useState('');
   const [status, setStatus] = useState('Pending');
-  const [isPosArrears, setIsPosArrears] = useState(true);
+  const [isPosArrears, setIsPosArrears] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Delete Modal State
   const [deleteRecordId, setDeleteRecordId] = useState(null);
+  const [deleteGroupData, setDeleteGroupData] = useState(null);
+  const [deleteCustomerData, setDeleteCustomerData] = useState(null);
 
   // Reset pagination when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchCustomer, searchArea, searchPhone, showOnlyDues]);
+  }, [searchCustomer, searchArea, searchPhone, activeCustomersTab]);
 
   useEffect(() => {
     fetchRecords();
@@ -113,7 +115,7 @@ export default function Customers({ isAdmin }) {
       setArea('');
       setAmount('');
       setStatus('Pending');
-      setIsPosArrears(true);
+      setIsPosArrears(false);
       fetchRecords();
     } catch (error) {
       console.error("Error adding record:", error);
@@ -283,6 +285,90 @@ export default function Customers({ isAdmin }) {
     } catch (error) {
       console.error("Error deleting record:", error);
       notify.error("Failed to delete record.");
+    } finally {
+      setDeleteRecordId(null);
+    }
+  };
+
+  const confirmDeleteGroup = async () => {
+    if (!deleteGroupData) return;
+    try {
+      for (const record of deleteGroupData.records) {
+        if (record.id) {
+          await deleteDoc(doc(db, 'customer_dues', record.id));
+        }
+      }
+      notify.success("All dues for this customer deleted.");
+      fetchRecords();
+    } catch (error) {
+      console.error("Error deleting group:", error);
+      notify.error("Failed to delete dues.");
+    } finally {
+      setDeleteGroupData(null);
+    }
+  };
+
+  const confirmDeleteCustomerDirectory = async () => {
+    if (!deleteCustomerData) return;
+    try {
+      if (deleteCustomerData.directoryId) {
+        await deleteDoc(doc(db, 'customers', deleteCustomerData.directoryId));
+      }
+      for (const record of deleteCustomerData.records) {
+        if (record.id) {
+          await deleteDoc(doc(db, 'customer_dues', record.id));
+        }
+      }
+      notify.success("Customer deleted successfully.");
+      fetchRecords();
+    } catch (error) {
+      console.error("Error deleting customer:", error);
+      notify.error("Failed to delete customer.");
+    } finally {
+      setDeleteCustomerData(null);
+    }
+  };
+
+  const handleGroupPayment = async (group) => {
+    try {
+      const paymentAmount = Number(payingAmount);
+      if (!paymentAmount || paymentAmount <= 0) {
+        setPayingRecordId(null);
+        return;
+      }
+
+      if (group.hasPosArrears) {
+        await addDoc(collection(db, 'daily_sales'), {
+          amount: paymentAmount,
+          discount: 0,
+          description: `Account Payment: ${group.name}`,
+          cartItems: [{ name: 'Account Settlement', price: paymentAmount, cost: 0, qty: 1 }],
+          timestamp: serverTimestamp(),
+          userId: 'system',
+          customerName: group.name,
+          isCredit: false,
+          isAccountSettlement: true
+        });
+      }
+
+      await addDoc(collection(db, 'customer_dues'), {
+        name: group.name,
+        phone: group.phone || '',
+        area: group.area || '',
+        amount: paymentAmount,
+        status: 'Paid',
+        type: 'Payment',
+        description: 'Account Payment',
+        timestamp: serverTimestamp()
+      });
+
+      notify.success(`Payment of Rs ${paymentAmount.toFixed(2)} recorded.`);
+      setPayingRecordId(null);
+      setPayingAmount('');
+      fetchRecords();
+    } catch (err) {
+      console.error(err);
+      notify.error("Failed to process payment");
     }
   };
 
@@ -380,7 +466,9 @@ export default function Customers({ isAdmin }) {
           totalPaid: 0,
           records: [],
           hasPending: false,
-          hasAdvance: false
+          hasAdvance: false,
+          hasPosArrears: false,
+          hasNonPosArrears: false
         };
       }
       acc[nameKey].records.push(record);
@@ -389,6 +477,11 @@ export default function Customers({ isAdmin }) {
         acc[nameKey].totalPaid += record.amount;
       } else if (record.status === 'Pending') {
         acc[nameKey].totalPending += record.amount;
+        if (record.isPosArrears !== false) {
+          acc[nameKey].hasPosArrears = true;
+        } else {
+          acc[nameKey].hasNonPosArrears = true;
+        }
       } else {
         acc[nameKey].totalPaid += record.amount;
       }
@@ -426,7 +519,6 @@ export default function Customers({ isAdmin }) {
       const matchArea = (group.area?.toLowerCase() || '').includes(searchAreaLower);
       const matchPhone = (group.phone || '').includes(searchPhoneLower);
       
-      if (showOnlyDues && !group.hasPending) return false;
       return matchCustomer && matchArea && matchPhone;
     });
 
@@ -439,147 +531,238 @@ export default function Customers({ isAdmin }) {
       if (a.hasAdvance && b.hasAdvance) return b.advanceBalance - a.advanceBalance;
       return (a.name || '').localeCompare(b.name || '');
     });
-  }, [allGrouped, searchCustomer, searchArea, searchPhone, showOnlyDues]);
+  }, [allGrouped, searchCustomer, searchArea, searchPhone]);
 
-  const { activeCustomers, settledCustomers } = React.useMemo(() => {
-    return {
-      activeCustomers: filteredGroups.filter(g => g.hasPending || g.hasAdvance),
-      settledCustomers: filteredGroups.filter(g => !g.hasPending && !g.hasAdvance)
-    };
-  }, [filteredGroups]);
+  const displayGroups = React.useMemo(() => {
+    if (activeCustomersTab === 'dues') {
+      return filteredGroups.filter(g => g.hasPending || g.hasAdvance);
+    }
+    return filteredGroups;
+  }, [filteredGroups, activeCustomersTab]);
 
   const renderGroup = (group) => {
     return (
       <div key={group.nameKey} className={`bg-slate-950/40 border-b border-white/5 transition-all flex flex-col hover:bg-slate-900/50`}>
         {/* Table Row */}
         <div className="grid grid-cols-12 gap-4 px-4 py-2.5 items-center">
-          {/* Col 0: Most Visited Star (col-span-1) */}
-          <div className="col-span-1 flex justify-center items-center">
-            <button 
-              onClick={(e) => toggleFavorite(group, e)}
-              className="p-1.5 rounded-lg hover:bg-slate-800 transition-colors"
-              title={group.mostVisited ? 'Remove from favorites' : 'Add to favorites'}
-            >
-              <Star className={`w-4 h-4 transition-colors ${group.mostVisited ? 'text-yellow-500 fill-yellow-500' : 'text-slate-600 hover:text-yellow-500/50'}`} />
-            </button>
-          </div>
+          {activeCustomersTab === 'all' ? (
+            <>
+              {/* Col 0: Most Visited Star (col-span-1) */}
+              <div className="col-span-1 flex justify-center items-center">
+                <button 
+                  onClick={(e) => toggleFavorite(group, e)}
+                  className="p-1.5 rounded-lg hover:bg-slate-800 transition-colors"
+                  title={group.mostVisited ? 'Remove from favorites' : 'Add to favorites'}
+                >
+                  <Star className={`w-4 h-4 transition-colors ${group.mostVisited ? 'text-yellow-500 fill-yellow-500' : 'text-slate-600 hover:text-yellow-500/50'}`} />
+                </button>
+              </div>
 
-          {/* Col 1: Customer Name (col-span-4 lg:col-span-3) */}
-          <div className="col-span-4 lg:col-span-3 flex items-center gap-3">
-            <h3 className="text-slate-200 font-bold text-[14px] truncate">{group.name}</h3>
-          </div>
+              {/* Col 1: Customer Name (col-span-4 lg:col-span-3) */}
+              <div className="col-span-4 lg:col-span-3 flex items-center gap-3">
+                <h3 className="text-slate-200 font-bold text-[14px] truncate">{group.name}</h3>
+              </div>
 
-            {/* Col 2: Area (col-span-3) */}
-            <div className="col-span-4 lg:col-span-3 flex items-center text-slate-400 text-[13px] truncate" onClick={() => {
-                setEditingRecordId(group.nameKey);
-                setEditingField('area');
-                setEditingValue(group.area || '');
-              }}>
-              {editingRecordId === group.nameKey && editingField === 'area' ? (
-                <div className="flex items-center gap-1 bg-slate-900/50 rounded px-1">
-                  <input
-                    type="text"
-                    value={editingValue}
-                    onChange={e => setEditingValue(e.target.value)}
-                    className="bg-transparent text-slate-200 border-none focus:outline-none w-20"
-                  />
-                  <CheckCircle
-                    className="w-4 h-4 text-emerald-400 hover:text-emerald-300 cursor-pointer"
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      try {
-                        await updateDoc(doc(db, 'customer_dues', group.records.find(r => r.id).id), { area: editingValue });
-                        notify.success('Area updated');
-                      } catch (err) {
-                        console.error(err);
-                        notify.error('Failed to update area');
-                      }
-                      setEditingRecordId(null);
-                      setEditingField('');
-                    }}
-                  />
-                  <X
-                    className="w-4 h-4 text-slate-400 hover:text-slate-200 cursor-pointer"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setEditingRecordId(null);
-                      setEditingField('');
-                      setEditingValue('');
-                    }}
-                  />
-                </div>
-              ) : (
-                <>
-                  <Edit className="w-3 h-3 mr-1 text-cyan-400" />
-                  {group.area ? group.area : '-'}
-                </>
-              )}
-            </div>
+              {/* Col 2: Area (col-span-3) */}
+              <div className="col-span-4 lg:col-span-3 flex items-center text-slate-400 text-[13px] truncate" onClick={() => {
+                  setEditingRecordId(group.nameKey);
+                  setEditingField('area');
+                  setEditingValue(group.area || '');
+                }}>
+                {editingRecordId === group.nameKey && editingField === 'area' ? (
+                  <div className="flex items-center gap-1 bg-slate-900/50 rounded px-1">
+                    <input
+                      type="text"
+                      value={editingValue}
+                      onChange={e => setEditingValue(e.target.value)}
+                      className="bg-transparent text-slate-200 border-none focus:outline-none w-20"
+                    />
+                    <CheckCircle
+                      className="w-4 h-4 text-emerald-400 hover:text-emerald-300 cursor-pointer"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        try {
+                          await updateDoc(doc(db, 'customer_dues', group.records.find(r => r.id).id), { area: editingValue });
+                          notify.success('Area updated');
+                        } catch (err) {
+                          console.error(err);
+                          notify.error('Failed to update area');
+                        }
+                        setEditingRecordId(null);
+                        setEditingField('');
+                      }}
+                    />
+                    <X
+                      className="w-4 h-4 text-slate-400 hover:text-slate-200 cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingRecordId(null);
+                        setEditingField('');
+                        setEditingValue('');
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <Edit className="w-3 h-3 mr-1 text-cyan-400" />
+                    {group.area ? group.area : '-'}
+                  </>
+                )}
+              </div>
 
-            {/* Col 3: Phone (col-span-2) */}
-            <div className="hidden lg:flex lg:col-span-2 items-center text-slate-400 text-[13px] truncate" onClick={() => {
-                setEditingRecordId(group.nameKey);
-                setEditingField('phone');
-                setEditingValue(group.phone || '');
-              }}>
-              {editingRecordId === group.nameKey && editingField === 'phone' ? (
-                <div className="flex items-center gap-1 bg-slate-900/50 rounded px-1">
-                  <input
-                    type="text"
-                    value={editingValue}
-                    onChange={e => setEditingValue(e.target.value)}
-                    className="bg-transparent text-slate-200 border-none focus:outline-none w-24"
-                  />
-                  <CheckCircle
-                    className="w-4 h-4 text-emerald-400 hover:text-emerald-300 cursor-pointer"
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      try {
-                        await updateDoc(doc(db, 'customer_dues', group.records.find(r => r.id).id), { phone: editingValue });
-                        notify.success('Phone updated');
-                      } catch (err) {
-                        console.error(err);
-                        notify.error('Failed to update phone');
-                      }
-                      setEditingRecordId(null);
-                      setEditingField('');
-                    }}
-                  />
-                  <X
-                    className="w-4 h-4 text-slate-400 hover:text-slate-200 cursor-pointer"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setEditingRecordId(null);
-                      setEditingField('');
-                      setEditingValue('');
-                    }}
-                  />
-                </div>
-              ) : (
-                <>
-                  <Edit className="w-3 h-3 mr-1 text-cyan-400" />
-                  {group.phone ? group.phone : '-'}
-                </>
-              )}
-            </div>
+              {/* Col 3: Phone (col-span-2) */}
+              <div className="hidden lg:flex lg:col-span-2 items-center text-slate-400 text-[13px] truncate" onClick={() => {
+                  setEditingRecordId(group.nameKey);
+                  setEditingField('phone');
+                  setEditingValue(group.phone || '');
+                }}>
+                {editingRecordId === group.nameKey && editingField === 'phone' ? (
+                  <div className="flex items-center gap-1 bg-slate-900/50 rounded px-1">
+                    <input
+                      type="text"
+                      value={editingValue}
+                      onChange={e => setEditingValue(e.target.value)}
+                      className="bg-transparent text-slate-200 border-none focus:outline-none w-24"
+                    />
+                    <CheckCircle
+                      className="w-4 h-4 text-emerald-400 hover:text-emerald-300 cursor-pointer"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        try {
+                          await updateDoc(doc(db, 'customer_dues', group.records.find(r => r.id).id), { phone: editingValue });
+                          notify.success('Phone updated');
+                        } catch (err) {
+                          console.error(err);
+                          notify.error('Failed to update phone');
+                        }
+                        setEditingRecordId(null);
+                        setEditingField('');
+                      }}
+                    />
+                    <X
+                      className="w-4 h-4 text-slate-400 hover:text-slate-200 cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingRecordId(null);
+                        setEditingField('');
+                        setEditingValue('');
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <Edit className="w-3 h-3 mr-1 text-cyan-400" />
+                    {group.phone ? group.phone : '-'}
+                  </>
+                )}
+              </div>
 
-          {/* Col 4: Is Due (Clickable) */}
-          <div className="col-span-3 lg:col-span-3 flex items-center justify-end">
-            <button 
-              onClick={() => setSelectedCustomerForModal(group)}
-              className={`px-3 py-1.5 rounded-lg border transition-all text-xs font-bold whitespace-nowrap shadow-sm hover:shadow-md ${
-                group.hasPending 
-                  ? 'bg-orange-500/10 border-orange-500/30 text-orange-400 hover:bg-orange-500/20' 
-                  : group.hasAdvance
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
-                    : group.records.length > 0 
-                      ? 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-700'
-                      : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-700'
-              }`}
-            >
-              {group.hasPending ? `Due: Rs ${group.totalPending.toFixed(0)}` : group.hasAdvance ? `Advance: Rs ${group.advanceBalance.toFixed(0)}` : group.records.length > 0 ? 'Settled' : 'No History'}
-            </button>
-          </div>
+              {/* Col 4: Action (col-span-3) */}
+              <div className="col-span-3 flex justify-end">
+                <button 
+                  onClick={(e) => { e.stopPropagation(); setDeleteCustomerData(group); }}
+                  className="p-1.5 rounded-lg border border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors shadow-sm"
+                  title="Delete Customer"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Col 1: Customer Name */}
+              <div className="col-span-3 flex items-center gap-3">
+                <h3 className="text-slate-200 font-bold text-[14px] truncate">{group.name}</h3>
+              </div>
+
+              {/* Col X: Phone */}
+              <div className="hidden lg:flex col-span-2 items-center text-slate-400 text-[13px] truncate">
+                <Phone className="w-3 h-3 mr-1 text-cyan-400" />
+                {group.phone ? group.phone : '-'}
+              </div>
+
+              {/* Col Type: Arrears Type */}
+              <div className="col-span-2 flex items-center">
+                {group.hasPending ? (
+                  group.hasPosArrears && group.hasNonPosArrears ? (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-400">Mixed</span>
+                  ) : group.hasPosArrears ? (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-400">POS Sale</span>
+                  ) : (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-400">Other</span>
+                  )
+                ) : (
+                  <span className="text-slate-600">-</span>
+                )}
+              </div>
+
+              {/* Col 4: Is Due */}
+              <div className="col-span-2 flex items-center justify-end">
+                <button 
+                  onClick={() => setSelectedCustomerForModal(group)}
+                  className={`px-3 py-1.5 rounded-lg border transition-all text-xs font-bold whitespace-nowrap shadow-sm hover:shadow-md ${
+                    group.hasPending 
+                      ? 'bg-orange-500/10 border-orange-500/30 text-orange-400 hover:bg-orange-500/20' 
+                      : group.hasAdvance
+                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
+                        : group.records.length > 0 
+                          ? 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-700'
+                          : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-700'
+                  }`}
+                >
+                  {group.hasPending ? `Due: Rs ${group.totalPending.toFixed(0)}` : group.hasAdvance ? `Advance: Rs ${group.advanceBalance.toFixed(0)}` : group.records.length > 0 ? 'Settled' : 'No History'}
+                </button>
+              </div>
+
+              {/* Col 5: Actions */}
+              <div className="col-span-3 flex items-center justify-end gap-2 pr-2">
+                {payingRecordId === group.nameKey ? (
+                  <div className="flex items-center gap-1 bg-slate-900/80 border border-slate-700 rounded-lg overflow-hidden">
+                    <input 
+                      type="number" 
+                      value={payingAmount}
+                      onChange={(e) => setPayingAmount(e.target.value)}
+                      placeholder="Amount"
+                      className="w-16 bg-transparent px-2 py-1.5 text-xs text-white focus:outline-none"
+                      autoFocus
+                    />
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); handleGroupPayment(group); }}
+                      className="p-1.5 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40 transition-colors"
+                      title="Confirm Payment"
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); setPayingRecordId(null); setPayingAmount(''); }}
+                      className="p-1.5 bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                      title="Cancel"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {!group.hasAdvance && (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setPayingRecordId(group.nameKey); setPayingAmount(group.totalPending > 0 ? group.totalPending : ''); }}
+                        className="px-3 py-1.5 rounded-lg border border-blue-500/30 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 text-xs font-bold transition-colors shadow-sm"
+                      >
+                        Pay
+                      </button>
+                    )}
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); setDeleteGroupData(group); }}
+                      className="p-1.5 rounded-lg border border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors shadow-sm"
+                      title="Clear All Dues"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
     );
@@ -638,7 +821,7 @@ export default function Customers({ isAdmin }) {
             title="Filters"
           >
             <Filter className="w-4 h-4" />
-            {(showOnlyDues || searchCustomer || searchArea || searchPhone) && (
+            {(searchCustomer || searchArea || searchPhone) && (
               <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-cyan-500"></span>
             )}
           </button>
@@ -661,7 +844,7 @@ export default function Customers({ isAdmin }) {
         
         {/* Top Panel: Form */}
         {isAddFormOpen && (
-        <div className="shrink-0">
+        <div className="shrink-0 relative z-20">
           <AddCustomerForm 
             name={name} setName={setName}
             phone={phone} setPhone={setPhone}
@@ -670,6 +853,7 @@ export default function Customers({ isAdmin }) {
             status={status} setStatus={setStatus}
             isPosArrears={isPosArrears} setIsPosArrears={setIsPosArrears}
             isSubmitting={isSubmitting} handleSubmit={handleSubmit}
+            activeCustomersTab={activeCustomersTab} directoryRecords={directoryRecords}
           />
         </div>
         )}
@@ -712,24 +896,30 @@ export default function Customers({ isAdmin }) {
                     className="w-full bg-slate-950 border border-slate-700/50 rounded-xl px-9 py-2.5 text-slate-200 focus:outline-none focus:border-cyan-500/50 text-sm"
                   />
                 </div>
-                
-                <label className="flex items-center justify-center gap-2 cursor-pointer text-sm font-semibold text-slate-300 whitespace-nowrap bg-slate-950 px-4 py-2.5 rounded-xl border border-slate-700/50 hover:border-cyan-500/30 transition-colors w-full">
-                  <input
-                    type="checkbox"
-                    checked={showOnlyDues}
-                    onChange={(e) => setShowOnlyDues(e.target.checked)}
-                    className="w-4 h-4 rounded border-slate-700 text-cyan-500 focus:ring-cyan-500/50 bg-slate-900"
-                  />
-                  Show Dues Only
-                </label>
               </div>
             )}
+
+            {/* Tabs */}
+            <div className="flex gap-4 mb-4 relative z-10 border-b border-white/5 pb-2">
+              <button 
+                onClick={() => setActiveCustomersTab('dues')}
+                className={`pb-2 px-2 font-bold text-sm transition-all border-b-2 ${activeCustomersTab === 'dues' ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
+              >
+                Dues & Advances
+              </button>
+              <button 
+                onClick={() => setActiveCustomersTab('all')}
+                className={`pb-2 px-2 font-bold text-sm transition-all border-b-2 ${activeCustomersTab === 'all' ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
+              >
+                All Customers
+              </button>
+            </div>
 
             {loading ? (
               <div className="flex-1 flex justify-center items-center">
                 <div className="w-8 h-8 border-2 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin"></div>
               </div>
-            ) : activeCustomers.length === 0 && settledCustomers.length === 0 ? (
+            ) : displayGroups.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center text-slate-500 py-12">
                 <User className="w-12 h-12 mb-3 opacity-20" />
                 <p>No customers found.</p>
@@ -738,42 +928,33 @@ export default function Customers({ isAdmin }) {
               <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar bg-slate-900/40 rounded-2xl border border-white/5">
                 {/* Table Header */}
                 <div className="hidden lg:grid grid-cols-12 gap-4 px-4 py-4 border-b border-white/10 text-xs font-bold text-slate-400 uppercase tracking-wider bg-slate-950/80 sticky top-0 z-10 items-center">
-                  <div className="col-span-1 flex justify-center text-yellow-500"><Star className="w-4 h-4 fill-yellow-500/20" /></div>
-                  <div className="col-span-3">Customer</div>
-                  <div className="col-span-3">Area</div>
-                  <div className="col-span-2">Phone</div>
-                  <div className="col-span-3 text-right">Due Status</div>
+                  {activeCustomersTab === 'all' ? (
+                    <>
+                      <div className="col-span-1 flex justify-center text-yellow-500"><Star className="w-4 h-4 fill-yellow-500/20" /></div>
+                      <div className="col-span-3">Customer</div>
+                      <div className="col-span-3">Area</div>
+                      <div className="col-span-2">Phone</div>
+                      <div className="col-span-3 text-right">Action</div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="col-span-3">Customer</div>
+                      <div className="col-span-2">Phone</div>
+                      <div className="col-span-2">Type</div>
+                      <div className="col-span-2 text-right">Due Status</div>
+                      <div className="col-span-3 text-right">Action</div>
+                    </>
+                  )}
                 </div>
 
                 <div className="divide-y divide-white/5">
-                  {activeCustomers.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map(renderGroup)}
-                  
-                  {settledCustomers.length > 0 && (
-                    <div className="p-4 border-t border-white/5">
-                      <button 
-                        onClick={() => setShowSettledCustomers(!showSettledCustomers)}
-                        className="w-full flex items-center justify-between p-3 bg-slate-800/40 hover:bg-slate-800/80 border border-slate-700 rounded-xl transition-all text-slate-300 font-bold text-sm shadow-sm"
-                      >
-                        <div className="flex items-center gap-2">
-                          <CheckCircle className="w-4 h-4 text-slate-500" />
-                          Settled & No History Customers ({settledCustomers.length})
-                        </div>
-                        {showSettledCustomers ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  )}
-                  
-                  {showSettledCustomers && (
-                    <div className="divide-y divide-white/5 border-t border-slate-800 bg-slate-900/30">
-                      {settledCustomers.map(renderGroup)}
-                    </div>
-                  )}
+                  {displayGroups.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map(renderGroup)}
                 </div>
 
-                {activeCustomers.length > ITEMS_PER_PAGE && (
+                {displayGroups.length > ITEMS_PER_PAGE && (
                   <div className="flex items-center justify-between px-4 py-4 border-t border-white/5 bg-slate-950/50 mt-auto">
                     <span className="text-xs text-slate-500 font-semibold">
-                      Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, activeCustomers.length)} of {activeCustomers.length} Active
+                      Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, displayGroups.length)} of {displayGroups.length}
                     </span>
                     <div className="flex gap-2">
                       <button
@@ -784,8 +965,8 @@ export default function Customers({ isAdmin }) {
                         Previous
                       </button>
                       <button
-                        onClick={() => setCurrentPage(p => Math.min(Math.ceil(activeCustomers.length / ITEMS_PER_PAGE), p + 1))}
-                        disabled={currentPage === Math.ceil(activeCustomers.length / ITEMS_PER_PAGE)}
+                        onClick={() => setCurrentPage(p => Math.min(Math.ceil(displayGroups.length / ITEMS_PER_PAGE), p + 1))}
+                        disabled={currentPage === Math.ceil(displayGroups.length / ITEMS_PER_PAGE)}
                         className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/50 text-slate-300 text-xs font-bold disabled:opacity-50 hover:bg-slate-700 transition-colors"
                       >
                         Next
@@ -809,6 +990,14 @@ export default function Customers({ isAdmin }) {
         message="Are you sure you want to delete this customer record? This action cannot be undone."
       />
 
+      <DeleteConfirmModal 
+        isOpen={!!deleteGroupData} 
+        onClose={() => setDeleteGroupData(null)} 
+        onConfirm={confirmDeleteGroup}
+        title="Clear All Dues?"
+        message="Are you sure you want to delete all dues for this customer? This action cannot be undone."
+      />
+
       {/* History Modal */}
       {selectedCustomerForModal && (
         <CustomerHistoryModal 
@@ -824,6 +1013,13 @@ export default function Customers({ isAdmin }) {
           handleDelete={handleDelete}
         />
       )}
+      <DeleteConfirmModal
+        isOpen={!!deleteCustomerData}
+        onClose={() => setDeleteCustomerData(null)}
+        onConfirm={confirmDeleteCustomerDirectory}
+        title="Delete Customer?"
+        message={`Are you sure you want to permanently delete "${deleteCustomerData?.name}"? All their history and records will also be deleted. This cannot be undone.`}
+      />
     </div>
   );
 }

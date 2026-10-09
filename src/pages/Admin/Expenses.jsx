@@ -1,9 +1,122 @@
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../config/firebase';
-import { Search, Plus, Trash2, Wallet, PackageOpen, DollarSign, Calendar, HelpCircle, ChevronUp, RefreshCw } from 'lucide-react';
+import { Search, Plus, Trash2, Wallet, PackageOpen, DollarSign, Calendar, HelpCircle, ChevronUp, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, addDays, parseISO } from 'date-fns';
 import { notify } from '../../utils/toast';
 import DeleteConfirmModal from '../../components/DeleteConfirmModal';
+
+const CustomDatePicker = ({ value, onChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const selectedDate = value ? parseISO(value) : new Date();
+  const [currentMonth, setCurrentMonth] = useState(selectedDate);
+
+  const renderHeader = () => {
+    return (
+      <div className="flex justify-between items-center mb-4">
+        <button type="button" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors">
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        <span className="text-sm font-bold text-slate-200 uppercase tracking-widest">
+          {format(currentMonth, 'MMMM yyyy')}
+        </span>
+        <button type="button" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors">
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+    );
+  };
+
+  const renderDays = () => {
+    const days = [];
+    const startDate = startOfWeek(currentMonth);
+    for (let i = 0; i < 7; i++) {
+      days.push(
+        <div key={i} className="text-center text-[10px] font-bold text-slate-500 uppercase tracking-widest py-1">
+          {format(addDays(startDate, i), 'EEEEEE')}
+        </div>
+      );
+    }
+    return <div className="grid grid-cols-7 mb-2">{days}</div>;
+  };
+
+  const renderCells = () => {
+    const monthStart = startOfMonth(currentMonth);
+    const monthEnd = endOfMonth(monthStart);
+    const startDate = startOfWeek(monthStart);
+    const endDate = endOfWeek(monthEnd);
+
+    const rows = [];
+    let days = [];
+    let day = startDate;
+    let formattedDate = '';
+
+    while (day <= endDate) {
+      for (let i = 0; i < 7; i++) {
+        formattedDate = format(day, 'd');
+        const cloneDay = day;
+        
+        let boxClass = "flex items-center justify-center w-8 h-8 rounded-lg text-xs font-semibold cursor-pointer transition-all ";
+        
+        if (!isSameMonth(day, monthStart)) {
+          boxClass += "text-slate-600 hover:bg-slate-800/50";
+        } else if (isSameDay(day, selectedDate)) {
+          boxClass += "bg-red-500/20 text-red-400 border border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.2)]";
+        } else if (isSameDay(day, new Date())) {
+          boxClass += "bg-slate-800 text-slate-200 border border-slate-700";
+        } else {
+          boxClass += "text-slate-300 hover:bg-slate-800/80";
+        }
+
+        days.push(
+          <div key={day.toString()} className="flex justify-center p-0.5">
+            <button
+              type="button"
+              onClick={() => {
+                onChange(format(cloneDay, 'yyyy-MM-dd'));
+                setIsOpen(false);
+              }}
+              className={boxClass}
+            >
+              {formattedDate}
+            </button>
+          </div>
+        );
+        day = addDays(day, 1);
+      }
+      rows.push(
+        <div className="grid grid-cols-7" key={day.toString()}>
+          {days}
+        </div>
+      );
+      days = [];
+    }
+    return <div>{rows}</div>;
+  };
+
+  return (
+    <div className="relative">
+      <div 
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full h-[46px] bg-slate-950/50 border border-slate-700/50 rounded-xl px-10 flex items-center text-slate-200 focus-within:border-red-500/50 focus-within:ring-1 focus-within:ring-red-500/50 transition-all text-sm cursor-pointer"
+      >
+        <Calendar className="w-4 h-4 absolute left-3 text-slate-500" />
+        {value ? format(selectedDate, 'MMM dd, yyyy') : 'Select Date'}
+      </div>
+      
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)}></div>
+          <div className="absolute top-full left-1/2 -translate-x-1/2 md:translate-x-0 md:left-0 mt-2 z-50 bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-2xl p-4 shadow-2xl min-w-[280px]">
+            {renderHeader()}
+            {renderDays()}
+            {renderCells()}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
 
 export default function Expenses({ isAdmin }) {
   const [records, setRecords] = useState([]);
@@ -14,6 +127,7 @@ export default function Expenses({ isAdmin }) {
   // Form State
   const [itemName, setItemName] = useState('');
   const [amount, setAmount] = useState('');
+  const [expenseDate, setExpenseDate] = useState(new Date().toLocaleDateString('en-CA')); // Defaults to local YYYY-MM-DD
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Delete Modal State
@@ -52,14 +166,26 @@ export default function Expenses({ isAdmin }) {
     
     setIsSubmitting(true);
     try {
+      let finalTimestamp;
+      const todayStr = new Date().toLocaleDateString('en-CA');
+      if (expenseDate === todayStr || !expenseDate) {
+        finalTimestamp = serverTimestamp();
+      } else {
+        const d = new Date(expenseDate);
+        d.setHours(12, 0, 0, 0); // Noon
+        finalTimestamp = d;
+      }
+
       await addDoc(collection(db, 'shop_expenses'), {
         itemName,
         amount: Number(amount),
-        timestamp: serverTimestamp()
+        timestamp: finalTimestamp,
+        createdAt: serverTimestamp()
       });
       notify.success("Expense recorded successfully!");
       setItemName('');
       setAmount('');
+      setExpenseDate(new Date().toLocaleDateString('en-CA'));
       fetchRecords();
     } catch (error) {
       console.error("Error adding expense:", error);
@@ -177,14 +303,14 @@ export default function Expenses({ isAdmin }) {
         
         {/* Top Panel: Form */}
         {isAddFormOpen && (
-        <div className="shrink-0 bg-gradient-to-b from-slate-900/80 to-slate-950/80 backdrop-blur-2xl border border-white/10 rounded-3xl p-5 shadow-[0_8px_30px_rgb(0,0,0,0.5)] relative animate-in slide-in-from-top-4 fade-in duration-300">
+        <div className="shrink-0 bg-gradient-to-b from-slate-900/80 to-slate-950/80 backdrop-blur-2xl border border-white/10 rounded-3xl p-5 shadow-[0_8px_30px_rgb(0,0,0,0.5)] relative z-50 animate-in slide-in-from-top-4 fade-in duration-300">
           <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-red-500/50 to-transparent"></div>
           <h2 className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-orange-400 mb-4 flex items-center gap-2 drop-shadow-sm shrink-0">
             <Plus className="w-5 h-5 text-red-400" /> Add New Expense
           </h2>
           
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-end">
-            <div className="col-span-1 md:col-span-2 xl:col-span-4 mb-2">
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-9 gap-4 items-end">
+            <div className="col-span-1 md:col-span-3 xl:col-span-9 mb-2">
               <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Quick Select</label>
               <div className="flex flex-wrap gap-2">
                 {quickItems.map(item => (
@@ -200,7 +326,7 @@ export default function Expenses({ isAdmin }) {
               </div>
             </div>
 
-            <div className="col-span-1 md:col-span-2 xl:col-span-2">
+            <div className="col-span-1 md:col-span-1 xl:col-span-3">
               <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Item Name / Description *</label>
               <div className="relative">
                 <PackageOpen className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
@@ -215,7 +341,7 @@ export default function Expenses({ isAdmin }) {
               </div>
             </div>
 
-            <div className="col-span-1 xl:col-span-1">
+            <div className="col-span-1 md:col-span-1 xl:col-span-2">
               <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Amount (Rs) *</label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-sm">Rs.</span>
@@ -232,11 +358,19 @@ export default function Expenses({ isAdmin }) {
               </div>
             </div>
 
-            <div className="col-span-1 xl:col-span-1 flex items-center justify-end">
+            <div className="col-span-1 md:col-span-1 xl:col-span-2 relative">
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Date *</label>
+              <CustomDatePicker 
+                value={expenseDate} 
+                onChange={(val) => setExpenseDate(val)} 
+              />
+            </div>
+
+            <div className="col-span-1 md:col-span-3 xl:col-span-2 flex items-center justify-end">
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-[0_0_15px_rgba(220,38,38,0.3)] hover:shadow-[0_0_25px_rgba(220,38,38,0.5)] disabled:opacity-50"
+                className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-[0_0_15px_rgba(220,38,38,0.3)] hover:shadow-[0_0_25px_rgba(220,38,38,0.5)] disabled:opacity-50"
               >
                 {isSubmitting ? 'Recording...' : 'Record Expense'}
               </button>
