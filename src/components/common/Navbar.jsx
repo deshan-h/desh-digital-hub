@@ -1,19 +1,21 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import logo from "../../assets/logo.webp";
 
 export default function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const location = useLocation();
 
-  const navLinks = {
-    'මුල් පිටුව': '#home',
-    'සේවාවන්': '#services',
-    'අප ගැන': '#about',
-    'අපව අමතන්න': '#contact'
-  };
+  const navItems = [
+    { label: 'මුල් පිටුව', href: '/#home', isRoute: false },
+    { label: 'සේවාවන්', href: '/#services', isRoute: false },
+    { label: 'Papers Hub', href: '/papers', isRoute: true },
+    { label: 'අප ගැන', href: '/#about', isRoute: false },
+    { label: 'අපව අමතන්න', href: '/#contact', isRoute: false },
+  ];
 
-  const navItems = Object.entries(navLinks);
+  const isPapersPage = location.pathname === '/papers';
 
   return (
     <nav className="fixed w-full z-50 top-0 left-0 right-0 bg-slate-950/60 backdrop-blur-2xl border-b border-white/10 transition-all duration-500 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.7)]">
@@ -22,27 +24,40 @@ export default function Navbar() {
       
       <div className="container mx-auto px-4 md:px-6 relative z-10">
         <div className="flex justify-between items-center py-3 md:py-4">
-          {/* Logo */}
-          <a href="#" className="flex items-center gap-3 z-50 group">
+          {/* Logo (Links to Home) */}
+          <Link to="/" className="flex items-center gap-3 z-50 group">
             <img src="/desh-digital-hub/pwa-192x192.png" alt="DESH Digital Hub Logo" className="w-8 h-8 md:w-9 md:h-9 object-contain drop-shadow-md transition-transform duration-500 group-hover:scale-110" />
             <span className="text-xl md:text-2xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-slate-100 to-slate-400">
               DESH Digital Hub
             </span>
-          </a>
+          </Link>
           
           {/* Desktop Navigation & Buttons */}
           <div className="hidden lg:flex items-center space-x-10">
-            <div className="flex space-x-8 items-center bg-slate-900/50 px-6 py-2 rounded-full border border-white/5 shadow-inner backdrop-blur-md">
-              {navItems.map(([label, href]) => (
-                <a 
-                  key={label}
-                  href={href} 
-                  className="relative text-sm font-bold text-slate-300 hover:text-white transition-all duration-300 group"
-                >
-                  {label}
-                  <span className="absolute -bottom-1.5 left-1/2 w-0 h-0.5 bg-cyan-400 rounded-full transition-all duration-300 group-hover:w-full group-hover:left-0 shadow-[0_0_8px_rgba(34,211,238,0.8)]"></span>
-                </a>
-              ))}
+            <div className="flex space-x-7 items-center bg-slate-900/50 px-6 py-2 rounded-full border border-white/5 shadow-inner backdrop-blur-md">
+              {navItems.map((item) => {
+                const isActive = item.isRoute && item.href === location.pathname;
+                const linkClasses = `relative text-sm font-bold transition-all duration-300 group flex items-center gap-1.5 ${
+                  isActive || item.label === 'Papers Hub'
+                    ? 'text-cyan-400 hover:text-cyan-300' 
+                    : 'text-slate-300 hover:text-white'
+                }`;
+
+                return item.isRoute ? (
+                  <Link key={item.label} to={item.href} className={linkClasses}>
+                    {item.label === 'Papers Hub' && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                    )}
+                    {item.label}
+                    <span className="absolute -bottom-1.5 left-1/2 w-0 h-0.5 bg-cyan-400 rounded-full transition-all duration-300 group-hover:w-full group-hover:left-0 shadow-[0_0_8px_rgba(34,211,238,0.8)]"></span>
+                  </Link>
+                ) : (
+                  <a key={item.label} href={item.href} className={linkClasses}>
+                    {item.label}
+                    <span className="absolute -bottom-1.5 left-1/2 w-0 h-0.5 bg-cyan-400 rounded-full transition-all duration-300 group-hover:w-full group-hover:left-0 shadow-[0_0_8px_rgba(34,211,238,0.8)]"></span>
+                  </a>
+                );
+              })}
             </div>
             
             <div className="flex items-center space-x-4">
@@ -78,19 +93,41 @@ export default function Navbar() {
 
       {/* Mobile Menu Dropdown */}
       <div 
-        className={`lg:hidden absolute top-full left-0 w-full bg-slate-950/95 backdrop-blur-2xl border-b border-white/10 transition-all duration-300 ease-in-out overflow-hidden ${isMobileMenuOpen ? 'max-h-[400px] py-4' : 'max-h-0 py-0 border-transparent'}`}
+        className={`lg:hidden absolute top-full left-0 w-full bg-slate-950/95 backdrop-blur-2xl border-b border-white/10 transition-all duration-300 ease-in-out overflow-hidden ${isMobileMenuOpen ? 'max-h-[450px] py-4' : 'max-h-0 py-0 border-transparent'}`}
       >
         <div className="flex flex-col px-6 space-y-4">
-          {navItems.map(([label, href]) => (
-            <a 
-              key={label}
-              href={href} 
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="text-base font-semibold text-slate-300 hover:text-cyan-400 border-b border-white/5 pb-2 transition-all"
-            >
-              {label}
-            </a>
-          ))}
+          {navItems.map((item) => {
+            const linkClasses = `text-base font-semibold border-b border-white/5 pb-2 transition-all flex items-center justify-between ${
+              item.label === 'Papers Hub' 
+                ? 'text-cyan-400 font-bold' 
+                : 'text-slate-300 hover:text-cyan-400'
+            }`;
+
+            return item.isRoute ? (
+              <Link
+                key={item.label}
+                to={item.href}
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={linkClasses}
+              >
+                <span>{item.label}</span>
+                {item.label === 'Papers Hub' && (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-black bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 uppercase tracking-wider">
+                    New
+                  </span>
+                )}
+              </Link>
+            ) : (
+              <a 
+                key={item.label}
+                href={item.href} 
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={linkClasses}
+              >
+                <span>{item.label}</span>
+              </a>
+            );
+          })}
           
           <div className="pt-2 flex flex-col space-y-3">
             <a 

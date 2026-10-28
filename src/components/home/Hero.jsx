@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
-import { Megaphone, ChevronRight } from 'lucide-react';
+import { Megaphone, ChevronRight, GraduationCap } from 'lucide-react';
 import logo from '../../assets/logo.webp';
 
 export default function Hero() {
@@ -99,20 +100,34 @@ export default function Hero() {
           ))}
         </motion.div>
 
+        {/* Action Buttons */}
         <motion.div 
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5, delay: 1 }}
-          className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start w-full sm:w-auto"
+          className="flex flex-col sm:flex-row gap-3.5 sm:gap-4 justify-center lg:justify-start w-full sm:w-auto"
         >
-          <a href="#services" className="group relative w-full sm:w-auto px-8 md:px-10 py-4 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold text-lg transition-all shadow-[0_0_20px_rgba(8,145,178,0.3)] hover:shadow-[0_0_40px_rgba(8,145,178,0.6)] hover:-translate-y-1 overflow-hidden text-center">
+          {/* Button 1: Services */}
+          <a href="#services" className="group relative w-full sm:w-auto px-7 md:px-9 py-4 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold text-lg transition-all shadow-[0_0_20px_rgba(8,145,178,0.3)] hover:shadow-[0_0_40px_rgba(8,145,178,0.6)] hover:-translate-y-1 overflow-hidden text-center flex items-center justify-center gap-2">
             <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out rounded-2xl"></div>
             <span className="relative z-10 flex items-center justify-center gap-2">
               සේවාවන් බලන්න
               <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </span>
           </a>
-          <a href="#contact" className="w-full sm:w-auto px-8 md:px-10 py-4 rounded-2xl bg-slate-800/50 backdrop-blur-lg border border-slate-700/50 text-slate-200 font-bold text-lg hover:bg-slate-800 hover:text-white transition-all shadow-lg hover:shadow-2xl hover:border-slate-600 hover:-translate-y-1 text-center">
+
+          {/* Button 2: Papers Hub (Opens dedicated /papers page) */}
+          <Link 
+            to="/papers" 
+            className="group relative w-full sm:w-auto px-7 md:px-8 py-4 rounded-2xl bg-slate-900/80 backdrop-blur-xl border border-cyan-500/40 hover:border-cyan-400 text-cyan-300 hover:text-white font-bold text-lg transition-all shadow-[0_0_20px_rgba(6,182,212,0.15)] hover:shadow-[0_0_35px_rgba(6,182,212,0.4)] hover:-translate-y-1 flex items-center justify-center gap-2.5 overflow-hidden text-center"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 via-blue-500/15 to-cyan-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            <GraduationCap className="w-5 h-5 text-cyan-400 group-hover:scale-110 transition-transform relative z-10" />
+            <span className="relative z-10">Papers Hub</span>
+          </Link>
+
+          {/* Button 3: Contact */}
+          <a href="#contact" className="w-full sm:w-auto px-7 md:px-9 py-4 rounded-2xl bg-slate-800/50 backdrop-blur-lg border border-slate-700/50 text-slate-200 font-bold text-lg hover:bg-slate-800 hover:text-white transition-all shadow-lg hover:shadow-2xl hover:border-slate-600 hover:-translate-y-1 text-center flex items-center justify-center">
             අපව අමතන්න
           </a>
         </motion.div>

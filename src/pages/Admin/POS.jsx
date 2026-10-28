@@ -151,7 +151,7 @@ export default function POS({
   const [discount, setDiscount] = useState('');
   const [isCredit, setIsCredit] = useState(false);
   const [includePreviousArrears, setIncludePreviousArrears] = useState(true);
-  const [keepChangeAsAdvance, setKeepChangeAsAdvance] = useState(true);
+  const [keepChangeAsAdvance, setKeepChangeAsAdvance] = useState(false);
 
   // Pending Orders State
   const [showSavePendingModal, setShowSavePendingModal] = useState(false);
@@ -781,7 +781,10 @@ export default function POS({
                   <Save className="w-4 h-4" /> Pending
                 </button>
                 <button
-                  onClick={() => setShowPaymentModal(true)}
+                  onClick={() => {
+                    setKeepChangeAsAdvance(false);
+                    setShowPaymentModal(true);
+                  }}
                   disabled={cart.length === 0}
                   className="flex-[2] bg-emerald-500 hover:bg-emerald-400 shadow-md hover:shadow-lg text-slate-950 font-extrabold py-3 disabled:opacity-50 transition-all rounded-xl flex items-center justify-center text-sm uppercase tracking-wide"
                 >
@@ -847,7 +850,10 @@ export default function POS({
                 Complete Sale
               </h2>
               <button
-                onClick={() => setShowPaymentModal(false)}
+                onClick={() => {
+                  setKeepChangeAsAdvance(false);
+                  setShowPaymentModal(false);
+                }}
                 className="text-slate-400 hover:text-red-400 transition-colors p-2 bg-slate-800/50 hover:bg-slate-800 rounded-full"
               >
                 <X className="w-5 h-5" />
