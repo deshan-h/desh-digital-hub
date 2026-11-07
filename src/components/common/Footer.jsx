@@ -1,4 +1,6 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
+import { Lock } from 'lucide-react';
 import logo from "../../assets/logo.webp";
 
 export default function Footer() {
@@ -123,6 +125,16 @@ export default function Footer() {
         
         <div className="border-t border-slate-800/50 mt-16 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-slate-500 text-sm font-medium">© {new Date().getFullYear()} DESH Digital Hub. All rights reserved.</p>
+          
+          {/* Staff Login Link */}
+          <Link
+            to="/admin"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/40 text-slate-400 hover:text-cyan-400 text-xs font-bold tracking-wider uppercase transition-all duration-300 shadow-sm hover:shadow-[0_0_15px_rgba(6,182,212,0.25)] hover:-translate-y-0.5 group"
+          >
+            <Lock className="w-3.5 h-3.5 text-cyan-400/70 group-hover:text-cyan-400 transition-colors" />
+            <span>Staff Login</span>
+          </Link>
+
           <div className="flex items-center gap-3 text-slate-500 text-xs">
             <span className="tracking-wide uppercase font-semibold">Developed By</span>
             <div className="flex items-center gap-2 bg-slate-900 px-4 py-2 rounded-xl border border-slate-800/80 shadow-inner hover:border-cyan-500/30 transition-colors cursor-default">

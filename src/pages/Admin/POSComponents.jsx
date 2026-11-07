@@ -105,7 +105,7 @@ export const POSItemsGrid = React.memo(({ filteredItems, handleAddToCart, favori
           key={`${item.id}-${item.name}`} 
           item={item} 
           addToCart={handleAddToCart} 
-          isFavorite={favoriteItemIds.includes(item.id)}
+          isFavorite={item.isFavorite === true || item.favorite === true || (favoriteItemIds && favoriteItemIds.includes(item.id))}
           onToggleFavorite={toggleFavorite}
         />
       ))}

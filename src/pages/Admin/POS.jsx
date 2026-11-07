@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { ShoppingCart, Plus, Trash2, Search, Package, RefreshCw, Save, Clock, TrendingUp, TrendingDown, Star, ChevronLeft, ChevronRight, X, MessageCircle } from 'lucide-react';
 import { notify } from '../../utils/toast';
 import { generateInvoiceHtml } from '../../utils/invoiceTemplate';
-import { collection, addDoc, deleteDoc, doc, serverTimestamp, query, where, getDocs, updateDoc, getDoc, setDoc } from 'firebase/firestore';
+import { collection, addDoc, deleteDoc, doc, serverTimestamp, query, where, getDocs, updateDoc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import DeleteConfirmModal from '../../components/DeleteConfirmModal';
 import { POSItem, CategoryTab, CartItem, POSItemsGrid, CustomerInput } from './POSComponents';
@@ -83,54 +83,119 @@ export default function POS({
     return saved ? JSON.parse(saved) : [];
   });
 
-  // Fetch true state from DB on mount
+  // Realtime sync from DB settings/pos_favorites
   useEffect(() => {
-    const fetchFavorites = async () => {
-      try {
-        const docRef = doc(db, 'settings', 'pos_favorites');
-        const snap = await getDoc(docRef);
-        if (snap.exists()) {
-          const dbItems = snap.data().items || [];
-          setFavoriteItemIds(dbItems);
-          localStorage.setItem('posFavorites', JSON.stringify(dbItems));
-        } else {
-          // If DB is empty, migrate local storage to DB
-          const saved = localStorage.getItem('posFavorites');
-          if (saved) {
-            const items = JSON.parse(saved);
-            await setDoc(docRef, { items });
-          }
-        }
-      } catch (err) {
-        console.error("Error fetching POS favorites from DB", err);
+    const docRef = doc(db, 'settings', 'pos_favorites');
+    const unsubscribe = onSnapshot(docRef, (snap) => {
+      if (snap.exists()) {
+        const dbItems = snap.data().items || [];
+        setFavoriteItemIds(dbItems);
+        localStorage.setItem('posFavorites', JSON.stringify(dbItems));
       }
-    };
-    fetchFavorites();
+    }, (err) => {
+      console.error("Error listening to pos_favorites:", err);
+    });
+
+    return () => unsubscribe();
   }, []);
+
+  // Sync favorites when posCategories updates from DB
+  useEffect(() => {
+    if (posCategories && posCategories.length > 0) {
+      const dbFavIds = posCategories
+        .flatMap(c => c.items || [])
+        .filter(i => i.isFavorite === true || i.favorite === true)
+        .map(i => i.id);
+
+      if (dbFavIds.length > 0) {
+        setFavoriteItemIds(prev => {
+          const merged = [...new Set([...prev, ...dbFavIds])];
+          localStorage.setItem('posFavorites', JSON.stringify(merged));
+          return merged;
+        });
+      }
+    }
+  }, [posCategories]);
+
+  // Ensure all existing favorite items have the isFavorite variable directly in pos_categories in DB
+  useEffect(() => {
+    if (!posCategories || posCategories.length === 0 || favoriteItemIds.length === 0) return;
+
+    posCategories.forEach(async (cat) => {
+      if (!cat.items || !cat.id) return;
+      let needsUpdate = false;
+      const updatedItems = cat.items.map(item => {
+        const shouldBeFav = favoriteItemIds.includes(item.id);
+        if (shouldBeFav && !item.isFavorite) {
+          needsUpdate = true;
+          return { ...item, isFavorite: true, favorite: true };
+        }
+        return item;
+      });
+
+      if (needsUpdate) {
+        try {
+          await updateDoc(doc(db, 'pos_categories', cat.id), { items: updatedItems });
+        } catch (e) {
+          console.error("Sync of isFavorite variable to pos_categories failed", e);
+        }
+      }
+    });
+  }, [posCategories, favoriteItemIds]);
 
   const toggleFavorite = useCallback(async (e, item) => {
     e.preventDefault();
     e.stopPropagation();
     
+    const isCurrentlyFav = item.isFavorite === true || item.favorite === true || favoriteItemIds.includes(item.id);
+    const newStatus = !isCurrentlyFav;
+
+    // 1. Instant local update for snappy UI
     let newFavs = [];
     setFavoriteItemIds(prev => {
-      newFavs = prev.includes(item.id)
-        ? prev.filter(id => id !== item.id)
-        : [...prev, item.id];
+      newFavs = newStatus
+        ? [...new Set([...prev, item.id])]
+        : prev.filter(id => id !== item.id);
       localStorage.setItem('posFavorites', JSON.stringify(newFavs));
       return newFavs;
     });
 
+    // 2. Save directly in pos_categories DB with the variable `isFavorite` and `favorite`
+    const targetCat = posCategories.find(c => c.items && c.items.some(i => i.id === item.id));
+    if (targetCat && targetCat.id) {
+      try {
+        const updatedItems = (targetCat.items || []).map(i => {
+          if (i.id === item.id) {
+            return {
+              ...i,
+              isFavorite: newStatus,
+              favorite: newStatus
+            };
+          }
+          return i;
+        });
+
+        await updateDoc(doc(db, 'pos_categories', targetCat.id), {
+          items: updatedItems
+        });
+      } catch (err) {
+        console.error("Error saving isFavorite to pos_categories in DB:", err);
+      }
+    }
+
+    // 3. Keep settings/pos_favorites in sync
     try {
       await setDoc(doc(db, 'settings', 'pos_favorites'), { items: newFavs });
     } catch (err) {
-      console.error("Error saving POS favorites to DB", err);
+      console.error("Error saving POS favorites list to DB", err);
     }
-  }, []);
+  }, [posCategories, favoriteItemIds]);
 
   const displayCategories = useMemo(() => {
     const allItems = posCategories.flatMap(c => c.items || []);
-    const favItems = allItems.filter(item => favoriteItemIds.includes(item.id));
+    const favItems = allItems.filter(item => 
+      item.isFavorite === true || item.favorite === true || favoriteItemIds.includes(item.id)
+    );
 
     const favCategory = {
       id: 'favorites',
@@ -968,19 +1033,49 @@ export default function POS({
 
                 {/* Cash & Balance */}
                 <div className="flex flex-col gap-5 bg-slate-900/80 p-6 rounded-2xl border border-slate-800/80 shadow-inner">
-                  <div className="relative">
-                    <span className="text-sm text-slate-400 uppercase tracking-wider block mb-2 font-bold">Cash Given</span>
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500 font-black text-xl">Rs</span>
-                      <input
-                        type="number"
-                        placeholder="0.00"
-                        value={cashGiven}
-                        onChange={(e) => setCashGiven(e.target.value)}
-                        className="w-full text-2xl bg-slate-950 border border-slate-700 text-emerald-400 font-black rounded-xl pl-14 pr-4 py-4 focus:outline-none focus:border-emerald-500/50 transition-all shadow-inner"
-                      />
-                    </div>
-                  </div>
+                  {(() => {
+                    const payableAmount = Math.max(0, Math.max(0, cartTotal - Number(discount || 0)) - currentCustomerAdvance) + (includePreviousArrears ? currentCustomerArrears : 0);
+                    const formattedPayable = payableAmount % 1 === 0 ? payableAmount.toString() : payableAmount.toFixed(2);
+
+                    return (
+                      <div className="relative">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm text-slate-400 uppercase tracking-wider font-bold">Cash Given</span>
+                          <button
+                            type="button"
+                            onClick={() => setCashGiven(formattedPayable)}
+                            className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-slate-950 border border-emerald-500/30 rounded-lg text-xs font-black tracking-wider uppercase transition-all duration-200 active:scale-95 flex items-center gap-1 shadow-sm"
+                            title={`Fill exact payable amount (Rs ${payableAmount.toFixed(2)})`}
+                          >
+                            <span>Exact (Rs {payableAmount.toFixed(2)})</span>
+                          </button>
+                        </div>
+                        <div className="relative">
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500 font-black text-xl">Rs</span>
+                          <input
+                            type="number"
+                            placeholder="0.00"
+                            value={cashGiven}
+                            onChange={(e) => setCashGiven(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Tab' && cashGiven === '') {
+                                setCashGiven(formattedPayable);
+                              }
+                            }}
+                            className="w-full text-2xl bg-slate-950 border border-slate-700 text-emerald-400 font-black rounded-xl pl-14 pr-24 py-4 focus:outline-none focus:border-emerald-500/50 transition-all shadow-inner"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setCashGiven(formattedPayable)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-emerald-500/15 hover:bg-emerald-500 text-emerald-400 hover:text-slate-950 border border-emerald-500/40 hover:border-emerald-500 rounded-lg text-xs font-black tracking-wider uppercase transition-all duration-200 active:scale-95 shadow-sm"
+                            title={`Fill exact amount (Rs ${payableAmount.toFixed(2)})`}
+                          >
+                            Exact
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   <div className="h-px bg-slate-800 w-full"></div>
 

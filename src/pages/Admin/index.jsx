@@ -23,6 +23,7 @@ const Repairs = lazy(() => import('./Repairs'));
 const Customers = lazy(() => import('./Customers'));
 const Expenses = lazy(() => import('./Expenses'));
 const ItemsManager = lazy(() => import('./ItemsManager'));
+const Reports = lazy(() => import('./Reports'));
 const Settings = lazy(() => import('./Settings'));
 
 
@@ -88,6 +89,7 @@ export default function Admin() {
 
   useEffect(() => {
     let pendingUnsubscribe = null;
+    let categoriesUnsubscribe = null;
 
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
@@ -96,6 +98,36 @@ export default function Admin() {
         fetchCategories();
         fetchCustomerDues();
         fetchCustomersList();
+
+        // Attach categories listener for realtime favorites and catalog sync across devices
+        categoriesUnsubscribe = onSnapshot(collection(db, 'pos_categories'), (snapshot) => {
+          let data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          data = data.filter(cat => cat.category !== 'Custom & Utilities');
+          
+          const CATEGORY_ORDER = [
+            "Printing & Scanning",
+            "Document Laminating",
+            "Book Binding",
+            "Type Setting",
+            "Online Services",
+            "Downloads & Media",
+            "Custom & Utilities"
+          ];
+          
+          data.sort((a, b) => {
+            if (a.order !== undefined && b.order !== undefined) {
+              return a.order - b.order;
+            }
+            let indexA = CATEGORY_ORDER.indexOf(a.category);
+            let indexB = CATEGORY_ORDER.indexOf(b.category);
+            if (indexA === -1) indexA = 999;
+            if (indexB === -1) indexB = 999;
+            return indexA - indexB;
+          });
+
+          setPosCategories(data);
+          localStorage.setItem('posCategories', JSON.stringify(data));
+        }, (err) => console.error("Categories snapshot error:", err));
         
         // Attach pending orders listener
         const pendingQ = query(collection(db, 'pos_pending_orders'), orderBy('createdAt', 'desc'));
@@ -113,6 +145,10 @@ export default function Admin() {
           pendingUnsubscribe();
           pendingUnsubscribe = null;
         }
+        if (categoriesUnsubscribe) {
+          categoriesUnsubscribe();
+          categoriesUnsubscribe = null;
+        }
         setPendingOrders([]);
       }
       setAuthLoading(false);
@@ -121,6 +157,7 @@ export default function Admin() {
     return () => {
       unsubscribe();
       if (pendingUnsubscribe) pendingUnsubscribe();
+      if (categoriesUnsubscribe) categoriesUnsubscribe();
     };
   }, []);
 
@@ -634,6 +671,7 @@ export default function Admin() {
           {activeTab === 'history' && <History salesHistory={salesHistory} fetchSales={fetchSales} handleDeleteSale={handleDeleteSale} user={user} posCategories={posCategories} isAdmin={isAdmin} customersList={customersList} />}
           {activeTab === 'repairs' && <Repairs user={user} fetchSales={fetchSales} />}
           {activeTab === 'items' && <ItemsManager posCategories={posCategories} fetchCategories={fetchCategories} />}
+          {activeTab === 'reports' && <Reports salesHistory={salesHistory} customersList={customersList} isAdmin={isAdmin} />}
           {activeTab === 'settings' && <Settings isAdmin={isAdmin} />}
         </Suspense>
       </AdminLayout>

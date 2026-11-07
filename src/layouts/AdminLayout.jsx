@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, ShoppingCart, History, LogOut, Menu, Wrench, UserCog, User, ChevronDown, Users, Wallet, RefreshCw, Tags, Contact, Settings, TrendingUp, Clock, ChevronRight, ChevronLeft } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, History, LogOut, Menu, Wrench, UserCog, User, ChevronDown, Users, Wallet, RefreshCw, Tags, Contact, Settings, TrendingUp, Clock, ChevronRight, ChevronLeft, BarChart3 } from 'lucide-react';
 
 export default function AdminLayout({ 
   children, 
@@ -152,6 +152,19 @@ export default function AdminLayout({
               {!isSidebarOpen && (
                 <div className="absolute left-16 hidden group-hover:block bg-slate-900/95 backdrop-blur-xl text-slate-100 text-xs font-semibold px-4 py-2 rounded-lg border border-white/10 whitespace-nowrap z-50 shadow-[0_8px_30px_rgb(0,0,0,0.3)]">
                   Sales History
+                </div>
+              )}
+            </button>
+
+            <button
+              onClick={() => setActiveTab('reports')}
+              className={`group relative w-full flex items-center ${isSidebarOpen ? 'justify-start px-3' : 'justify-center'} py-2.5 rounded-xl transition-all duration-300 ${activeTab === 'reports' ? 'bg-teal-500/15 text-teal-400 shadow-[inset_3px_0_0_0_#14b8a6] ring-1 ring-teal-500/20' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}
+            >
+              <BarChart3 className="w-5 h-5 shrink-0 text-teal-400" />
+              {isSidebarOpen && <span className="ml-3 font-semibold text-sm whitespace-nowrap">Reports</span>}
+              {!isSidebarOpen && (
+                <div className="absolute left-16 hidden group-hover:block bg-slate-900/95 backdrop-blur-xl text-slate-100 text-xs font-semibold px-4 py-2 rounded-lg border border-white/10 whitespace-nowrap z-50 shadow-[0_8px_30px_rgb(0,0,0,0.3)]">
+                  Reports
                 </div>
               )}
             </button>

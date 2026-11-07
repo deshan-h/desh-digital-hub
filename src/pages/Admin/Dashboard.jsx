@@ -61,6 +61,7 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
   const [lastRefreshed, setLastRefreshed] = useState(() => localStorage.getItem('dashboardLastRefreshed') || null);
   const [revenueTimeFilter, setRevenueTimeFilter] = useState('month');
   const [expandedCats, setExpandedCats] = useState({});
+  const [ordersViewMode, setOrdersViewMode] = useState('monthly');
 
   const toggleCat = (catName) => {
     setExpandedCats(prev => ({ ...prev, [catName]: !prev[catName] }));
@@ -555,6 +556,45 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
   });
 
   const dailyOrdersData = Object.values(dailyOrdersMap);
+
+  // -- CHART: Monthly Orders Counts ({currentYear}) --
+  const monthlyOrdersMap = {};
+  monthsList.forEach(m => {
+    monthlyOrdersMap[m] = {
+      month: m,
+      orders: 0,
+      posOrders: 0,
+      repairOrders: 0,
+      revenue: 0
+    };
+  });
+
+  salesHistory.forEach(sale => {
+    if (sale.timestamp) {
+      const d = parseTimestamp(sale.timestamp);
+      if (d.getFullYear() === currentYear) {
+        const mStr = monthsList[d.getMonth()];
+        if (monthlyOrdersMap[mStr]) {
+          monthlyOrdersMap[mStr].orders += 1;
+          if (sale.isRepair) {
+            monthlyOrdersMap[mStr].repairOrders += 1;
+          } else {
+            monthlyOrdersMap[mStr].posOrders += 1;
+          }
+          monthlyOrdersMap[mStr].revenue += Number(sale.amount || 0);
+        }
+      }
+    }
+  });
+
+  const monthlyOrdersData = monthsList.map(m => monthlyOrdersMap[m]);
+  const thisMonthOrderCount = monthSales.length;
+  const lastMonthOrderCount = lastMonthSales.length;
+  const orderGrowth = lastMonthOrderCount === 0 
+    ? (thisMonthOrderCount > 0 ? 100 : 0) 
+    : (((thisMonthOrderCount - lastMonthOrderCount) / lastMonthOrderCount) * 100);
+  const avgOrdersPerDay = today.getDate() > 0 ? (thisMonthOrderCount / today.getDate()).toFixed(1) : 0;
+  const yearOrdersCount = yearSales.length;
 
   // -- CHART: Daily Comparison (This Month vs Last Month) --
   const dailyComparisonMap = {};
@@ -1066,6 +1106,183 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
           </div>
         </motion.div>
       </div>
+
+      {/* WIDGET: MONTHLY ORDERS COUNTS */}
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-5%" }}
+        transition={{ duration: 0.5, delay: 0.1 }}
+        className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-lg mb-6 flex flex-col"
+      >
+        {/* Header with Title, Quick Stats, and View Mode Toggle */}
+        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-6 pb-4 border-b border-white/5">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-cyan-500/10 rounded-xl border border-cyan-500/20 text-cyan-400">
+              <ShoppingBag className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm md:text-base font-bold text-slate-100 uppercase tracking-widest flex items-center gap-2">
+                Monthly Orders Counts
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                  {currentYear}
+                </span>
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5 font-medium">
+                Order volume & transaction counts across months
+              </p>
+            </div>
+          </div>
+
+          {/* Metric Badges & View Toggle */}
+          <div className="flex flex-wrap items-center gap-2.5 w-full xl:w-auto">
+            {/* This Month */}
+            <div className="bg-slate-950/60 border border-white/5 rounded-xl px-3 py-1.5 flex items-center gap-2.5">
+              <div>
+                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">This Month</span>
+                <span className="text-base font-black text-cyan-400">{thisMonthOrderCount} <span className="text-[11px] font-normal text-slate-500">orders</span></span>
+              </div>
+              {lastMonthOrderCount > 0 && (
+                <div className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${orderGrowth >= 0 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                  {orderGrowth >= 0 ? '+' : ''}{orderGrowth.toFixed(1)}%
+                </div>
+              )}
+            </div>
+
+            {/* Last Month */}
+            <div className="bg-slate-950/60 border border-white/5 rounded-xl px-3 py-1.5">
+              <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">Last Month</span>
+              <span className="text-base font-black text-slate-300">{lastMonthOrderCount} <span className="text-[11px] font-normal text-slate-500">orders</span></span>
+            </div>
+
+            {/* Daily Average */}
+            <div className="bg-slate-950/60 border border-white/5 rounded-xl px-3 py-1.5">
+              <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">Avg / Day</span>
+              <span className="text-base font-black text-emerald-400">{avgOrdersPerDay} <span className="text-[11px] font-normal text-slate-500">/day</span></span>
+            </div>
+
+            {/* Year Total */}
+            <div className="bg-slate-950/60 border border-white/5 rounded-xl px-3 py-1.5">
+              <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">Year Total</span>
+              <span className="text-base font-black text-purple-400">{yearOrdersCount} <span className="text-[11px] font-normal text-slate-500">orders</span></span>
+            </div>
+
+            {/* Toggle Button */}
+            <div className="flex bg-slate-950/70 p-1 rounded-xl border border-white/5 ml-auto xl:ml-0">
+              <button
+                type="button"
+                onClick={() => setOrdersViewMode('monthly')}
+                className={`px-3 py-1 text-[11px] font-bold uppercase tracking-wider rounded-lg transition-all ${ordersViewMode === 'monthly' ? 'bg-cyan-500 text-slate-950 shadow-md font-black' : 'text-slate-400 hover:text-white'}`}
+              >
+                Monthly
+              </button>
+              <button
+                type="button"
+                onClick={() => setOrdersViewMode('daily')}
+                className={`px-3 py-1 text-[11px] font-bold uppercase tracking-wider rounded-lg transition-all ${ordersViewMode === 'daily' ? 'bg-cyan-500 text-slate-950 shadow-md font-black' : 'text-slate-400 hover:text-white'}`}
+              >
+                Daily ({monthsList[currentMonth]})
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Chart View */}
+        <div className="h-[270px] w-full">
+          {ordersViewMode === 'monthly' ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={monthlyOrdersData} margin={{ top: 15, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorMonthlyOrders" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.9}/>
+                    <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.25}/>
+                  </linearGradient>
+                  <linearGradient id="colorActiveCurrentMonth" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.95}/>
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.35}/>
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="month" stroke="#475569" fontSize={11} tickMargin={10} axisLine={false} tickLine={false} />
+                <YAxis stroke="#475569" fontSize={11} axisLine={false} tickLine={false} allowDecimals={false} />
+                <Tooltip 
+                  cursor={{ fill: '#1e293b', opacity: 0.4 }} 
+                  content={({ active, payload, label }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      return (
+                        <div className="bg-slate-900/95 backdrop-blur-md border border-slate-700/80 p-3.5 rounded-xl shadow-2xl min-w-[170px]">
+                          <p className="text-slate-100 font-bold mb-2 pb-1.5 border-b border-white/10 flex items-center justify-between">
+                            <span>{label} {currentYear}</span>
+                            <span className="text-xs text-cyan-400 font-bold">{data.orders} Orders</span>
+                          </p>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex justify-between">
+                              <span className="text-slate-400">POS Sales:</span>
+                              <span className="text-white font-semibold">{data.posOrders}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-400">Repairs:</span>
+                              <span className="text-teal-400 font-semibold">{data.repairOrders}</span>
+                            </div>
+                            <div className="flex justify-between pt-1 border-t border-white/5">
+                              <span className="text-slate-400">Revenue:</span>
+                              <span className="text-emerald-400 font-bold">Rs {data.revenue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }} 
+                />
+                <Bar dataKey="orders" name="Orders Count" radius={[6, 6, 0, 0]} maxBarSize={45}>
+                  {monthlyOrdersData.map((entry, index) => (
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={index === currentMonth ? 'url(#colorActiveCurrentMonth)' : 'url(#colorMonthlyOrders)'} 
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={dailyOrdersData} margin={{ top: 15, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorDailyOrdersBar" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.9}/>
+                    <stop offset="95%" stopColor="#38bdf8" stopOpacity={0.25}/>
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="day" stroke="#475569" fontSize={10} tickMargin={10} axisLine={false} tickLine={false} />
+                <YAxis stroke="#475569" fontSize={10} axisLine={false} tickLine={false} allowDecimals={false} />
+                <Tooltip 
+                  cursor={{ fill: '#1e293b', opacity: 0.4 }} 
+                  content={({ active, payload, label }) => {
+                    if (active && payload && payload.length) {
+                      return (
+                        <div className="bg-slate-900/95 backdrop-blur-md border border-slate-700/80 p-3 rounded-xl shadow-2xl text-xs">
+                          <p className="text-slate-300 font-semibold mb-1">Day {label} ({monthsList[currentMonth]})</p>
+                          <p className="text-cyan-400 font-black text-sm">{payload[0].value} Orders</p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }} 
+                />
+                <Bar dataKey="orders" name="Daily Orders" fill="url(#colorDailyOrdersBar)" radius={[4, 4, 0, 0]} maxBarSize={20}>
+                  {dailyOrdersData.map((entry, index) => (
+                    <Cell 
+                      key={`cell-day-${index}`} 
+                      fill={entry.day === today.getDate().toString() ? '#10b981' : 'url(#colorDailyOrdersBar)'} 
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </motion.div>
 
       {/* ROW 4: Peak Hours Heatmap & Monthly Overview */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
