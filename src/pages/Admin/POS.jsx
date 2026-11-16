@@ -21,6 +21,7 @@ export default function POS({
   sendWhatsAppBill,
   posCategories = [],
   customersList = [],
+  fetchCustomersList,
   salesHistory = [],
   customerDuesList = [],
   refreshPOSData,
@@ -30,21 +31,26 @@ export default function POS({
   todaySalesSum = 0,
   totalPendingDues = 0
 }) {
-  const topCustomers = useMemo(() => {
-    // Always prefer the freshest data from local storage, as it is instantly 
-    // updated by the Customers tab when stars are toggled.
+  const [favoriteCustomerNames, setFavoriteCustomerNames] = useState(() => {
     const cached = localStorage.getItem('favoriteCustomers');
     if (cached) {
-      return JSON.parse(cached);
+      try { return JSON.parse(cached); } catch (e) {}
     }
-    // Fallback if local storage is empty
     if (customersList && customersList.length > 0) {
-      const favorites = customersList.filter(c => c.mostVisited).map(c => c.name);
-      localStorage.setItem('favoriteCustomers', JSON.stringify(favorites));
-      return favorites;
+      return customersList.filter(c => c.mostVisited).map(c => c.name);
     }
     return [];
+  });
+
+  useEffect(() => {
+    if (customersList && customersList.length > 0) {
+      const dbFavs = customersList.filter(c => c.mostVisited).map(c => c.name);
+      setFavoriteCustomerNames(dbFavs);
+      localStorage.setItem('favoriteCustomers', JSON.stringify(dbFavs));
+    }
   }, [customersList]);
+
+  const topCustomers = favoriteCustomerNames;
 
   const yesterdaySalesSum = useMemo(() => {
     if (!salesHistory) return 0;
@@ -217,6 +223,91 @@ export default function POS({
   const [isCredit, setIsCredit] = useState(false);
   const [includePreviousArrears, setIncludePreviousArrears] = useState(true);
   const [keepChangeAsAdvance, setKeepChangeAsAdvance] = useState(false);
+
+  const isCurrentCustomerFavorite = useMemo(() => {
+    if (!customerName || !customerName.trim()) return false;
+    const trimmed = customerName.trim().toLowerCase();
+    const match = customersList?.find(c => c.name?.toLowerCase() === trimmed);
+    if (match && match.mostVisited !== undefined) return Boolean(match.mostVisited);
+    return favoriteCustomerNames.some(n => n?.toLowerCase() === trimmed);
+  }, [customerName, customersList, favoriteCustomerNames]);
+
+  const toggleCustomerFavorite = useCallback(async (custIdentifier) => {
+    const targetName = typeof custIdentifier === 'string' ? custIdentifier.trim() : custIdentifier?.name?.trim();
+    if (!targetName) {
+      notify.error("Please enter a customer name first.");
+      return;
+    }
+
+    try {
+      const existing = customersList?.find(c => c.name?.trim().toLowerCase() === targetName.toLowerCase());
+      const isCurrentlyFav = existing ? Boolean(existing.mostVisited) : favoriteCustomerNames.some(n => n?.toLowerCase() === targetName.toLowerCase());
+      const newFavStatus = !isCurrentlyFav;
+
+      let targetId = existing?.id;
+      if (!targetId) {
+        const qCust = query(collection(db, 'customers'), where('name', '==', targetName));
+        const snap = await getDocs(qCust);
+        if (!snap.empty) {
+          targetId = snap.docs[0].id;
+          await updateDoc(doc(db, 'customers', targetId), {
+            mostVisited: newFavStatus
+          });
+        } else {
+          const newDoc = await addDoc(collection(db, 'customers'), {
+            name: targetName,
+            phone: whatsappNumber || '',
+            area: '',
+            mostVisited: newFavStatus,
+            timestamp: serverTimestamp()
+          });
+          targetId = newDoc.id;
+        }
+      } else {
+        await updateDoc(doc(db, 'customers', targetId), {
+          mostVisited: newFavStatus
+        });
+      }
+
+      setFavoriteCustomerNames(prev => {
+        let updated;
+        if (newFavStatus) {
+          updated = prev.some(n => n.toLowerCase() === targetName.toLowerCase()) ? prev : [...prev, targetName];
+        } else {
+          updated = prev.filter(n => n.toLowerCase() !== targetName.toLowerCase());
+        }
+        localStorage.setItem('favoriteCustomers', JSON.stringify(updated));
+        return updated;
+      });
+
+      const savedCustomers = localStorage.getItem('customersList');
+      if (savedCustomers) {
+        try {
+          let list = JSON.parse(savedCustomers);
+          const idx = list.findIndex(c => (targetId && c.id === targetId) || c.name?.toLowerCase() === targetName.toLowerCase());
+          if (idx !== -1) {
+            list[idx].mostVisited = newFavStatus;
+          } else {
+            list.push({ id: targetId, name: targetName, phone: whatsappNumber || '', area: '', mostVisited: newFavStatus });
+          }
+          localStorage.setItem('customersList', JSON.stringify(list));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      if (typeof fetchCustomersList === 'function') {
+        fetchCustomersList();
+      } else if (typeof refreshPOSData === 'function') {
+        refreshPOSData();
+      }
+
+      notify.success(newFavStatus ? `Added "${targetName}" to favorites!` : `Removed "${targetName}" from favorites.`);
+    } catch (err) {
+      console.error("Error toggling customer favorite:", err);
+      notify.error("Failed to update favorite customer.");
+    }
+  }, [customersList, favoriteCustomerNames, whatsappNumber, fetchCustomersList, refreshPOSData]);
 
   // Pending Orders State
   const [showSavePendingModal, setShowSavePendingModal] = useState(false);
@@ -940,6 +1031,7 @@ export default function POS({
                       {topCustomers.map((name, idx) => (
                         <button
                           key={idx}
+                          type="button"
                           onClick={() => {
                             setCustomerName(name);
                             const matchedCustomer = customersList?.find(c => c.name === name);
@@ -947,7 +1039,11 @@ export default function POS({
                               setWhatsappNumber(matchedCustomer.phone);
                             }
                           }}
-                          className="text-sm font-bold px-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-500/10 transition-all truncate max-w-[200px] shadow-sm"
+                          className={`text-sm font-bold px-4 py-2 rounded-xl border transition-all truncate max-w-[200px] shadow-sm ${
+                            customerName === name 
+                              ? 'bg-yellow-500/20 border-yellow-500 text-yellow-300' 
+                              : 'bg-slate-950 border-slate-800 text-slate-300 hover:text-yellow-400 hover:border-yellow-500/50 hover:bg-yellow-500/10'
+                          }`}
                           title={name}
                         >
                           {name}
@@ -959,7 +1055,24 @@ export default function POS({
 
                 {/* Customer Details */}
                 <div className="flex flex-col gap-3">
-                  <span className="text-sm uppercase tracking-wider font-bold text-slate-500">Customer Details</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm uppercase tracking-wider font-bold text-slate-500">Customer Details</span>
+                    {customerName.trim() && (
+                      <button
+                        type="button"
+                        onClick={() => toggleCustomerFavorite(customerName.trim())}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                          isCurrentCustomerFavorite
+                            ? 'bg-yellow-500/10 border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/20 shadow-[0_0_12px_rgba(234,179,8,0.2)]'
+                            : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:text-yellow-400 hover:border-yellow-500/40'
+                        }`}
+                        title={isCurrentCustomerFavorite ? "Remove from Favorites" : "Add to Favorites"}
+                      >
+                        <Star className={`w-3.5 h-3.5 ${isCurrentCustomerFavorite ? 'fill-yellow-400 text-yellow-400' : 'text-slate-400'}`} />
+                        <span>{isCurrentCustomerFavorite ? 'Favorited' : 'Add to Favorites'}</span>
+                      </button>
+                    )}
+                  </div>
                   <div className="flex gap-4">
                     <CustomerInput
                       customerName={customerName}
@@ -968,6 +1081,8 @@ export default function POS({
                       whatsappNumber={whatsappNumber}
                       setWhatsappNumber={setWhatsappNumber}
                       isCredit={isCredit}
+                      favoriteCustomers={favoriteCustomerNames}
+                      onToggleFavorite={toggleCustomerFavorite}
                     />
                     <div className="w-36 relative">
                       <input
@@ -1239,6 +1354,8 @@ export default function POS({
                   whatsappNumber={pendingWhatsappNumber}
                   setWhatsappNumber={setPendingWhatsappNumber}
                   isCredit={true}
+                  favoriteCustomers={favoriteCustomerNames}
+                  onToggleFavorite={toggleCustomerFavorite}
                 />
               </div>
               <button

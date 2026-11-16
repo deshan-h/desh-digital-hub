@@ -650,12 +650,14 @@ export default function Admin() {
               setWhatsappNumber={setWhatsappNumber}
               sendWhatsAppBill={sendWhatsAppBill}
               customersList={customersList}
+              fetchCustomersList={fetchCustomersList}
               salesHistory={salesHistory}
               customerDuesList={customerDuesList}
               refreshPOSData={() => {
                 fetchCategories();
                 fetchSales();
                 fetchCustomerDues();
+                fetchCustomersList();
               }}
               pendingOrders={pendingOrders}
               showPendingOrdersModal={showPendingOrdersModal}
