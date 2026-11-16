@@ -24,7 +24,7 @@ export default function Navbar() {
         <div className="flex justify-between items-center py-3 md:py-4">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-3 z-50 group">
-            <img src="/desh-digital-hub/pwa-192x192.png" alt="DESH Digital Hub Logo" className="w-8 h-8 md:w-9 md:h-9 object-contain drop-shadow-md transition-transform duration-500 group-hover:scale-110" />
+            <img src="/pwa-192x192.png" alt="DESH Digital Hub Logo" className="w-8 h-8 md:w-9 md:h-9 object-contain drop-shadow-md transition-transform duration-500 group-hover:scale-110" />
             <span className="text-xl md:text-2xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-slate-100 to-slate-400">
               DESH Digital Hub
             </span>

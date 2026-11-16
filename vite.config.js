@@ -6,7 +6,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: '/desh-digital-hub/',
+  base: '/',
   plugins: [
     react(),
     tailwindcss(),
@@ -20,8 +20,8 @@ export default defineConfig({
         theme_color: '#0f172a',
         background_color: '#0f172a',
         display: 'standalone',
-        start_url: '/desh-digital-hub/admin',
-        scope: '/desh-digital-hub/admin',
+        start_url: '/admin',
+        scope: '/admin',
         icons: [
           {
             src: 'pwa-192x192.png',

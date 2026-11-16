@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { settingsService } from '../../services/supabaseService';
 import { notify } from '../../utils/toast';
-import { Save, Plus, Trash2, GripVertical, Info, HelpCircle, Settings as SettingsIcon } from 'lucide-react';
+import { Save, Plus, Trash2, GripVertical, Info, HelpCircle, Settings as SettingsIcon, Database, CheckCircle2, RefreshCw } from 'lucide-react';
 import Loader from '../../components/Loader';
+import { runFirebaseToSupabaseMigration } from '../../utils/migrationService';
 
 export default function Settings({ isAdmin }) {
   const [loading, setLoading] = useState(true);
@@ -11,20 +11,50 @@ export default function Settings({ isAdmin }) {
   const [newsItems, setNewsItems] = useState([]);
   const [newItemText, setNewItemText] = useState('');
 
+  // Migration State
+  const [isMigrating, setIsMigrating] = useState(false);
+  const [migrationProgress, setMigrationProgress] = useState(null);
+  const [migrationSummary, setMigrationSummary] = useState(null);
+
   useEffect(() => {
     fetchSettings();
   }, []);
 
+  const handleStartMigration = async () => {
+    if (!window.confirm("Are you sure you want to transfer all data from Firebase to Supabase? Existing Firebase data will remain untouched.")) {
+      return;
+    }
+
+    setIsMigrating(true);
+    setMigrationSummary(null);
+    setMigrationProgress({ message: 'Initializing migration...', percent: 0, stage: 'init' });
+
+    try {
+      const res = await runFirebaseToSupabaseMigration((p) => {
+        setMigrationProgress(p);
+      });
+
+      if (res.success) {
+        notify.success('All data migrated to Supabase successfully!');
+        setMigrationSummary(res.results);
+      } else {
+        notify.error('Migration encountered errors. Check summary.');
+        setMigrationSummary(res.results);
+      }
+    } catch (e) {
+      console.error(e);
+      notify.error('Migration failed: ' + e.message);
+    } finally {
+      setIsMigrating(false);
+    }
+  };
+
   const fetchSettings = async () => {
     try {
-      const docRef = doc(db, 'settings', 'news');
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setNewsItems(data.items || []);
+      const data = await settingsService.getSetting('news');
+      if (data && data.items) {
+        setNewsItems(data.items);
       } else {
-        // Initialize if not exists
-        await setDoc(docRef, { items: [], updatedAt: serverTimestamp() });
         setNewsItems([]);
       }
     } catch (error) {
@@ -43,11 +73,10 @@ export default function Settings({ isAdmin }) {
     
     setSaving(true);
     try {
-      const docRef = doc(db, 'settings', 'news');
-      await setDoc(docRef, { 
+      await settingsService.saveSetting('news', { 
         items: newsItems,
-        updatedAt: serverTimestamp()
-      }, { merge: true });
+        updatedAt: new Date().toISOString()
+      });
       notify.success("News updated successfully!");
     } catch (error) {
       console.error("Error saving news settings:", error);
@@ -180,6 +209,126 @@ export default function Settings({ isAdmin }) {
         <div className="mt-4 text-xs text-slate-500 flex justify-end">
           * Remember to click 'Save Settings' after making changes.
         </div>
+      </div>
+
+      {/* Supabase Migration Section */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+          <div className="flex items-start gap-3">
+            <div className="p-2.5 bg-emerald-500/10 rounded-xl text-emerald-400 border border-emerald-500/20 shrink-0">
+              <Database className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-bold text-slate-100">Database Migration to Supabase</h2>
+                <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  Ready
+                </span>
+              </div>
+              <p className="text-sm text-slate-400 mt-1">
+                Transfer all Customers, Daily Sales, Dues, Repairs, POS Categories, and Expenses from Firebase Firestore to your normalized Supabase PostgreSQL database.
+              </p>
+              <div className="mt-2 text-xs text-slate-500 font-mono flex flex-wrap items-center gap-2">
+                <span>Target URL:</span>
+                <span className="text-cyan-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                  https://cxtfqlrnqdvrhsnifzmr.supabase.co
+                </span>
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={handleStartMigration}
+            disabled={isMigrating}
+            className="flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-sm bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] disabled:opacity-50 shrink-0 cursor-pointer"
+          >
+            {isMigrating ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span>Migrating...</span>
+              </>
+            ) : (
+              <>
+                <Database className="w-4 h-4" />
+                <span>Start Migration</span>
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Progress Bar when running */}
+        {isMigrating && migrationProgress && (
+          <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3 animate-in fade-in duration-200">
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-emerald-400 font-bold flex items-center gap-2">
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                {migrationProgress.message}
+              </span>
+              <span className="text-slate-400 font-mono font-bold">{migrationProgress.percent}%</span>
+            </div>
+            <div className="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
+              <div 
+                className="bg-gradient-to-r from-emerald-500 to-cyan-500 h-2.5 rounded-full transition-all duration-300"
+                style={{ width: `${migrationProgress.percent}%` }}
+              ></div>
+            </div>
+          </div>
+        )}
+
+        {/* Migration Summary Report */}
+        {migrationSummary && (
+          <div className="bg-slate-950 border border-emerald-500/30 rounded-xl p-5 space-y-4 animate-in fade-in duration-300">
+            <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
+              <CheckCircle2 className="w-5 h-5" />
+              <span>Migration Completed Successfully!</span>
+            </div>
+            
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              <div className="bg-slate-900 border border-slate-800 rounded-lg p-3">
+                <span className="text-slate-400 block mb-1">Customers</span>
+                <span className="text-lg font-black text-white">{migrationSummary.customers}</span>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-lg p-3">
+                <span className="text-slate-400 block mb-1">Daily Sales</span>
+                <span className="text-lg font-black text-cyan-400">{migrationSummary.daily_sales}</span>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-lg p-3">
+                <span className="text-slate-400 block mb-1">Customer Dues</span>
+                <span className="text-lg font-black text-orange-400">{migrationSummary.customer_dues}</span>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-lg p-3">
+                <span className="text-slate-400 block mb-1">Repairs</span>
+                <span className="text-lg font-black text-purple-400">{migrationSummary.repairs}</span>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-lg p-3">
+                <span className="text-slate-400 block mb-1">POS Categories</span>
+                <span className="text-lg font-black text-white">{migrationSummary.pos_categories}</span>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-lg p-3">
+                <span className="text-slate-400 block mb-1">Expenses</span>
+                <span className="text-lg font-black text-white">{migrationSummary.expenses}</span>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-lg p-3">
+                <span className="text-slate-400 block mb-1">Pending Orders</span>
+                <span className="text-lg font-black text-white">{migrationSummary.pending_orders}</span>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-lg p-3">
+                <span className="text-slate-400 block mb-1">Settings</span>
+                <span className="text-lg font-black text-white">{migrationSummary.settings}</span>
+              </div>
+            </div>
+
+            {migrationSummary.errors && migrationSummary.errors.length > 0 && (
+              <div className="mt-3 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-400">
+                <span className="font-bold block mb-1">Warnings/Errors ({migrationSummary.errors.length}):</span>
+                <ul className="list-disc pl-4 space-y-1">
+                  {migrationSummary.errors.slice(0, 5).map((err, i) => (
+                    <li key={i}>{err}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

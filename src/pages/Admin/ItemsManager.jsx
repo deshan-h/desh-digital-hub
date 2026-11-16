@@ -1,8 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  collection, getDocs, addDoc, updateDoc, deleteDoc, doc, writeBatch 
-} from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { categoryService } from '../../services/supabaseService';
 import { notify } from '../../utils/toast';
 import DeleteConfirmModal from '../../components/DeleteConfirmModal';
 import { 
@@ -139,27 +136,7 @@ export default function ItemsManager() {
   const fetchCategories = async () => {
     setLoading(true);
     try {
-      const snap = await getDocs(collection(db, 'pos_categories'));
-      let data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-      // Temporary Migration: Update 'Graphic & Editing' to 'Type Setting' in Firestore
-      data = await Promise.all(data.map(async (cat) => {
-        if (cat.category === 'Graphic & Editing') {
-          cat.category = 'Type Setting';
-          cat.icon = 'Type';
-          cat.color = 'text-orange-400';
-          try {
-            await updateDoc(doc(db, 'pos_categories', cat.id), { 
-              category: 'Type Setting', 
-              icon: 'Type',
-              color: 'text-orange-400'
-            });
-          } catch (e) {
-            console.error("Migration update failed", e);
-          }
-        }
-        return cat;
-      }));
+      const data = await categoryService.getCategories();
 
       const CATEGORY_ORDER = [
         "Printing & Scanning",
@@ -182,13 +159,6 @@ export default function ItemsManager() {
         return indexA - indexB;
       });
 
-      // NO LONGER SORTING ITEMS BY PRICE - We respect the custom array order
-      // data.forEach(cat => {
-      //   if (cat.items && Array.isArray(cat.items)) {
-      //     cat.items.sort((a, b) => (Number(a.price) || 0) - (Number(b.price) || 0));
-      //   }
-      // });
-
       setCategories(data);
     } catch (err) {
       console.error(err);
@@ -205,17 +175,20 @@ export default function ItemsManager() {
   const handleMigrate = async () => {
     setIsMigrating(true);
     try {
-      const batch = writeBatch(db);
-      INITIAL_CATEGORIES.forEach(cat => {
-        const docRef = doc(collection(db, 'pos_categories'));
-        batch.set(docRef, cat);
-      });
-      await batch.commit();
-      notify.success("Categories migrated successfully!");
+      for (let i = 0; i < INITIAL_CATEGORIES.length; i++) {
+        const cat = INITIAL_CATEGORIES[i];
+        await categoryService.createCategory({
+          category: cat.category,
+          icon: cat.icon,
+          items: cat.items,
+          order: i
+        });
+      }
+      notify.success("Categories initialized successfully!");
       fetchCategories();
     } catch (error) {
       console.error(error);
-      notify.error("Migration failed");
+      notify.error("Initialization failed");
     } finally {
       setIsMigrating(false);
     }
@@ -234,7 +207,7 @@ export default function ItemsManager() {
         qty: Number(editingQty) || 0
       };
 
-      await updateDoc(doc(db, 'pos_categories', catId), { items: newItems });
+      await categoryService.updateCategory(catId, { items: newItems });
       
       setCategories(categories.map(c => c.id === catId ? { ...c, items: newItems } : c));
       notify.success("Item updated!");
@@ -263,7 +236,7 @@ export default function ItemsManager() {
         qty: Number(newItemQty) || 0
       };
       const newItems = [...categoryDoc.items, newItem];
-      await updateDoc(doc(db, 'pos_categories', catId), { items: newItems });
+      await categoryService.updateCategory(catId, { items: newItems });
       
       setCategories(categories.map(c => c.id === catId ? { ...c, items: newItems } : c));
       notify.success("Item added!");
@@ -289,7 +262,7 @@ export default function ItemsManager() {
       const categoryDoc = categories.find(c => c.id === catId);
       const newItems = categoryDoc.items.filter((_, idx) => idx !== itemIndex);
       
-      await updateDoc(doc(db, 'pos_categories', catId), { items: newItems });
+      await categoryService.updateCategory(catId, { items: newItems });
       setCategories(categories.map(c => c.id === catId ? { ...c, items: newItems } : c));
       notify.success("Item deleted!");
     } catch (error) {
@@ -309,12 +282,11 @@ export default function ItemsManager() {
       const newCat = {
         category: newCatName,
         icon: newCatIcon || 'Package',
-        color: 'text-emerald-400',
         items: [],
         order: newOrder
       };
-      const docRef = await addDoc(collection(db, 'pos_categories'), newCat);
-      setCategories([...categories, { id: docRef.id, ...newCat }]);
+      const created = await categoryService.createCategory(newCat);
+      setCategories([...categories, { id: created.id, ...newCat }]);
       notify.success("Category added!");
       setNewCatName("");
       setIsAddingCategory(false);
@@ -327,7 +299,7 @@ export default function ItemsManager() {
   const handleUpdateCategory = async (catId) => {
     if (!editCatName) return;
     try {
-      await updateDoc(doc(db, 'pos_categories', catId), { category: editCatName, icon: editCatIcon });
+      await categoryService.updateCategory(catId, { category: editCatName, icon: editCatIcon });
       setCategories(categories.map(c => c.id === catId ? { ...c, category: editCatName, icon: editCatIcon } : c));
       notify.success("Category updated!");
       setEditingCategory(null);
@@ -340,7 +312,7 @@ export default function ItemsManager() {
   const confirmDeleteCategory = async () => {
     if (!catToDelete) return;
     try {
-      await deleteDoc(doc(db, 'pos_categories', catToDelete));
+      await categoryService.deleteCategory(catToDelete);
       setCategories(categories.filter(c => c.id !== catToDelete));
       notify.success("Category deleted!");
     } catch (error) {
@@ -358,16 +330,12 @@ export default function ItemsManager() {
     newCategories[index] = newCategories[index + direction];
     newCategories[index + direction] = temp;
     
-    // Update order values and save to db
     try {
-      const batch = writeBatch(db);
-      newCategories.forEach((cat, idx) => {
+      await Promise.all(newCategories.map((cat, idx) => {
         cat.order = idx;
-        batch.update(doc(db, 'pos_categories', cat.id), { order: idx });
-      });
-      await batch.commit();
+        return categoryService.updateCategory(cat.id, { order: idx });
+      }));
       setCategories(newCategories);
-      // notify.success("Order updated"); // Optional
     } catch (error) {
       console.error(error);
       notify.error("Failed to reorder categories");
@@ -385,7 +353,7 @@ export default function ItemsManager() {
     newItems[itemIndex + direction] = temp;
 
     try {
-      await updateDoc(doc(db, 'pos_categories', catId), { items: newItems });
+      await categoryService.updateCategory(catId, { items: newItems });
       setCategories(categories.map(c => c.id === catId ? { ...c, items: newItems } : c));
     } catch (error) {
       console.error(error);
@@ -413,7 +381,7 @@ export default function ItemsManager() {
     setCategories(categories.map(c => c.id === catId ? { ...c, items: newItems } : c));
     
     try {
-      await updateDoc(doc(db, 'pos_categories', catId), { items: newItems });
+      await categoryService.updateCategory(catId, { items: newItems });
     } catch (error) {
       console.error(error);
       notify.error("Failed to save reordered items");

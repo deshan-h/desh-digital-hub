@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { settingsService } from '../../services/supabaseService';
 import { Megaphone, ChevronRight, ExternalLink } from 'lucide-react';
 import logo from '../../assets/logo.webp';
 import eduHubLogo from '../../assets/edu-hub-logo.jpg';
@@ -13,10 +12,9 @@ export default function Hero() {
   useEffect(() => {
     const fetchNews = async () => {
       try {
-        const docRef = doc(db, 'settings', 'news');
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists() && docSnap.data().items?.length > 0) {
-          setNews(docSnap.data().items);
+        const newsData = await settingsService.getSetting('news');
+        if (newsData && newsData.items?.length > 0) {
+          setNews(newsData.items);
         } else {
           setNews(['ඩිජිටල් ලෝකයේ නවතම වෙනස්කම් සමඟින් අපි ඔබ වෙතට...']);
         }

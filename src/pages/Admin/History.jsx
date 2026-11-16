@@ -3,8 +3,8 @@ import { format } from 'date-fns';
 import { Calendar, Search, Filter, Download, ArrowRight, Printer, AlertTriangle, FileText, ChevronDown, ChevronUp, Package, Wrench, X, RefreshCw, Smartphone, Monitor, Battery, CheckCircle, Clock, Trash2, HelpCircle, ShoppingCart, User, History as HistoryIcon, MessageCircle } from 'lucide-react';
 import { generateInvoiceHtml } from '../../utils/invoiceTemplate';
 import { notify } from '../../utils/toast';
-import { collection, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { customerService } from '../../services/supabaseService';
+import { supabase } from '../../config/supabase';
 
 export default function History({ salesHistory, fetchSales, handleDeleteSale, user, posCategories = [], isAdmin, customersList = [] }) {
   const [invoiceSearch, setInvoiceSearch] = useState('');
@@ -80,29 +80,16 @@ const submitWhatsappModal = async () => {
   setIsUpdatingCustomer(true);
   try {
     const sale = whatsappModalData;
+    const phoneTrimmed = whatsappNumberInput.trim();
     
-    // If we have a customerName in the sale, let's update their record in DB
-    if (sale.customerName) {
-      const q = query(collection(db, 'customers'), where('name', '==', sale.customerName));
-      const querySnapshot = await getDocs(q);
-      
-      if (!querySnapshot.empty) {
-        // Update the first matching customer
-        const customerDoc = querySnapshot.docs[0];
-        await updateDoc(doc(db, 'customers', customerDoc.id), {
-          phone: whatsappNumberInput.trim()
-        });
-      }
-    }
-    
-    // Update the sale document itself
-    if (sale.id) {
-      await updateDoc(doc(db, 'sales', sale.id), {
-        customerPhone: whatsappNumberInput.trim()
-      });
+    // Update customer phone in DB
+    if (sale.customerId) {
+      await customerService.updateCustomer(sale.customerId, { phone: phoneTrimmed });
+    } else if (sale.customerName) {
+      await customerService.findOrCreateCustomerByName(sale.customerName, phoneTrimmed);
     }
 
-    proceedSendWhatsapp(sale, whatsappNumberInput);
+    proceedSendWhatsapp(sale, phoneTrimmed);
     setWhatsappModalData(null);
   } catch (error) {
     console.error("Error updating customer phone:", error);

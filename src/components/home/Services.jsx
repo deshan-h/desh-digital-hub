@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { categoryService } from '../../services/supabaseService';
 import { FcPackage, FcPrint, FcTemplate, FcDocument, FcRules, FcImageFile, FcDataBackup, FcCommandLine, FcSettings, FcGlobe } from 'react-icons/fc';
 
 const ICON_MAP = {
@@ -63,8 +62,7 @@ export default function Services() {
   useEffect(() => {
     async function fetchServices() {
       try {
-        const snap = await getDocs(collection(db, 'pos_categories'));
-        let data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        let data = await categoryService.getCategories();
 
         // Hide "Custom & Utilities" from the public frontend
         data = data.filter(cat => cat.category !== 'Custom & Utilities');

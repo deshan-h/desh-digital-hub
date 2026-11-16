@@ -1,4 +1,5 @@
 import React from 'react';
+import { parseTimestamp } from '../../utils/helpers';
 import { Plus, User, Phone, MapPin, CheckCircle, RotateCcw, Trash2, Clock, X, ChevronDown } from 'lucide-react';
 
 export const AddCustomerForm = ({
@@ -226,7 +227,7 @@ export const CustomerHistoryModal = ({
                 <div className={`bg-slate-950/50 border border-white/5 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${record.status === 'Paid' ? 'opacity-60 hover:opacity-100 transition-opacity' : ''}`}>
                   <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-6">
                     <span className="text-[11px] font-medium text-slate-400 min-w-[70px]">
-                      {record.timestamp ? new Date(record.timestamp.toDate()).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Just now'}
+                      {record.timestamp ? parseTimestamp(record.timestamp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Just now'}
                     </span>
                     <span className={`font-black text-[14px] ${record.type === 'Payment' ? 'text-emerald-400' : (record.status === 'Pending' ? 'text-orange-400' : 'text-emerald-400')}`}>
                       {record.type === 'Payment' ? '-' : ''}Rs {record.amount.toFixed(2)}

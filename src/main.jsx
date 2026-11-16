@@ -7,7 +7,7 @@ import App from './App.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <BrowserRouter basename="/desh-digital-hub">
+    <BrowserRouter>
       <App />
     </BrowserRouter>
   </StrictMode>,

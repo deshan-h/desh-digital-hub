@@ -1,9 +1,16 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { ShoppingCart, Plus, Trash2, Search, Package, RefreshCw, Save, Clock, TrendingUp, TrendingDown, Star, ChevronLeft, ChevronRight, X, MessageCircle } from 'lucide-react';
 import { notify } from '../../utils/toast';
+import { parseTimestamp } from '../../utils/helpers';
 import { generateInvoiceHtml } from '../../utils/invoiceTemplate';
-import { collection, addDoc, deleteDoc, doc, serverTimestamp, query, where, getDocs, updateDoc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { 
+  customerService, 
+  salesService, 
+  duesService, 
+  categoryService, 
+  pendingOrderService, 
+  settingsService 
+} from '../../services/supabaseService';
 import DeleteConfirmModal from '../../components/DeleteConfirmModal';
 import { POSItem, CategoryTab, CartItem, POSItemsGrid, CustomerInput } from './POSComponents';
 
@@ -89,20 +96,18 @@ export default function POS({
     return saved ? JSON.parse(saved) : [];
   });
 
-  // Realtime sync from DB settings/pos_favorites
+  // Sync from Supabase settings/pos_favorites
   useEffect(() => {
-    const docRef = doc(db, 'settings', 'pos_favorites');
-    const unsubscribe = onSnapshot(docRef, (snap) => {
-      if (snap.exists()) {
-        const dbItems = snap.data().items || [];
-        setFavoriteItemIds(dbItems);
-        localStorage.setItem('posFavorites', JSON.stringify(dbItems));
-      }
-    }, (err) => {
-      console.error("Error listening to pos_favorites:", err);
-    });
-
-    return () => unsubscribe();
+    settingsService.getSetting('pos_favorites')
+      .then(data => {
+        if (data && data.items) {
+          setFavoriteItemIds(data.items);
+          localStorage.setItem('posFavorites', JSON.stringify(data.items));
+        }
+      })
+      .catch(err => {
+        console.error("Error fetching pos_favorites:", err);
+      });
   }, []);
 
   // Sync favorites when posCategories updates from DB
@@ -141,7 +146,7 @@ export default function POS({
 
       if (needsUpdate) {
         try {
-          await updateDoc(doc(db, 'pos_categories', cat.id), { items: updatedItems });
+          await categoryService.updateCategory(cat.id, { items: updatedItems });
         } catch (e) {
           console.error("Sync of isFavorite variable to pos_categories failed", e);
         }
@@ -181,7 +186,7 @@ export default function POS({
           return i;
         });
 
-        await updateDoc(doc(db, 'pos_categories', targetCat.id), {
+        await categoryService.updateCategory(targetCat.id, {
           items: updatedItems
         });
       } catch (err) {
@@ -191,7 +196,7 @@ export default function POS({
 
     // 3. Keep settings/pos_favorites in sync
     try {
-      await setDoc(doc(db, 'settings', 'pos_favorites'), { items: newFavs });
+      await settingsService.saveSetting('pos_favorites', { items: newFavs });
     } catch (err) {
       console.error("Error saving POS favorites list to DB", err);
     }
@@ -246,25 +251,13 @@ export default function POS({
 
       let targetId = existing?.id;
       if (!targetId) {
-        const qCust = query(collection(db, 'customers'), where('name', '==', targetName));
-        const snap = await getDocs(qCust);
-        if (!snap.empty) {
-          targetId = snap.docs[0].id;
-          await updateDoc(doc(db, 'customers', targetId), {
-            mostVisited: newFavStatus
-          });
-        } else {
-          const newDoc = await addDoc(collection(db, 'customers'), {
-            name: targetName,
-            phone: whatsappNumber || '',
-            area: '',
-            mostVisited: newFavStatus,
-            timestamp: serverTimestamp()
-          });
-          targetId = newDoc.id;
+        const custId = await customerService.findOrCreateCustomerByName(targetName, whatsappNumber || '');
+        if (custId) {
+          targetId = custId;
+          await customerService.updateCustomer(custId, { mostVisited: newFavStatus });
         }
       } else {
-        await updateDoc(doc(db, 'customers', targetId), {
+        await customerService.updateCustomer(targetId, {
           mostVisited: newFavStatus
         });
       }
@@ -326,7 +319,7 @@ export default function POS({
   const confirmDeleteSale = async () => {
     if (!saleToDelete) return;
     try {
-      await deleteDoc(doc(db, 'daily_sales', saleToDelete));
+      await salesService.deleteSale(saleToDelete);
       if (refreshPOSData) refreshPOSData();
       notify.success("Sale deleted successfully!");
     } catch (err) {
@@ -346,7 +339,7 @@ export default function POS({
     e.stopPropagation();
     if (window.confirm("Are you sure you want to delete this arrears record? This action cannot be undone.")) {
       try {
-        await deleteDoc(doc(db, 'customer_dues', dueId));
+        await duesService.deleteDue(dueId);
         if (refreshPOSData) refreshPOSData();
         notify.success("Record deleted successfully!");
       } catch (err) {
@@ -412,30 +405,13 @@ export default function POS({
     }
     setPendingLoading(true);
 
-    if (finalCustomerName !== 'No Name Provided') {
-      try {
-        const q = query(collection(db, 'customers'), where('name', '==', finalCustomerName));
-        const qs = await getDocs(q);
-        if (qs.empty) {
-          await addDoc(collection(db, 'customers'), {
-            name: finalCustomerName,
-            phone: pendingWhatsappNumber || '',
-            area: '',
-            timestamp: serverTimestamp()
-          });
-        }
-      } catch (err) {
-        console.error("Error saving new customer:", err);
-      }
-    }
-
     try {
-      await addDoc(collection(db, 'pos_pending_orders'), {
+      await pendingOrderService.createPendingOrder({
         note: finalCustomerName,
         phone: pendingWhatsappNumber || '',
         items: cart,
         totalAmount: cartTotal,
-        createdAt: serverTimestamp()
+        discount: Number(discount) || 0
       });
       notify.success("Order saved as pending!");
       setCart([]);
@@ -443,6 +419,7 @@ export default function POS({
       setPendingCustomerName('');
       setPendingWhatsappNumber('');
       setActiveRightTab('Pending');
+      if (refreshPOSData) refreshPOSData();
     } catch (error) {
       console.error(error);
       notify.error("Failed to save pending order");
@@ -492,20 +469,16 @@ export default function POS({
     
     setIsUpdatingCustomer(true);
     try {
-      if (order.note) {
-        const q = query(collection(db, 'customers'), where('name', '==', order.note));
-        const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-          const customerDoc = querySnapshot.docs[0];
-          await updateDoc(doc(db, 'customers', customerDoc.id), {
-            phone: reminderWhatsapp.trim()
-          });
+      if (order.note && order.note !== 'No Name Provided') {
+        const custId = await customerService.findOrCreateCustomerByName(order.note, reminderWhatsapp.trim());
+        if (custId) {
+          await customerService.updateCustomer(custId, { phone: reminderWhatsapp.trim() });
         }
       }
       
       // Update the pending order itself so it doesn't ask again
       if (order.id) {
-        await updateDoc(doc(db, 'pos_pending_orders', order.id), {
+        await pendingOrderService.updatePendingOrder(order.id, {
           phone: reminderWhatsapp.trim()
         });
       }
@@ -532,7 +505,8 @@ export default function POS({
     }
     setActiveRightTab('Cart');
     try {
-      await deleteDoc(doc(db, 'pos_pending_orders', order.id));
+      await pendingOrderService.deletePendingOrder(order.id);
+      if (refreshPOSData) refreshPOSData();
     } catch (e) {
       console.error("Error removing pending doc", e);
     }
@@ -545,7 +519,8 @@ export default function POS({
   const confirmDeletePending = async () => {
     if (!pendingToDelete) return;
     try {
-      await deleteDoc(doc(db, 'pos_pending_orders', pendingToDelete));
+      await pendingOrderService.deletePendingOrder(pendingToDelete);
+      if (refreshPOSData) refreshPOSData();
       notify.success("Pending order deleted");
     } catch (e) {
       console.error(e);
@@ -961,7 +936,7 @@ export default function POS({
                       <div>
                         <h4 className="text-sm font-bold text-slate-200">{order.note}</h4>
                         <p className="text-[11px] text-slate-500 font-medium">
-                          {order.items?.length || 0} items • {order.createdAt?.toDate ? order.createdAt.toDate().toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Just now'}
+                          {order.items?.length || 0} items • {order.createdAt ? parseTimestamp(order.createdAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Just now'}
                         </p>
                       </div>
                       <p className="text-sm font-black text-emerald-400">Rs {(order.totalAmount || 0).toFixed(2)}</p>

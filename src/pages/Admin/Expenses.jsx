@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, serverTimestamp } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { expenseService } from '../../services/supabaseService';
+import { parseTimestamp } from '../../utils/helpers';
 import { Search, Plus, Trash2, Wallet, PackageOpen, DollarSign, Calendar, HelpCircle, ChevronUp, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, addDays, parseISO } from 'date-fns';
 import { notify } from '../../utils/toast';
@@ -142,12 +142,7 @@ export default function Expenses({ isAdmin }) {
 
   const fetchRecords = async () => {
     try {
-      const q = query(collection(db, 'shop_expenses'), orderBy('timestamp', 'desc'));
-      const querySnapshot = await getDocs(q);
-      const data = [];
-      querySnapshot.forEach((doc) => {
-        data.push({ id: doc.id, ...doc.data() });
-      });
+      const data = await expenseService.getExpenses();
       setRecords(data);
     } catch (error) {
       console.error("Error fetching expenses:", error);
@@ -166,21 +161,10 @@ export default function Expenses({ isAdmin }) {
     
     setIsSubmitting(true);
     try {
-      let finalTimestamp;
-      const todayStr = new Date().toLocaleDateString('en-CA');
-      if (expenseDate === todayStr || !expenseDate) {
-        finalTimestamp = serverTimestamp();
-      } else {
-        const d = new Date(expenseDate);
-        d.setHours(12, 0, 0, 0); // Noon
-        finalTimestamp = d;
-      }
-
-      await addDoc(collection(db, 'shop_expenses'), {
+      await expenseService.createExpense({
         itemName,
         amount: Number(amount),
-        timestamp: finalTimestamp,
-        createdAt: serverTimestamp()
+        expenseDate
       });
       notify.success("Expense recorded successfully!");
       setItemName('');
@@ -203,7 +187,7 @@ export default function Expenses({ isAdmin }) {
   const confirmDelete = async () => {
     if (!deleteRecordId) return;
     try {
-      await deleteDoc(doc(db, 'shop_expenses', deleteRecordId));
+      await expenseService.deleteExpense(deleteRecordId);
       notify.success("Expense record deleted.");
       fetchRecords();
     } catch (error) {
@@ -226,7 +210,7 @@ export default function Expenses({ isAdmin }) {
 
   const thisMonthExpenses = records.reduce((sum, r) => {
     if (r.timestamp) {
-      const date = r.timestamp.toDate();
+      const date = parseTimestamp(r.timestamp);
       if (date.getMonth() === currentMonth && date.getFullYear() === currentYear) {
         return sum + r.amount;
       }
@@ -425,7 +409,7 @@ export default function Expenses({ isAdmin }) {
                       </div>
                       <div className="col-span-1 lg:col-span-3 flex items-center text-slate-400 text-[13px] truncate">
                         <Calendar className="w-3.5 h-3.5 mr-2" />
-                        {record.timestamp ? new Date(record.timestamp.toDate()).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Just now'}
+                        {record.timestamp ? parseTimestamp(record.timestamp).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Just now'}
                       </div>
                       <div className="col-span-1 lg:col-span-3 flex items-center justify-end text-red-400 font-black text-[14px]">
                         Rs {record.amount.toFixed(2)}

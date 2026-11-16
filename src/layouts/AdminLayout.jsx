@@ -197,7 +197,7 @@ export default function AdminLayout({
           <h1 className="hidden sm:flex items-center absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 text-lg font-extrabold tracking-tight gap-2.5 hover:scale-105 transition-transform duration-500 cursor-pointer">
             <div className="relative">
               <div className="absolute inset-0 bg-cyan-500/20 blur-xl rounded-full"></div>
-              <img src="/desh-digital-hub/pwa-192x192.png" alt="DESH Digital Hub Logo" className="w-7 h-7 object-contain drop-shadow-lg relative z-10" />
+              <img src="/pwa-192x192.png" alt="DESH Digital Hub Logo" className="w-7 h-7 object-contain drop-shadow-lg relative z-10" />
             </div>
             <span className="bg-gradient-to-r from-slate-100 via-white to-slate-400 bg-clip-text text-transparent drop-shadow-sm">DESH Digital Hub</span>
           </h1>

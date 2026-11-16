@@ -1,7 +1,12 @@
 import React, { useState, useEffect, Suspense, lazy, useCallback } from 'react';
-import { signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence, browserSessionPersistence } from 'firebase/auth';
-import { collection, addDoc, getDocs, query, orderBy, serverTimestamp, doc, deleteDoc, where, updateDoc, onSnapshot } from 'firebase/firestore';
-import { auth, db } from '../../config/firebase';
+import { 
+  authService, 
+  salesService, 
+  categoryService, 
+  duesService, 
+  customerService, 
+  pendingOrderService 
+} from '../../services/supabaseService';
 import { format } from 'date-fns';
 import { parseTimestamp } from '../../utils/helpers';
 import logo from '../../assets/logo.webp';
@@ -91,7 +96,7 @@ export default function Admin() {
     let pendingUnsubscribe = null;
     let categoriesUnsubscribe = null;
 
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = authService.onAuthStateChange((currentUser) => {
       setUser(currentUser);
       if (currentUser) {
         fetchSales();
@@ -100,9 +105,8 @@ export default function Admin() {
         fetchCustomersList();
 
         // Attach categories listener for realtime favorites and catalog sync across devices
-        categoriesUnsubscribe = onSnapshot(collection(db, 'pos_categories'), (snapshot) => {
-          let data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          data = data.filter(cat => cat.category !== 'Custom & Utilities');
+        categoriesUnsubscribe = categoryService.subscribe((data) => {
+          let filtered = (data || []).filter(cat => cat.category !== 'Custom & Utilities');
           
           const CATEGORY_ORDER = [
             "Printing & Scanning",
@@ -114,7 +118,7 @@ export default function Admin() {
             "Custom & Utilities"
           ];
           
-          data.sort((a, b) => {
+          filtered.sort((a, b) => {
             if (a.order !== undefined && b.order !== undefined) {
               return a.order - b.order;
             }
@@ -125,19 +129,17 @@ export default function Admin() {
             return indexA - indexB;
           });
 
-          setPosCategories(data);
-          localStorage.setItem('posCategories', JSON.stringify(data));
-        }, (err) => console.error("Categories snapshot error:", err));
+          setPosCategories(filtered);
+          localStorage.setItem('posCategories', JSON.stringify(filtered));
+        });
         
         // Attach pending orders listener
-        const pendingQ = query(collection(db, 'pos_pending_orders'), orderBy('createdAt', 'desc'));
-        pendingUnsubscribe = onSnapshot(pendingQ, (snapshot) => {
-          const orders = [];
-          snapshot.forEach((doc) => {
-            orders.push({ id: doc.id, ...doc.data() });
-          });
-          setPendingOrders(orders);
-        }, (err) => console.error("Pending orders snapshot error:", err));
+        pendingUnsubscribe = pendingOrderService.subscribe((orders) => {
+          setPendingOrders(orders || []);
+        });
+
+        // Initial fetch of pending orders
+        pendingOrderService.getPendingOrders().then(orders => setPendingOrders(orders || [])).catch(console.error);
 
         setActiveTab('pos');
       } else {
@@ -155,7 +157,7 @@ export default function Admin() {
     });
 
     return () => {
-      unsubscribe();
+      if (unsubscribe) unsubscribe();
       if (pendingUnsubscribe) pendingUnsubscribe();
       if (categoriesUnsubscribe) categoriesUnsubscribe();
     };
@@ -164,16 +166,10 @@ export default function Admin() {
   // 2. Fetch Sales Data
   async function fetchSales() {
     try {
-      const q = query(collection(db, 'daily_sales'), orderBy('timestamp', 'desc'));
-      const querySnapshot = await getDocs(q);
-      const sales = [];
+      const sales = await salesService.getSales();
       const aggregatedData = {};
 
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        sales.push({ id: doc.id, ...data });
-
-        // Prepare chart data (Group by date)
+      sales.forEach((data) => {
         if (data.timestamp) {
           const dateStr = format(parseTimestamp(data.timestamp), 'MMM dd');
           if (!aggregatedData[dateStr]) aggregatedData[dateStr] = 0;
@@ -200,30 +196,10 @@ export default function Admin() {
   // 3. Fetch Categories Data
   async function fetchCategories() {
     try {
-      const snap = await getDocs(collection(db, 'pos_categories'));
-      let data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      let data = await categoryService.getCategories();
       
       // Remove Custom & Utilities completely from POS and Items Manager
       data = data.filter(cat => cat.category !== 'Custom & Utilities');
-      
-      // Temporary Migration: Update 'Graphic & Editing' to 'Type Setting' in Firestore
-      data = await Promise.all(data.map(async (cat) => {
-        if (cat.category === 'Graphic & Editing') {
-          cat.category = 'Type Setting';
-          cat.icon = 'Type';
-          cat.color = 'text-orange-400';
-          try {
-            await updateDoc(doc(db, 'pos_categories', cat.id), { 
-              category: 'Type Setting', 
-              icon: 'Type',
-              color: 'text-orange-400'
-            });
-          } catch (e) {
-            console.error("Migration update failed", e);
-          }
-        }
-        return cat;
-      }));
 
       const CATEGORY_ORDER = [
         "Printing & Scanning",
@@ -246,13 +222,6 @@ export default function Admin() {
         return indexA - indexB;
       });
 
-      // We no longer sort items by price to respect the custom order set in ItemsManager
-      // data.forEach(cat => {
-      //   if (cat.items && Array.isArray(cat.items)) {
-      //     cat.items.sort((a, b) => (Number(a.price) || 0) - (Number(b.price) || 0));
-      //   }
-      // });
-
       setPosCategories(data);
       localStorage.setItem('posCategories', JSON.stringify(data));
     } catch (error) {
@@ -262,14 +231,13 @@ export default function Admin() {
 
   async function fetchCustomerDues() {
     try {
-      const snap = await getDocs(collection(db, 'customer_dues'));
+      const dues = await duesService.getCustomerDues();
       const duesList = [];
       const balances = {};
       
-      snap.forEach(doc => {
-        const data = doc.data();
+      dues.forEach(data => {
         if (data.status === 'Pending' || data.type === 'Payment') {
-          duesList.push({ id: doc.id, ...data });
+          duesList.push(data);
           
           const name = data.name || 'Unknown';
           if (!balances[name]) balances[name] = 0;
@@ -294,12 +262,7 @@ export default function Admin() {
 
   async function fetchCustomersList() {
     try {
-      const q = query(collection(db, 'customers'), orderBy('name', 'asc'));
-      const querySnapshot = await getDocs(q);
-      const data = [];
-      querySnapshot.forEach((doc) => {
-        data.push({ id: doc.id, ...doc.data() });
-      });
+      const data = await customerService.getCustomers();
       setCustomersList(data);
       localStorage.setItem('customersList', JSON.stringify(data));
     } catch (error) {
@@ -311,15 +274,14 @@ export default function Admin() {
   const handleLogin = async (e, rememberMe) => {
     e.preventDefault();
     try {
-      await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
-      await signInWithEmailAndPassword(auth, email, password);
+      await authService.login(email, password);
     } catch (error) {
       notify.error('Login failed: ' + error.message);
     }
   };
 
   const handleLogout = async () => {
-    await signOut(auth);
+    await authService.logout();
   };
 
   // 4. POS Cart Methods
@@ -419,23 +381,6 @@ export default function Admin() {
     let finalCustomerName = posCustomerName.trim();
     if (!finalCustomerName) {
       finalCustomerName = 'No Name Provided';
-    } else if (finalCustomerName !== 'No Name Provided') {
-      // Add to customers collection if not exists
-      try {
-        const q = query(collection(db, 'customers'), where('name', '==', finalCustomerName));
-        const qs = await getDocs(q);
-        if (qs.empty) {
-          await addDoc(collection(db, 'customers'), {
-            name: finalCustomerName,
-            phone: whatsappNumber || '',
-            area: '',
-            timestamp: serverTimestamp()
-          });
-          fetchCustomersList(); // Refresh list
-        }
-      } catch (err) {
-        console.error("Error saving new customer:", err);
-      }
     }
 
     try {
@@ -445,55 +390,49 @@ export default function Admin() {
       });
 
       if (saleAmount > 0) {
-        await addDoc(collection(db, 'daily_sales'), {
+        await salesService.createSale({
           amount: saleAmount,
           discount: Number(discount),
           description: description + (amountDeductedFromAdvance > 0 ? ` (Rs ${amountDeductedFromAdvance.toFixed(2)} from Advance)` : '') + (paymentToAdd > 0 && paymentToAdd <= currentArrears ? ` (Incl. Rs ${paymentToAdd.toFixed(2)} Arrears Payment)` : '') + (keepChangeAsAdvance && (actualCash - remainingBill - Math.min(actualCash - remainingBill, currentArrears)) > 0 ? ` (+ Rs ${(actualCash - remainingBill - Math.min(actualCash - remainingBill, currentArrears)).toFixed(2)} Advance Retained)` : '') + (!keepChangeAsAdvance && (currentAdvance - amountDeductedFromAdvance) > 0 ? ` (Refunded Rs ${(currentAdvance - amountDeductedFromAdvance).toFixed(2)} Advance)` : '') + (isCredit ? ` (Partial)` : ''),
           cartItems: cleanCartItems,
-          timestamp: serverTimestamp(),
-          userId: user.uid,
-          userEmail: user.email,
           customerName: finalCustomerName,
-          isCredit: false
+          customerPhone: whatsappNumber || '',
+          isCredit: false,
+          userId: user?.id || user?.uid || 'system'
         });
       }
 
       if (pendingToAdd > 0) {
-         await addDoc(collection(db, 'customer_dues'), {
-           name: finalCustomerName,
-           phone: whatsappNumber || '',
-           area: '',
-           amount: pendingToAdd,
-           status: 'Pending',
-           description: description,
-           timestamp: serverTimestamp()
-         });
+        await duesService.createDue({
+          customerName: finalCustomerName,
+          phone: whatsappNumber || '',
+          area: '',
+          amount: pendingToAdd,
+          status: 'Pending',
+          description: description
+        });
       }
 
       if (paymentToAdd > 0) {
-         await addDoc(collection(db, 'customer_dues'), {
-           name: finalCustomerName,
-           phone: whatsappNumber || '',
-           area: '',
-           amount: paymentToAdd,
-           status: 'Paid',
-           type: 'Payment',
-           description: 'Payment Received' + (keepChangeAsAdvance && (actualCash - remainingBill - Math.min(actualCash - remainingBill, currentArrears)) > 0 ? ' (Includes Advance)' : ''),
-           timestamp: serverTimestamp()
-         });
+        await duesService.createDue({
+          customerName: finalCustomerName,
+          phone: whatsappNumber || '',
+          area: '',
+          amount: paymentToAdd,
+          status: 'Paid',
+          type: 'Payment',
+          description: 'Payment Received' + (keepChangeAsAdvance && (actualCash - remainingBill - Math.min(actualCash - remainingBill, currentArrears)) > 0 ? ' (Includes Advance)' : '')
+        });
       }
 
       if (pendingToAdd > 0 || paymentToAdd > 0) {
-         fetchCustomerDues();
+        fetchCustomerDues();
       }
-      
-      // Trigger external sync asynchronously so it doesn't block UI
-      // Removed automatic push sync, as we now use manual pull sync from Expense Tracker side
-      // syncSaleToExpenseTracker(cartTotal, `POS Sale: ${description}`).catch(console.error);
 
       setCart([]);
       notify.success('Checkout successful!');
       fetchSales(); 
+      fetchCustomersList();
       return true;
     } catch (error) {
       console.error("Error adding sale: ", error);
@@ -514,12 +453,14 @@ export default function Admin() {
   const confirmDeleteSale = async () => {
     if (!deleteSaleId) return;
     try {
-      await deleteDoc(doc(db, 'daily_sales', deleteSaleId));
+      await salesService.deleteSale(deleteSaleId);
       fetchSales(); // Refresh the list
       notify.success("Record deleted successfully.");
     } catch (error) {
       console.error("Error deleting sale: ", error);
       notify.error("Failed to delete record.");
+    } finally {
+      setDeleteSaleId(null);
     }
   };
 

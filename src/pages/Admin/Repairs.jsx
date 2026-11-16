@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, updateDoc, doc, serverTimestamp, query, orderBy, addDoc, deleteDoc } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { supabase } from '../../config/supabase';
+import { salesService, customerService } from '../../services/supabaseService';
 import { format } from 'date-fns';
+import { parseTimestamp } from '../../utils/helpers';
 import { Search, Plus, Wrench, X, Check, Save, PlusCircle, Trash2, Calculator, Printer, Edit, Send, HelpCircle } from 'lucide-react';
 import logo from '../../assets/logo.webp';
 import { notify } from '../../utils/toast';
@@ -35,12 +36,35 @@ export default function Repairs({ user, fetchSales }) {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const repQuery = query(collection(db, 'repairs'), orderBy('createdAt', 'desc'));
-      const repSnap = await getDocs(repQuery);
-      setRepairs(repSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const { data: repData, error } = await supabase
+        .from('view_repairs')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-      const invSnap = await getDocs(collection(db, 'inventory'));
-      setInventory(invSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      if (error) console.error("Error fetching repairs:", error);
+
+      const mappedRepairs = (repData || []).map(r => {
+        const extra = (r.parts_used && typeof r.parts_used === 'object' && !Array.isArray(r.parts_used))
+          ? r.parts_used
+          : { parts: r.parts_used || [] };
+
+        return {
+          id: r.id,
+          customerId: r.customer_id,
+          customerName: r.customer_name || 'Repair Customer',
+          whatsapp: r.phone || '',
+          deviceType: r.device_model || 'PC',
+          issue: r.issue || '',
+          status: r.status || 'Pending',
+          isPaid: Boolean(r.is_paid),
+          createdAt: r.created_at,
+          timestamp: r.created_at,
+          ...extra
+        };
+      });
+
+      setRepairs(mappedRepairs);
+      setInventory([]);
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
@@ -55,7 +79,7 @@ export default function Repairs({ user, fetchSales }) {
   const confirmDeleteJob = async () => {
     if (!deleteModalJobId) return;
     try {
-      await deleteDoc(doc(db, 'repairs', deleteModalJobId));
+      await supabase.from('repairs').delete().eq('id', deleteModalJobId);
       fetchData();
       notify.success("Job deleted successfully.");
     } catch (err) {
@@ -137,11 +161,15 @@ export default function Repairs({ user, fetchSales }) {
       discount: Number(discount) || 0,
       advancePayment: Number(editAdvancePayment) || 0,
       finalPayment: Number(editFinalPayment) || 0,
-      estCost: editCalcItems.reduce((sum, item) => sum + Number(item.amount || 0), 0),
-      updatedAt: serverTimestamp()
+      estCost: editCalcItems.reduce((sum, item) => sum + Number(item.amount || 0), 0)
     };
 
     try {
+      let customerId = selectedRepair?.customerId || null;
+      if (!customerId && jobData.customerName) {
+        customerId = await customerService.findOrCreateCustomerByName(jobData.customerName, jobData.whatsapp);
+      }
+
       if (selectedRepair) {
         jobData.status = modalStatus;
 
@@ -155,7 +183,6 @@ export default function Repairs({ user, fetchSales }) {
           
           jobData.finalTotal = totalJobAmount;
           jobData.profit = totalJobAmount - buyingTotal;
-          jobData.completedAt = serverTimestamp();
 
           let description = `Repair Payment: ${jobData.customerName} - ${jobData.deviceType} `;
           if ((selectedRepair.parts || []).length > 0) {
@@ -168,30 +195,67 @@ export default function Repairs({ user, fetchSales }) {
             }
           }
 
-          await addDoc(collection(db, 'daily_sales'), {
+          await salesService.createSale({
             amount: totalJobAmount,
-            cost: buyingTotal,
             description,
-            isRepair: true,
-            repairId: selectedRepair.id,
-            timestamp: serverTimestamp(),
-            userId: user.uid,
-            userEmail: user.email,
-            customerName: jobData.customerName || 'Repair Customer'
+            customerName: jobData.customerName || 'Repair Customer',
+            customerPhone: jobData.whatsapp || '',
+            userId: user?.id || user?.email || 'system'
           });
         }
 
-        await updateDoc(doc(db, 'repairs', selectedRepair.id), jobData);
+        const repairPayload = {
+          customer_id: customerId,
+          device_model: jobData.deviceType || 'PC',
+          issue: jobData.issue || '',
+          cost: Number(jobData.finalTotal || jobData.estCost || 0),
+          estimated_cost: Number(jobData.estCost || 0),
+          status: jobData.status,
+          is_paid: jobData.status === 'Paid',
+          parts_used: {
+            parts: selectedRepair.parts || [],
+            calcItems: jobData.calcItems || [],
+            warrantyDays: jobData.warrantyDays,
+            advancePayment: jobData.advancePayment,
+            finalPayment: jobData.finalPayment,
+            serial: jobData.serial,
+            deviceType: jobData.deviceType,
+            salutation: editSalutation,
+            profit: jobData.profit,
+            finalTotal: jobData.finalTotal
+          }
+        };
+
+        await supabase.from('repairs').update(repairPayload).eq('id', selectedRepair.id);
       } else {
         jobData.status = 'Pending';
-        jobData.createdAt = serverTimestamp();
-        jobData.createdBy = user.email;
         jobData.parts = [];
         jobData.laborCharge = 0;
         jobData.finalTotal = 0;
+
+        const repairPayload = {
+          customer_id: customerId,
+          device_model: jobData.deviceType || 'PC',
+          issue: jobData.issue || '',
+          cost: 0,
+          estimated_cost: Number(jobData.estCost || 0),
+          status: 'Pending',
+          is_paid: false,
+          parts_used: {
+            parts: [],
+            calcItems: jobData.calcItems || [],
+            warrantyDays: jobData.warrantyDays,
+            advancePayment: jobData.advancePayment,
+            finalPayment: jobData.finalPayment,
+            serial: jobData.serial,
+            deviceType: jobData.deviceType,
+            salutation: editSalutation
+          }
+        };
         
-        const docRef = await addDoc(collection(db, 'repairs'), jobData);
-        jobData.id = docRef.id;
+        const { data: createdRepair, error: createErr } = await supabase.from('repairs').insert(repairPayload).select().single();
+        if (createErr) throw createErr;
+        jobData.id = createdRepair.id;
         
         if (shouldPrint) {
           printEstimate(jobData);
@@ -730,7 +794,7 @@ export default function Repairs({ user, fetchSales }) {
                       )}
                     </td>
                     <td className="px-4 py-4 text-slate-400 text-xs whitespace-nowrap align-top">
-                      {job.createdAt ? format(job.createdAt.toDate(), 'MMM dd, p') : '...'}
+                      {job.createdAt ? format(parseTimestamp(job.createdAt), 'MMM dd, p') : '...'}
                     </td>
                     <td className="px-4 py-4 text-slate-200 font-medium text-sm align-top">
                       {job.customerName}
@@ -1100,7 +1164,7 @@ export default function Repairs({ user, fetchSales }) {
                 </div>
                 <div className="flex justify-between">
                   <span className="font-semibold">Date:</span>
-                  <span>{viewingJob.createdAt ? format(viewingJob.createdAt.toDate(), 'dd/MM/yyyy p') : ''}</span>
+                  <span>{viewingJob.createdAt ? format(parseTimestamp(viewingJob.createdAt), 'dd/MM/yyyy p') : ''}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="font-semibold">Customer:</span>

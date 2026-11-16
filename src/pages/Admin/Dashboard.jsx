@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AreaChart, Area, BarChart, Bar, LineChart, Line, ComposedChart, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ReferenceDot, Label, LabelList, ReferenceLine } from 'recharts';
-import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { repairService, expenseService } from '../../services/supabaseService';
 import { formatDistanceToNow } from 'date-fns';
 import { parseTimestamp } from '../../utils/helpers';
 import { 
@@ -88,15 +87,11 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
       if (fetchSales) await fetchSales();
       if (fetchCustomerDues) await fetchCustomerDues();
 
-      const repairsQ = query(collection(db, 'repairs'), orderBy('createdAt', 'desc'));
-      const repairsSnap = await getDocs(repairsQ);
-      const repairsData = repairsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const repairsData = await repairService.getRepairs();
       setRepairs(repairsData);
       localStorage.setItem('dashboardRepairs', JSON.stringify(repairsData));
 
-      const expensesQ = query(collection(db, 'shop_expenses'), orderBy('timestamp', 'desc'));
-      const expensesSnap = await getDocs(expensesQ);
-      const expensesData = expensesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const expensesData = await expenseService.getExpenses();
       setExpenses(expensesData);
       localStorage.setItem('dashboardExpenses', JSON.stringify(expensesData));
 

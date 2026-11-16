@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy, serverTimestamp, where } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { customerService, duesService, salesService } from '../../services/supabaseService';
 import { Search, Plus, Trash2, CheckCircle, Clock, User, Phone, MapPin, DollarSign, RotateCcw, ChevronDown, ChevronUp, Filter, Edit, X, RefreshCw, Star, HelpCircle, Users } from 'lucide-react';
 import { notify } from '../../utils/toast';
 import DeleteConfirmModal from '../../components/DeleteConfirmModal';
@@ -67,22 +66,11 @@ export default function Customers({ isAdmin }) {
 
   const fetchRecords = async () => {
     try {
-      const q = query(collection(db, 'customer_dues'), orderBy('timestamp', 'desc'));
-      const querySnapshot = await getDocs(q);
-      const data = [];
-      querySnapshot.forEach((doc) => {
-        data.push({ id: doc.id, ...doc.data() });
-      });
-      setRecords(data);
+      const dues = await duesService.getCustomerDues();
+      setRecords(dues);
 
-      const dirQ = query(collection(db, 'customers'), orderBy('timestamp', 'desc'));
-      const dirSnapshot = await getDocs(dirQ);
-      const dirData = [];
-      dirSnapshot.forEach((doc) => {
-        dirData.push({ id: doc.id, ...doc.data() });
-      });
+      const dirData = await customerService.getCustomers();
       setDirectoryRecords(dirData);
-
     } catch (error) {
       console.error("Error fetching records:", error);
       notify.error("Failed to load customer records.");
@@ -100,24 +88,19 @@ export default function Customers({ isAdmin }) {
     
     setIsSubmitting(true);
     try {
-      // Add to directory regardless to keep track of Area and Phone centrally
-      await addDoc(collection(db, 'customers'), {
-        name: name.trim(),
-        phone: phone.trim(),
-        area: area.trim(),
-        timestamp: serverTimestamp()
-      });
+      const custId = await customerService.findOrCreateCustomerByName(name.trim(), phone.trim(), area.trim());
 
       // If an amount is provided, add it to customer_dues
       if (amount && Number(amount) > 0) {
-        await addDoc(collection(db, 'customer_dues'), {
-          name: name.trim(),
+        await duesService.createDue({
+          customerId: custId,
+          customerName: name.trim(),
           phone: phone.trim(),
           area: area.trim(),
           amount: Number(amount),
           status,
           isPosArrears,
-          timestamp: serverTimestamp()
+          description: 'Manual Due Entry'
         });
       }
       notify.success("Record added successfully!");
@@ -147,7 +130,7 @@ export default function Customers({ isAdmin }) {
         // Find existing payments for this customer
         const customerPayments = group ? group.records.filter(r => r.type === 'Payment') : [];
         const totalPaymentsAmount = customerPayments.reduce((sum, r) => sum + r.amount, 0);
-        
+
         // The actual amount paid today is the bill amount MINUS any prepaid balance (payments)
         let amountToConsume = Math.min(record.amount, totalPaymentsAmount);
         const actualCashReceived = record.amount - amountToConsume;
@@ -159,10 +142,10 @@ export default function Customers({ isAdmin }) {
             if (amountToConsume <= 0) break;
             
             if (payment.amount <= amountToConsume) {
-              await deleteDoc(doc(db, 'customer_dues', payment.id));
+              await duesService.deleteDue(payment.id);
               amountToConsume -= payment.amount;
             } else {
-              await updateDoc(doc(db, 'customer_dues', payment.id), {
+              await duesService.updateDue(payment.id, {
                 amount: payment.amount - amountToConsume
               });
               amountToConsume = 0;
@@ -172,24 +155,22 @@ export default function Customers({ isAdmin }) {
         
         // Add to daily_sales only if it's a POS Arrears and actual cash was received
         if (record.isPosArrears !== false && actualCashReceived > 0) {
-          const saleRef = await addDoc(collection(db, 'daily_sales'), {
+          const sale = await salesService.createSale({
             amount: actualCashReceived,
             discount: 0,
             description: `Account Settled: ${record.name}`,
             cartItems: [{ name: 'Account Settlement (Balance)', price: actualCashReceived, cost: 0, qty: 1 }],
-            timestamp: serverTimestamp(),
             userId: 'system',
             customerName: record.name,
             isCredit: false,
             isAccountSettlement: true
           });
-          saleRefId = saleRef.id;
+          saleRefId = sale.id;
         }
 
-        await updateDoc(doc(db, 'customer_dues', record.id), {
+        await duesService.updateDue(record.id, {
           status: newStatus,
-          ...(saleRefId && { linkedSaleId: saleRefId }),
-          ...(consumedPaymentAmount > 0 && { consumedPaymentAmount })
+          linkedSaleId: saleRefId || null
         });
         
         if (actualCashReceived > 0) {
@@ -201,27 +182,26 @@ export default function Customers({ isAdmin }) {
         const newStatus = 'Pending';
         
         if (record.linkedSaleId) {
-          await deleteDoc(doc(db, 'daily_sales', record.linkedSaleId));
+          await salesService.deleteSale(record.linkedSaleId);
         }
 
         // Restore consumed payments
         if (record.consumedPaymentAmount && record.consumedPaymentAmount > 0) {
-           await addDoc(collection(db, 'customer_dues'), {
-             name: record.name,
-             phone: record.phone || '',
-             area: record.area || '',
-             amount: record.consumedPaymentAmount,
-             status: 'Paid',
-             type: 'Payment',
-             description: 'Restored Payment from Undo',
-             timestamp: serverTimestamp()
-           });
+          await duesService.createDue({
+            customerId: record.customerId,
+            customerName: record.name,
+            phone: record.phone || '',
+            area: record.area || '',
+            amount: record.consumedPaymentAmount,
+            status: 'Paid',
+            type: 'Payment',
+            description: 'Restored Payment from Undo'
+          });
         }
         
-        await updateDoc(doc(db, 'customer_dues', record.id), {
+        await duesService.updateDue(record.id, {
           status: newStatus,
-          linkedSaleId: null,
-          consumedPaymentAmount: null
+          linkedSaleId: null
         });
 
         notify.success(`Undone Paid status & Removed from Sales`);
@@ -246,12 +226,11 @@ export default function Customers({ isAdmin }) {
       } else {
         // Partial payment
         if (record.isPosArrears !== false) {
-          await addDoc(collection(db, 'daily_sales'), {
+          await salesService.createSale({
             amount: paymentAmount,
             discount: 0,
             description: `Partial Payment: ${record.name}`,
             cartItems: [{ name: 'Account Settlement (Partial)', price: paymentAmount, cost: 0, qty: 1 }],
-            timestamp: serverTimestamp(),
             userId: 'system',
             customerName: record.name,
             isCredit: false,
@@ -259,15 +238,15 @@ export default function Customers({ isAdmin }) {
           });
         }
         
-        await addDoc(collection(db, 'customer_dues'), {
-          name: record.name,
+        await duesService.createDue({
+          customerId: record.customerId,
+          customerName: record.name,
           phone: record.phone || '',
           area: record.area || '',
           amount: paymentAmount,
           status: 'Paid',
           type: 'Payment',
-          description: 'Partial Payment',
-          timestamp: serverTimestamp()
+          description: 'Partial Payment'
         });
         
         notify.success(`Partial payment of Rs ${paymentAmount.toFixed(2)} recorded.`);
@@ -290,7 +269,7 @@ export default function Customers({ isAdmin }) {
   const confirmDelete = async () => {
     if (!deleteRecordId) return;
     try {
-      await deleteDoc(doc(db, 'customer_dues', deleteRecordId));
+      await duesService.deleteDue(deleteRecordId);
       notify.success("Record deleted.");
       fetchRecords();
     } catch (error) {
@@ -306,7 +285,7 @@ export default function Customers({ isAdmin }) {
     try {
       for (const record of deleteGroupData.records) {
         if (record.id) {
-          await deleteDoc(doc(db, 'customer_dues', record.id));
+          await duesService.deleteDue(record.id);
         }
       }
       notify.success("All dues for this customer deleted.");
@@ -323,11 +302,11 @@ export default function Customers({ isAdmin }) {
     if (!deleteCustomerData) return;
     try {
       if (deleteCustomerData.directoryId) {
-        await deleteDoc(doc(db, 'customers', deleteCustomerData.directoryId));
+        await customerService.deleteCustomer(deleteCustomerData.directoryId);
       }
       for (const record of deleteCustomerData.records) {
         if (record.id) {
-          await deleteDoc(doc(db, 'customer_dues', record.id));
+          await duesService.deleteDue(record.id);
         }
       }
       notify.success("Customer deleted successfully.");
@@ -349,12 +328,11 @@ export default function Customers({ isAdmin }) {
       }
 
       if (group.hasPosArrears) {
-        await addDoc(collection(db, 'daily_sales'), {
+        await salesService.createSale({
           amount: paymentAmount,
           discount: 0,
           description: `Account Payment: ${group.name}`,
           cartItems: [{ name: 'Account Settlement', price: paymentAmount, cost: 0, qty: 1 }],
-          timestamp: serverTimestamp(),
           userId: 'system',
           customerName: group.name,
           isCredit: false,
@@ -362,15 +340,15 @@ export default function Customers({ isAdmin }) {
         });
       }
 
-      await addDoc(collection(db, 'customer_dues'), {
-        name: group.name,
+      await duesService.createDue({
+        customerId: group.directoryId || null,
+        customerName: group.name,
         phone: group.phone || '',
         area: group.area || '',
         amount: paymentAmount,
         status: 'Paid',
         type: 'Payment',
-        description: 'Account Payment',
-        timestamp: serverTimestamp()
+        description: 'Account Payment'
       });
 
       notify.success(`Payment of Rs ${paymentAmount.toFixed(2)} recorded.`);
@@ -390,18 +368,16 @@ export default function Customers({ isAdmin }) {
       const isNowFavorite = !group.mostVisited;
 
       if (!targetId) {
-        // If customer doesn't exist in the directory yet, create it
-        const newDoc = await addDoc(collection(db, 'customers'), {
+        const newCust = await customerService.createCustomer({
           name: group.name,
           phone: group.phone || '',
           area: group.area || '',
-          mostVisited: true,
-          timestamp: serverTimestamp()
+          mostVisited: true
         });
-        targetId = newDoc.id;
+        targetId = newCust.id;
         notify.success('Added to favorites');
       } else {
-        await updateDoc(doc(db, 'customers', targetId), {
+        await customerService.updateCustomer(targetId, {
           mostVisited: isNowFavorite
         });
         notify.success(isNowFavorite ? 'Added to favorites' : 'Removed from favorites');
@@ -475,38 +451,14 @@ export default function Customers({ isAdmin }) {
     try {
       setIsSavingPhone(true);
 
-      // 1. Update in customers collection (directory)
-      if (phoneModalCustomer.directoryId) {
-        await updateDoc(doc(db, 'customers', phoneModalCustomer.directoryId), { phone: trimmedPhone });
+      let custId = phoneModalCustomer.directoryId;
+      if (custId) {
+        await customerService.updateCustomer(custId, { phone: trimmedPhone });
       } else {
-        const qCust = query(collection(db, 'customers'), where('name', '==', phoneModalCustomer.name));
-        const snapCust = await getDocs(qCust);
-        if (!snapCust.empty) {
-          await updateDoc(doc(db, 'customers', snapCust.docs[0].id), { phone: trimmedPhone });
-        } else {
-          await addDoc(collection(db, 'customers'), {
-            name: phoneModalCustomer.name,
-            phone: trimmedPhone,
-            area: phoneModalCustomer.area || '',
-            timestamp: serverTimestamp()
-          });
-        }
+        const foundId = await customerService.findOrCreateCustomerByName(phoneModalCustomer.name, trimmedPhone, phoneModalCustomer.area || '');
+        custId = foundId;
       }
 
-      // 2. Update customer_dues documents if any exist
-      if (phoneModalCustomer.records && phoneModalCustomer.records.length > 0) {
-        for (const rec of phoneModalCustomer.records) {
-          if (rec.id) {
-            try {
-              await updateDoc(doc(db, 'customer_dues', rec.id), { phone: trimmedPhone });
-            } catch (err) {
-              console.error('Error updating phone in due record:', err);
-            }
-          }
-        }
-      }
-
-      // 3. Update active customer object in state
       phoneModalCustomer.phone = trimmedPhone;
       if (selectedCustomerForModal && selectedCustomerForModal.nameKey === phoneModalCustomer.nameKey) {
         setSelectedCustomerForModal(prev => prev ? { ...prev, phone: trimmedPhone } : null);
@@ -685,8 +637,12 @@ export default function Customers({ isAdmin }) {
                       onClick={async (e) => {
                         e.stopPropagation();
                         try {
-                          await updateDoc(doc(db, 'customer_dues', group.records.find(r => r.id).id), { area: editingValue });
+                          const custId = group.directoryId || await customerService.findOrCreateCustomerByName(group.name, group.phone, editingValue);
+                          if (custId) {
+                            await customerService.updateCustomer(custId, { area: editingValue });
+                          }
                           notify.success('Area updated');
+                          fetchRecords();
                         } catch (err) {
                           console.error(err);
                           notify.error('Failed to update area');
@@ -732,8 +688,12 @@ export default function Customers({ isAdmin }) {
                       onClick={async (e) => {
                         e.stopPropagation();
                         try {
-                          await updateDoc(doc(db, 'customer_dues', group.records.find(r => r.id).id), { phone: editingValue });
+                          const custId = group.directoryId || await customerService.findOrCreateCustomerByName(group.name, editingValue, group.area);
+                          if (custId) {
+                            await customerService.updateCustomer(custId, { phone: editingValue });
+                          }
                           notify.success('Phone updated');
+                          fetchRecords();
                         } catch (err) {
                           console.error(err);
                           notify.error('Failed to update phone');

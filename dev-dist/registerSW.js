@@ -1,1 +1,1 @@
-if('serviceWorker' in navigator) navigator.serviceWorker.register('/desh-digital-hub/dev-sw.js?dev-sw', { scope: '/desh-digital-hub/', type: 'classic' })
+if('serviceWorker' in navigator) navigator.serviceWorker.register('/dev-sw.js?dev-sw', { scope: '/', type: 'classic' })
