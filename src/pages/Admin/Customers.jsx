@@ -3,7 +3,7 @@ import { customerService, duesService, salesService } from '../../services/supab
 import { Search, Plus, Trash2, CheckCircle, Clock, User, Phone, MapPin, DollarSign, RotateCcw, ChevronDown, ChevronUp, Filter, Edit, X, RefreshCw, Star, HelpCircle, Users } from 'lucide-react';
 import { notify } from '../../utils/toast';
 import DeleteConfirmModal from '../../components/DeleteConfirmModal';
-import { AddCustomerForm, CustomerHistoryModal } from './CustomersComponents';
+import { AddCustomerForm, CustomerHistoryModal, CustomerPhoneModal } from './CustomersComponents';
 
 const WhatsAppIcon = ({ className = "w-4 h-4" }) => (
   <svg className={className} fill="currentColor" viewBox="0 0 24 24">
@@ -1104,88 +1104,15 @@ export default function Customers({ isAdmin }) {
       />
 
       {/* WhatsApp Phone Input Modal */}
-      {phoneModalCustomer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-slate-900 border border-white/10 rounded-3xl w-full max-w-md p-6 shadow-2xl relative">
-            <div className="flex items-center justify-between pb-4 border-b border-white/10">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-                  <WhatsAppIcon className="w-5 h-5 fill-current" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-white">WhatsApp Reminder</h3>
-                  <p className="text-xs text-slate-400">Add phone number to send reminder</p>
-                </div>
-              </div>
-              <button 
-                onClick={() => { setPhoneModalCustomer(null); setPhoneModalInput(''); }}
-                className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-white/5 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="py-4 space-y-4">
-              <div className="bg-slate-950/60 border border-white/5 rounded-xl p-3 flex justify-between items-center">
-                <div>
-                  <span className="text-xs text-slate-400 block">Customer</span>
-                  <span className="text-sm font-bold text-white">{phoneModalCustomer.name}</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-xs text-slate-400 block">Due Amount</span>
-                  <span className="text-sm font-bold text-orange-400">Rs. {Number(phoneModalCustomer.totalPending).toFixed(2)}</span>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-                  Phone / WhatsApp Number *
-                </label>
-                <div className="relative">
-                  <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                  <input 
-                    type="tel"
-                    value={phoneModalInput}
-                    onChange={(e) => setPhoneModalInput(e.target.value)}
-                    placeholder="e.g. 071 234 5678"
-                    autoFocus
-                    className="w-full bg-slate-950 border border-slate-700/60 rounded-xl pl-10 pr-4 py-2.5 text-slate-100 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50 transition-all"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        savePhoneAndSendReminder();
-                      }
-                    }}
-                  />
-                </div>
-                <p className="text-[11px] text-slate-500 mt-1.5">
-                  This phone number will be saved to the customer's account for future notices.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/10">
-              <button
-                type="button"
-                onClick={() => { setPhoneModalCustomer(null); setPhoneModalInput(''); }}
-                disabled={isSavingPhone}
-                className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-800 rounded-xl transition-colors border border-slate-700/50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={savePhoneAndSendReminder}
-                disabled={isSavingPhone}
-                className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] disabled:opacity-50"
-              >
-                <WhatsAppIcon className="w-4 h-4 fill-current" />
-                {isSavingPhone ? 'Saving...' : 'Save & Send WhatsApp'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <CustomerPhoneModal
+        isOpen={!!phoneModalCustomer}
+        customer={phoneModalCustomer}
+        phoneInput={phoneModalInput}
+        setPhoneInput={setPhoneModalInput}
+        onClose={() => { setPhoneModalCustomer(null); setPhoneModalInput(''); }}
+        onSaveAndSend={savePhoneAndSendReminder}
+        isSaving={isSavingPhone}
+      />
     </div>
   );
 }

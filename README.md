@@ -1,12 +1,12 @@
 # DESH Digital Hub
 
-A modern, highly optimized, and scalable Point of Sale (POS) and Management Dashboard built with React, Vite, and Firebase.
+A modern, highly optimized, and scalable Point of Sale (POS) and Management Dashboard built with React, Vite, and Supabase.
 
 ## 🚀 Key Features
 
 * **High-Performance POS System**: Fully optimized checkout flow utilizing `React.memo`, `useMemo`, and `useCallback` for zero-lag cart operations.
 * **Lazy Loaded Routes**: Code-splitting powered by `React.lazy` and `Suspense` ensures lightning-fast initial load times.
-* **Real-time Synchronization**: Direct integration with Firebase Firestore for live sales, expenses, and customer tracking.
+* **PostgreSQL & Real-time Integration**: Direct integration with Supabase for normalized relational data, live sales, expenses, and customer tracking.
 * **Premium UI/UX**: Built with TailwindCSS and `framer-motion` for a glassmorphism aesthetic with micro-animations.
 * **PWA Ready**: Works offline and can be installed as a progressive web app.
 * **Smart Customer Directory**: Auto-saves customers during checkout and provides auto-complete suggestions.
@@ -19,7 +19,7 @@ src/
 ├── components/             # Reusable UI components
 │   ├── Loader.jsx          # Generic Suspense fallback
 │   └── DeleteConfirmModal.jsx 
-├── config/                 # Firebase config
+├── config/                 # Supabase client config
 ├── constants/              # Global constants
 ├── layouts/                # Layout wrappers (AdminLayout)
 ├── pages/                  # Route level components
@@ -47,7 +47,7 @@ src/
 
 * **Frontend**: React 18, Vite
 * **Styling**: Tailwind CSS
-* **Database/Auth**: Firebase (Firestore, Authentication)
+* **Database/Auth**: Supabase (PostgreSQL, Supabase Auth)
 * **Icons**: Lucide React
 * **Charts**: Recharts
 * **Animations**: Framer Motion

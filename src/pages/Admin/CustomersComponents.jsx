@@ -314,3 +314,104 @@ export const CustomerHistoryModal = ({
     </div>
   </div>
 );
+
+export const WhatsAppIcon = ({ className = "w-4 h-4" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.664-.699c.97.546 1.895.82 2.796.82 3.183 0 5.768-2.587 5.768-5.766.001-3.187-2.575-5.77-5.768-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86s.275.073.377-.044c.101-.116.433-.506.549-.68.116-.174.231-.145.39-.087s1.011.477 1.184.564.289.13.332.202c.045.072.045.419-.099.824zm-3.392-12.416c-5.514 0-10 4.486-10 10 0 1.761.458 3.417 1.258 4.86l-1.336 4.88 5.006-1.314c1.401.763 3.003 1.196 4.704 1.196 5.514 0 10-4.486 10-10s-4.486-10-10-10z" />
+  </svg>
+);
+
+export const CustomerPhoneModal = ({
+  isOpen,
+  customer,
+  phoneInput,
+  setPhoneInput,
+  onClose,
+  onSaveAndSend,
+  isSaving
+}) => {
+  if (!isOpen || !customer) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-slate-900 border border-white/10 rounded-3xl w-full max-w-md p-6 shadow-2xl relative">
+        <div className="flex items-center justify-between pb-4 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+              <WhatsAppIcon className="w-5 h-5 fill-current" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-white">WhatsApp Reminder</h3>
+              <p className="text-xs text-slate-400">Add phone number to send reminder</p>
+            </div>
+          </div>
+          <button 
+            onClick={onClose}
+            className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-white/5 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="py-4 space-y-4">
+          <div className="bg-slate-950/60 border border-white/5 rounded-xl p-3 flex justify-between items-center">
+            <div>
+              <span className="text-xs text-slate-400 block">Customer</span>
+              <span className="text-sm font-bold text-white">{customer.name}</span>
+            </div>
+            <div className="text-right">
+              <span className="text-xs text-slate-400 block">Due Amount</span>
+              <span className="text-sm font-bold text-orange-400">Rs. {Number(customer.totalPending).toFixed(2)}</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+              Phone / WhatsApp Number *
+            </label>
+            <div className="relative">
+              <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+              <input 
+                type="tel"
+                value={phoneInput}
+                onChange={(e) => setPhoneInput(e.target.value)}
+                placeholder="e.g. 071 234 5678"
+                autoFocus
+                className="w-full bg-slate-950 border border-slate-700/60 rounded-xl pl-10 pr-4 py-2.5 text-slate-100 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50 transition-all"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    onSaveAndSend();
+                  }
+                }}
+              />
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1.5">
+              This phone number will be saved to the customer's account for future notices.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/10">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSaving}
+            className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-800 rounded-xl transition-colors border border-slate-700/50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onSaveAndSend}
+            disabled={isSaving}
+            className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] disabled:opacity-50"
+          >
+            <WhatsAppIcon className="w-4 h-4 fill-current" />
+            {isSaving ? 'Saving...' : 'Save & Send WhatsApp'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};

@@ -12,7 +12,7 @@ import {
   settingsService 
 } from '../../services/supabaseService';
 import DeleteConfirmModal from '../../components/DeleteConfirmModal';
-import { POSItem, CategoryTab, CartItem, POSItemsGrid, CustomerInput } from './POSComponents';
+import { POSItem, CategoryTab, CartItem, POSItemsGrid, CustomerInput, SavePendingModal, POSReminderModal } from './POSComponents';
 
 export default function POS({
   cart,
@@ -1310,40 +1310,19 @@ export default function POS({
         </div>
       )}
       {/* Save Pending Modal */}
-      {showSavePendingModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md overflow-visible shadow-2xl">
-            <div className="p-6 border-b border-slate-800 flex justify-between items-center">
-              <h3 className="text-xl font-black text-slate-100 uppercase tracking-wide">Save Pending Order</h3>
-              <button onClick={() => setShowSavePendingModal(false)} className="text-slate-400 hover:text-white transition-colors">
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            <div className="p-6 space-y-6">
-              <div className="flex flex-col gap-3">
-                <span className="text-sm uppercase tracking-wider font-bold text-slate-500">Customer Details</span>
-                <CustomerInput
-                  customerName={pendingCustomerName}
-                  setCustomerName={setPendingCustomerName}
-                  customersList={customersList}
-                  whatsappNumber={pendingWhatsappNumber}
-                  setWhatsappNumber={setPendingWhatsappNumber}
-                  isCredit={true}
-                  favoriteCustomers={favoriteCustomerNames}
-                  onToggleFavorite={toggleCustomerFavorite}
-                />
-              </div>
-              <button
-                onClick={handleSavePending}
-                disabled={pendingLoading || !pendingCustomerName.trim()}
-                className="w-full bg-orange-500 hover:bg-orange-400 text-slate-950 font-black py-4 rounded-xl text-lg uppercase tracking-wide transition-all disabled:opacity-50"
-              >
-                {pendingLoading ? 'Saving...' : 'Save Pending Order'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <SavePendingModal
+        isOpen={showSavePendingModal}
+        onClose={() => setShowSavePendingModal(false)}
+        pendingCustomerName={pendingCustomerName}
+        setPendingCustomerName={setPendingCustomerName}
+        customersList={customersList}
+        pendingWhatsappNumber={pendingWhatsappNumber}
+        setPendingWhatsappNumber={setPendingWhatsappNumber}
+        favoriteCustomerNames={favoriteCustomerNames}
+        toggleCustomerFavorite={toggleCustomerFavorite}
+        handleSavePending={handleSavePending}
+        pendingLoading={pendingLoading}
+      />
 
       <DeleteConfirmModal
         isOpen={!!pendingToDelete}
@@ -1362,48 +1341,14 @@ export default function POS({
       />
 
       {/* WhatsApp Reminder Modal */}
-      {reminderModalData && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl">
-            <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
-              <h3 className="text-lg font-black text-slate-100 uppercase tracking-wide flex items-center gap-2">
-                <MessageCircle className="w-5 h-5 text-blue-400" /> Send Reminder
-              </h3>
-              <button onClick={() => setReminderModalData(null)} className="text-slate-400 hover:text-white transition-colors">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <p className="text-sm text-slate-400">
-                Send a WhatsApp message to <span className="text-slate-200 font-bold">{reminderModalData.order.note}</span> that their order is ready.
-              </p>
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">
-                  WhatsApp Number
-                </label>
-                <input
-                  type="text"
-                  autoFocus
-                  value={reminderWhatsapp}
-                  onChange={(e) => setReminderWhatsapp(e.target.value)}
-                  placeholder="07XXXXXXXX"
-                  className="w-full text-lg bg-slate-950 border border-slate-800 text-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500/50 transition-all"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleSendReminder();
-                  }}
-                />
-              </div>
-              <button
-                onClick={handleSendReminder}
-                disabled={!reminderWhatsapp.trim() || isUpdatingCustomer}
-                className="w-full bg-blue-500 hover:bg-blue-400 text-slate-950 font-black py-3.5 rounded-xl text-sm uppercase tracking-wide transition-all disabled:opacity-50 mt-2"
-              >
-                {isUpdatingCustomer ? 'Sending...' : 'Send Message'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <POSReminderModal
+        data={reminderModalData}
+        onClose={() => setReminderModalData(null)}
+        reminderWhatsapp={reminderWhatsapp}
+        setReminderWhatsapp={setReminderWhatsapp}
+        handleSendReminder={handleSendReminder}
+        isUpdatingCustomer={isUpdatingCustomer}
+      />
     </div>
   );
 }

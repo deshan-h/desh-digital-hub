@@ -11,7 +11,6 @@ import { format } from 'date-fns';
 import { parseTimestamp } from '../../utils/helpers';
 import logo from '../../assets/logo.webp';
 import { notify } from '../../utils/toast';
-import { syncSaleToExpenseTracker } from '../../utils/expenseTrackerSync';
 
 // Components
 
