@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, ShoppingCart, History, LogOut, Menu, Wrench, UserCog, User, ChevronDown, Users, Wallet, RefreshCw, Tags, Contact, Settings, TrendingUp, Clock, ChevronRight, ChevronLeft, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, History, LogOut, Menu, Wrench, UserCog, User, ChevronDown, Users, Wallet, RefreshCw, Tags, Contact, Settings, TrendingUp, Clock, ChevronRight, ChevronLeft, BarChart3, Calculator } from 'lucide-react';
+import CalculatorModal from '../components/common/CalculatorModal';
 
 export default function AdminLayout({ 
   children, 
@@ -16,6 +17,7 @@ export default function AdminLayout({
   setShowPendingOrdersModal
 }) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const dropdownRef = useRef(null);
 
   useEffect(() => {
@@ -204,9 +206,17 @@ export default function AdminLayout({
 
           <div className="flex items-center justify-end gap-3 flex-1">
             <button 
+              onClick={() => setIsCalculatorOpen(true)}
+              title="Calculator"
+              className="flex items-center justify-center p-2 bg-slate-950/40 border border-white/5 rounded-full hover:bg-white/10 hover:border-white/10 transition-all duration-300 text-slate-400 hover:text-emerald-400 shadow-inner group cursor-pointer"
+            >
+              <Calculator className="w-3.5 h-3.5 group-hover:scale-110 transition-transform duration-300" />
+            </button>
+
+            <button 
               onClick={handleHardRefresh}
               title="Hard Refresh"
-              className="flex items-center justify-center p-2 bg-slate-950/40 border border-white/5 rounded-full hover:bg-white/10 hover:border-white/10 transition-all duration-300 text-slate-400 hover:text-slate-200 shadow-inner group"
+              className="flex items-center justify-center p-2 bg-slate-950/40 border border-white/5 rounded-full hover:bg-white/10 hover:border-white/10 transition-all duration-300 text-slate-400 hover:text-slate-200 shadow-inner group cursor-pointer"
             >
               <RefreshCw className="w-3.5 h-3.5 group-hover:rotate-180 transition-transform duration-500" />
             </button>
@@ -268,6 +278,12 @@ export default function AdminLayout({
           </div>
         </footer>
       </div>
+
+      {/* Floating Quick Calculator Modal */}
+      <CalculatorModal 
+        isOpen={isCalculatorOpen} 
+        onClose={() => setIsCalculatorOpen(false)} 
+      />
     </div>
   );
 }
