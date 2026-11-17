@@ -1,5 +1,28 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { ShoppingCart, Plus, Trash2, Search, Package, RefreshCw, Save, Clock, TrendingUp, TrendingDown, Star, ChevronLeft, ChevronRight, X, MessageCircle } from 'lucide-react';
+import { 
+  ShoppingCart, 
+  Plus, 
+  Trash2, 
+  Search, 
+  Package, 
+  RefreshCw, 
+  Save, 
+  Clock, 
+  TrendingUp, 
+  TrendingDown, 
+  Star, 
+  ChevronLeft, 
+  ChevronRight, 
+  X, 
+  MessageCircle,
+  LayoutGrid,
+  Table as TableIcon,
+  UserPlus,
+  ChevronDown,
+  Printer,
+  CheckCircle2,
+  DollarSign
+} from 'lucide-react';
 import { notify } from '../../utils/toast';
 import { parseTimestamp } from '../../utils/helpers';
 import { generateInvoiceHtml } from '../../utils/invoiceTemplate';
@@ -38,6 +61,19 @@ export default function POS({
   todaySalesSum = 0,
   totalPendingDues = 0
 }) {
+  // View mode: 'table' (ERP style matching screenshot) or 'grid' (Visual tiles)
+  const [viewMode, setViewMode] = useState('table');
+  
+  // Order Metadata (ERP Layout)
+  const [orderSource, setOrderSource] = useState('Walk-in Shop');
+  const [assignee, setAssignee] = useState('Admin (Owner)');
+  const [businessLocation, setBusinessLocation] = useState('Main Branch');
+  const [deliveryCharge, setDeliveryCharge] = useState('');
+  const [orderNotes, setOrderNotes] = useState('');
+  const [selectedProductSearch, setSelectedProductSearch] = useState('');
+  const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
+
+  // Customer Favorites State
   const [favoriteCustomerNames, setFavoriteCustomerNames] = useState(() => {
     const cached = localStorage.getItem('favoriteCustomers');
     if (cached) {
@@ -91,119 +127,49 @@ export default function POS({
   }, []);
 
   const [favoriteItemIds, setFavoriteItemIds] = useState(() => {
-    // Initial sync from local storage for fast render
     const saved = localStorage.getItem('posFavorites');
     return saved ? JSON.parse(saved) : [];
   });
 
-  // Sync from Supabase settings/pos_favorites
   useEffect(() => {
-    settingsService.getSetting('pos_favorites')
-      .then(data => {
-        if (data && data.items) {
-          setFavoriteItemIds(data.items);
-          localStorage.setItem('posFavorites', JSON.stringify(data.items));
+    const loadSavedFavorites = async () => {
+      try {
+        const data = await settingsService.getSetting('pos_favorites');
+        if (data && Array.isArray(data.itemIds)) {
+          setFavoriteItemIds(data.itemIds);
+          localStorage.setItem('posFavorites', JSON.stringify(data.itemIds));
         }
-      })
-      .catch(err => {
-        console.error("Error fetching pos_favorites:", err);
-      });
+      } catch (e) {
+        console.error("Error loading POS favorites from Supabase", e);
+      }
+    };
+    loadSavedFavorites();
   }, []);
 
-  // Sync favorites when posCategories updates from DB
-  useEffect(() => {
-    if (posCategories && posCategories.length > 0) {
-      const dbFavIds = posCategories
-        .flatMap(c => c.items || [])
-        .filter(i => i.isFavorite === true || i.favorite === true)
-        .map(i => i.id);
-
-      if (dbFavIds.length > 0) {
-        setFavoriteItemIds(prev => {
-          const merged = [...new Set([...prev, ...dbFavIds])];
-          localStorage.setItem('posFavorites', JSON.stringify(merged));
-          return merged;
-        });
-      }
-    }
-  }, [posCategories]);
-
-  // Ensure all existing favorite items have the isFavorite variable directly in pos_categories in DB
-  useEffect(() => {
-    if (!posCategories || posCategories.length === 0 || favoriteItemIds.length === 0) return;
-
-    posCategories.forEach(async (cat) => {
-      if (!cat.items || !cat.id) return;
-      let needsUpdate = false;
-      const updatedItems = cat.items.map(item => {
-        const shouldBeFav = favoriteItemIds.includes(item.id);
-        if (shouldBeFav && !item.isFavorite) {
-          needsUpdate = true;
-          return { ...item, isFavorite: true, favorite: true };
-        }
-        return item;
-      });
-
-      if (needsUpdate) {
-        try {
-          await categoryService.updateCategory(cat.id, { items: updatedItems });
-        } catch (e) {
-          console.error("Sync of isFavorite variable to pos_categories failed", e);
-        }
-      }
-    });
-  }, [posCategories, favoriteItemIds]);
-
   const toggleFavorite = useCallback(async (e, item) => {
-    e.preventDefault();
     e.stopPropagation();
-    
-    const isCurrentlyFav = item.isFavorite === true || item.favorite === true || favoriteItemIds.includes(item.id);
-    const newStatus = !isCurrentlyFav;
-
-    // 1. Instant local update for snappy UI
-    let newFavs = [];
-    setFavoriteItemIds(prev => {
-      newFavs = newStatus
-        ? [...new Set([...prev, item.id])]
-        : prev.filter(id => id !== item.id);
-      localStorage.setItem('posFavorites', JSON.stringify(newFavs));
-      return newFavs;
-    });
-
-    // 2. Save directly in pos_categories DB with the variable `isFavorite` and `favorite`
-    const targetCat = posCategories.find(c => c.items && c.items.some(i => i.id === item.id));
-    if (targetCat && targetCat.id) {
-      try {
-        const updatedItems = (targetCat.items || []).map(i => {
-          if (i.id === item.id) {
-            return {
-              ...i,
-              isFavorite: newStatus,
-              favorite: newStatus
-            };
-          }
-          return i;
-        });
-
-        await categoryService.updateCategory(targetCat.id, {
-          items: updatedItems
-        });
-      } catch (err) {
-        console.error("Error saving isFavorite to pos_categories in DB:", err);
-      }
+    const itemId = item.id;
+    let updated;
+    if (favoriteItemIds.includes(itemId)) {
+      updated = favoriteItemIds.filter(id => id !== itemId);
+    } else {
+      updated = [...favoriteItemIds, itemId];
     }
+    setFavoriteItemIds(updated);
+    localStorage.setItem('posFavorites', JSON.stringify(updated));
 
-    // 3. Keep settings/pos_favorites in sync
     try {
-      await settingsService.saveSetting('pos_favorites', { items: newFavs });
+      await settingsService.setSetting('pos_favorites', { itemIds: updated });
     } catch (err) {
       console.error("Error saving POS favorites list to DB", err);
     }
-  }, [posCategories, favoriteItemIds]);
+  }, [favoriteItemIds]);
+
+  const allItems = useMemo(() => {
+    return posCategories.flatMap(c => c.items || []);
+  }, [posCategories]);
 
   const displayCategories = useMemo(() => {
-    const allItems = posCategories.flatMap(c => c.items || []);
     const favItems = allItems.filter(item => 
       item.isFavorite === true || item.favorite === true || favoriteItemIds.includes(item.id)
     );
@@ -216,12 +182,10 @@ export default function POS({
     };
 
     return [favCategory, ...posCategories];
-  }, [posCategories, favoriteItemIds]);
+  }, [posCategories, allItems, favoriteItemIds]);
 
   const [activeCategoryIndex, setActiveCategoryIndex] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [cashGiven, setCashGiven] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [discount, setDiscount] = useState('');
@@ -229,82 +193,9 @@ export default function POS({
   const [includePreviousArrears, setIncludePreviousArrears] = useState(true);
   const [keepChangeAsAdvance, setKeepChangeAsAdvance] = useState(false);
 
-  const isCurrentCustomerFavorite = useMemo(() => {
-    if (!customerName || !customerName.trim()) return false;
-    const trimmed = customerName.trim().toLowerCase();
-    const match = customersList?.find(c => c.name?.toLowerCase() === trimmed);
-    if (match && match.mostVisited !== undefined) return Boolean(match.mostVisited);
-    return favoriteCustomerNames.some(n => n?.toLowerCase() === trimmed);
-  }, [customerName, customersList, favoriteCustomerNames]);
-
-  const toggleCustomerFavorite = useCallback(async (custIdentifier) => {
-    const targetName = typeof custIdentifier === 'string' ? custIdentifier.trim() : custIdentifier?.name?.trim();
-    if (!targetName) {
-      notify.error("Please enter a customer name first.");
-      return;
-    }
-
-    try {
-      const existing = customersList?.find(c => c.name?.trim().toLowerCase() === targetName.toLowerCase());
-      const isCurrentlyFav = existing ? Boolean(existing.mostVisited) : favoriteCustomerNames.some(n => n?.toLowerCase() === targetName.toLowerCase());
-      const newFavStatus = !isCurrentlyFav;
-
-      let targetId = existing?.id;
-      if (!targetId) {
-        const custId = await customerService.findOrCreateCustomerByName(targetName, whatsappNumber || '');
-        if (custId) {
-          targetId = custId;
-          await customerService.updateCustomer(custId, { mostVisited: newFavStatus });
-        }
-      } else {
-        await customerService.updateCustomer(targetId, {
-          mostVisited: newFavStatus
-        });
-      }
-
-      setFavoriteCustomerNames(prev => {
-        let updated;
-        if (newFavStatus) {
-          updated = prev.some(n => n.toLowerCase() === targetName.toLowerCase()) ? prev : [...prev, targetName];
-        } else {
-          updated = prev.filter(n => n.toLowerCase() !== targetName.toLowerCase());
-        }
-        localStorage.setItem('favoriteCustomers', JSON.stringify(updated));
-        return updated;
-      });
-
-      const savedCustomers = localStorage.getItem('customersList');
-      if (savedCustomers) {
-        try {
-          let list = JSON.parse(savedCustomers);
-          const idx = list.findIndex(c => (targetId && c.id === targetId) || c.name?.toLowerCase() === targetName.toLowerCase());
-          if (idx !== -1) {
-            list[idx].mostVisited = newFavStatus;
-          } else {
-            list.push({ id: targetId, name: targetName, phone: whatsappNumber || '', area: '', mostVisited: newFavStatus });
-          }
-          localStorage.setItem('customersList', JSON.stringify(list));
-        } catch (e) {
-          console.error(e);
-        }
-      }
-
-      if (typeof fetchCustomersList === 'function') {
-        fetchCustomersList();
-      } else if (typeof refreshPOSData === 'function') {
-        refreshPOSData();
-      }
-
-      notify.success(newFavStatus ? `Added "${targetName}" to favorites!` : `Removed "${targetName}" from favorites.`);
-    } catch (err) {
-      console.error("Error toggling customer favorite:", err);
-      notify.error("Failed to update favorite customer.");
-    }
-  }, [customersList, favoriteCustomerNames, whatsappNumber, fetchCustomersList, refreshPOSData]);
-
   // Pending Orders State
   const [showSavePendingModal, setShowSavePendingModal] = useState(false);
-  const [activeRightTab, setActiveRightTab] = useState('Cart');
+  const [activeRightTab, setActiveRightTab] = useState('Order'); // 'Order' | 'Pending'
   const [pendingCustomerName, setPendingCustomerName] = useState('');
   const [pendingWhatsappNumber, setPendingWhatsappNumber] = useState('');
   const [pendingLoading, setPendingLoading] = useState(false);
@@ -313,42 +204,15 @@ export default function POS({
   const [reminderWhatsapp, setReminderWhatsapp] = useState('');
   const [showRecentSalesDropdown, setShowRecentSalesDropdown] = useState(false);
   const [showRecentDuesDropdown, setShowRecentDuesDropdown] = useState(false);
-
   const [saleToDelete, setSaleToDelete] = useState(null);
 
-  const confirmDeleteSale = async () => {
-    if (!saleToDelete) return;
-    try {
-      await salesService.deleteSale(saleToDelete);
-      if (refreshPOSData) refreshPOSData();
-      notify.success("Sale deleted successfully!");
-    } catch (err) {
-      console.error("Error deleting sale:", err);
-      notify.error("Failed to delete sale");
-    } finally {
-      setSaleToDelete(null);
-    }
-  };
+  // Match selected customer record
+  const selectedCustomerRecord = useMemo(() => {
+    if (!customerName || !customerName.trim()) return null;
+    return customersList.find(c => c.name?.toLowerCase() === customerName.trim().toLowerCase()) || null;
+  }, [customerName, customersList]);
 
-  const handleDeleteSale = (e, saleId) => {
-    e.stopPropagation();
-    setSaleToDelete(saleId);
-  };
-
-  const handleDeleteDue = async (e, dueId) => {
-    e.stopPropagation();
-    if (window.confirm("Are you sure you want to delete this arrears record? This action cannot be undone.")) {
-      try {
-        await duesService.deleteDue(dueId);
-        if (refreshPOSData) refreshPOSData();
-        notify.success("Record deleted successfully!");
-      } catch (err) {
-        console.error("Error deleting due record:", err);
-        notify.error("Failed to delete record");
-      }
-    }
-  };
-
+  // Arrears & Advance calculation
   const customerBalance = useMemo(() => {
     if (!customerName || customerName.trim() === '') return 0;
     const nameMatch = customerName.trim().toLowerCase();
@@ -365,32 +229,6 @@ export default function POS({
       }, 0);
   }, [customerName, customerDuesList]);
 
-  const customerBalances = useMemo(() => {
-    const acc = {};
-    customerDuesList.forEach(due => {
-      const name = due.name?.trim() || 'Unknown';
-      if (!acc[name]) acc[name] = 0;
-      if (due.type === 'Payment') acc[name] -= Number(due.amount || 0);
-      else if (due.status === 'Pending') acc[name] += Number(due.amount || 0);
-    });
-
-    const list = [];
-    Object.keys(acc).forEach(name => {
-      const bal = acc[name];
-      if (bal > 0.01) list.push({ name, type: 'Due', amount: bal });
-      else if (bal < -0.01) list.push({ name, type: 'Advance', amount: Math.abs(bal) });
-    });
-    
-    // Sort by Due highest first, then Advance highest first
-    list.sort((a, b) => {
-      if (a.type === 'Due' && b.type === 'Advance') return -1;
-      if (a.type === 'Advance' && b.type === 'Due') return 1;
-      return b.amount - a.amount;
-    });
-
-    return list;
-  }, [customerDuesList]);
-
   const currentCustomerArrears = Math.max(0, customerBalance);
   const currentCustomerAdvance = Math.max(0, -customerBalance);
 
@@ -398,8 +236,98 @@ export default function POS({
     return pendingOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0);
   }, [pendingOrders]);
 
+  // Filtered products for dropdown search
+  const searchedProducts = useMemo(() => {
+    if (!selectedProductSearch.trim()) return allItems.slice(0, 10);
+    const q = selectedProductSearch.toLowerCase();
+    return allItems.filter(item => item.name?.toLowerCase().includes(q)).slice(0, 15);
+  }, [allItems, selectedProductSearch]);
+
+  // Filtered items for Grid view
+  const activeCategory = displayCategories[activeCategoryIndex] || null;
+  const filteredItems = useMemo(() => {
+    return searchQuery.trim() !== ''
+      ? allItems.filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase()))
+      : (activeCategory ? activeCategory.items : []);
+  }, [allItems, activeCategory, searchQuery]);
+
+  // Reset order listener
+  useEffect(() => {
+    const handleReset = () => {
+      setCart([]);
+      setCustomerName('');
+      setCashGiven('');
+      setDiscount('');
+      setDeliveryCharge('');
+      setOrderNotes('');
+      setIsCredit(false);
+      notify.success('New sale order started!');
+    };
+    window.addEventListener('pos-reset-sale', handleReset);
+    return () => window.removeEventListener('pos-reset-sale', handleReset);
+  }, [setCart]);
+
+  const handlePrint = (customSaleData = null) => {
+    if (cart.length === 0 && !customSaleData) {
+      notify.error("Cart is empty");
+      return;
+    }
+    const sale = customSaleData || {
+      id: Math.random().toString(36).substring(2, 8).toUpperCase(),
+      timestamp: new Date(),
+      customerName: customerName || 'Valued Customer',
+      cartItems: cart,
+      amount: Math.max(0, cartTotal - Number(discount || 0)) + Number(deliveryCharge || 0),
+      description: 'POS Sale'
+    };
+
+    const printWindow = window.open('', '_blank');
+    const html = generateInvoiceHtml(sale);
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
+  };
+
+  const handleCompleteOrder = async () => {
+    if (cart.length === 0) {
+      notify.error("Please add products to the cart first.");
+      return;
+    }
+
+    const calculatedTotal = Math.max(0, cartTotal - Number(discount || 0)) + Number(deliveryCharge || 0);
+
+    const success = await handleCheckout(
+      customerName, 
+      discount, 
+      isCredit, 
+      cashGiven, 
+      includePreviousArrears ? currentCustomerArrears : 0, 
+      currentCustomerAdvance, 
+      keepChangeAsAdvance
+    );
+
+    if (success) {
+      // Auto print bill
+      handlePrint();
+
+      // Reset Form
+      setCashGiven('');
+      setCustomerName('');
+      setDiscount('');
+      setDeliveryCharge('');
+      setOrderNotes('');
+      setIsCredit(false);
+      setKeepChangeAsAdvance(false);
+      setIncludePreviousArrears(true);
+    }
+  };
+
   const handleSavePending = async () => {
-    let finalCustomerName = pendingCustomerName.trim();
+    let finalCustomerName = pendingCustomerName.trim() || customerName.trim();
     if (!finalCustomerName) {
       finalCustomerName = 'No Name Provided';
     }
@@ -408,7 +336,7 @@ export default function POS({
     try {
       await pendingOrderService.createPendingOrder({
         note: finalCustomerName,
-        phone: pendingWhatsappNumber || '',
+        phone: pendingWhatsappNumber || whatsappNumber || '',
         items: cart,
         totalAmount: cartTotal,
         discount: Number(discount) || 0
@@ -428,72 +356,6 @@ export default function POS({
     }
   };
 
-  const [isUpdatingCustomer, setIsUpdatingCustomer] = useState(false);
-
-  const handleOpenReminder = (order) => {
-    let customerPhone = order.phone || '';
-    if (!customerPhone && order.note) {
-      const customer = customersList.find(c => c.name.toLowerCase() === order.note.toLowerCase());
-      if (customer && customer.phone) {
-        customerPhone = customer.phone;
-      }
-    }
-
-    if (customerPhone) {
-      proceedSendReminder(order, customerPhone);
-    } else {
-      setReminderModalData({ order });
-      setReminderWhatsapp('');
-    }
-  };
-
-  const proceedSendReminder = (order, numberToUse) => {
-    const msg = `Hello *${order.note || 'Customer'}*,\nYour order from *DESH Digital Hub* is ready for collection!\n*Total Amount:* Rs ${(order.totalAmount || 0).toFixed(2)}\nThank you for choosing us!`;
-    const encodedMsg = encodeURIComponent(msg);
-    let number = numberToUse.trim().replace(/\D/g, '');
-    if (number.startsWith('0')) {
-      number = '94' + number.substring(1);
-    } else if (!number.startsWith('94')) {
-      number = '94' + number;
-    }
-
-    window.open(`https://wa.me/${number}?text=${encodedMsg}`, '_blank');
-  };
-
-  const handleSendReminder = async () => {
-    if (!reminderWhatsapp.trim()) {
-      notify.error("Please enter a WhatsApp number");
-      return;
-    }
-    const order = reminderModalData.order;
-    
-    setIsUpdatingCustomer(true);
-    try {
-      if (order.note && order.note !== 'No Name Provided') {
-        const custId = await customerService.findOrCreateCustomerByName(order.note, reminderWhatsapp.trim());
-        if (custId) {
-          await customerService.updateCustomer(custId, { phone: reminderWhatsapp.trim() });
-        }
-      }
-      
-      // Update the pending order itself so it doesn't ask again
-      if (order.id) {
-        await pendingOrderService.updatePendingOrder(order.id, {
-          phone: reminderWhatsapp.trim()
-        });
-      }
-      
-      proceedSendReminder(order, reminderWhatsapp);
-      setReminderModalData(null);
-      setReminderWhatsapp('');
-    } catch (err) {
-      console.error("Error updating customer phone:", err);
-      notify.error("Failed to update customer phone");
-    } finally {
-      setIsUpdatingCustomer(false);
-    }
-  };
-
   const handleResumePending = async (order) => {
     if (cart.length > 0) {
       if (!window.confirm("Current cart will be replaced. Continue?")) return;
@@ -503,7 +365,7 @@ export default function POS({
     if (order.phone) {
       setWhatsappNumber(order.phone);
     }
-    setActiveRightTab('Cart');
+    setActiveRightTab('Order');
     try {
       await pendingOrderService.deletePendingOrder(order.id);
       if (refreshPOSData) refreshPOSData();
@@ -512,8 +374,18 @@ export default function POS({
     }
   };
 
-  const handleDeletePending = (id) => {
-    setPendingToDelete(id);
+  const confirmDeleteSale = async () => {
+    if (!saleToDelete) return;
+    try {
+      await salesService.deleteSale(saleToDelete);
+      if (refreshPOSData) refreshPOSData();
+      notify.success("Sale deleted successfully!");
+    } catch (err) {
+      console.error(err);
+      notify.error("Failed to delete sale");
+    } finally {
+      setSaleToDelete(null);
+    }
   };
 
   const confirmDeletePending = async () => {
@@ -530,796 +402,571 @@ export default function POS({
     }
   };
 
-  const handlePrint = () => {
-    if (cart.length === 0) {
-      notify.error("Cart is empty");
-      return;
-    }
-    const sale = {
-      id: Math.random().toString(36).substring(2, 8).toUpperCase(),
-      timestamp: new Date(),
-      customerName: customerName,
-      cartItems: cart,
-      amount: cartTotal - Number(discount || 0),
-      description: 'POS Sale'
-    };
-
-    const printWindow = window.open('', '_blank');
-    const html = generateInvoiceHtml(sale);
-    printWindow.document.write(html);
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => {
-      printWindow.print();
-      printWindow.close();
-    }, 250);
-  };
-
-  const activeCategory = displayCategories[activeCategoryIndex] || null;
-
-  // Optimize filtering to not run on every cart update
-  const filteredItems = useMemo(() => {
-    return searchQuery.trim() !== ''
-      ? posCategories.flatMap(cat =>
-        (cat.items || []).filter(item =>
-          item.name.toLowerCase().includes(searchQuery.toLowerCase())
-        )
-      )
-      : (activeCategory ? activeCategory.items : []);
-  }, [posCategories, activeCategory, searchQuery]);
-
-  // Stable callbacks for child components
-  const handleAddToCart = useCallback((item) => {
-    addToCart(item);
-  }, [addToCart]);
-
-  const handleUpdateCartItem = useCallback((id, field, value) => {
-    updateCartItem(id, field, value);
-  }, [updateCartItem]);
-
-  const handleRemoveFromCart = useCallback((id) => {
-    removeFromCart(id);
-  }, [removeFromCart]);
+  // Calculations for Summary
+  const rawSubTotal = cartTotal;
+  const discountVal = Number(discount || 0);
+  const deliveryVal = Number(deliveryCharge || 0);
+  const finalPayable = Math.max(0, rawSubTotal - discountVal) + deliveryVal + (includePreviousArrears ? currentCustomerArrears : 0) - currentCustomerAdvance;
+  const cashVal = cashGiven === '' ? 0 : Number(cashGiven);
+  const cashDiff = cashVal - Math.max(0, finalPayable);
 
   return (
-    <div className="flex flex-col lg:flex-row h-[calc(100vh-64px)] bg-slate-950">
+    <div className="space-y-5 animate-in fade-in duration-300">
+      
+      {/* Top Header Row matching Reference Layout */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-800">
+        <div>
+          <h1 className="text-2xl font-black text-slate-100 flex items-center gap-2.5">
+            <span>Add New Sale</span>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 font-bold uppercase tracking-wider">
+              POS Terminal
+            </span>
+          </h1>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Select customer, add products or services, and generate sales invoices.
+          </p>
+        </div>
 
-      {/* Left Area (Search + Items + Categories) */}
-      <div className="flex-1 flex flex-col relative overflow-hidden bg-slate-950">
+        {/* View Switcher & Quick Stats */}
+        <div className="flex items-center gap-3 self-start sm:self-auto flex-wrap">
+          {/* Today's Sales Pill */}
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-xs">
+            <TrendingUp className="w-4 h-4 text-emerald-400" />
+            <span className="text-slate-400">Today:</span>
+            <span className="font-bold text-emerald-400">Rs {(todaySalesSum || 0).toFixed(0)}</span>
+          </div>
 
-        <div className="z-10 relative flex flex-col h-full px-6 pt-2 pb-6">
-
-          {/* Top Bar: Search and Refresh */}
-          <div className="flex mb-12 gap-3 items-center">
-            <div className={`flex relative transition-all duration-300 h-10 ${isSearchExpanded ? 'w-full max-w-[320px]' : 'w-10'}`}>
-              {!isSearchExpanded ? (
-                <button
-                  onClick={() => setIsSearchExpanded(true)}
-                  className="absolute left-0 top-0 w-10 h-10 flex items-center justify-center text-slate-400 hover:text-emerald-400 z-20 rounded-full bg-slate-900 border border-slate-800 shadow-none transition-colors"
-                >
-                  <Search className="w-[18px] h-[18px]" />
-                </button>
-              ) : (
-                <div className="relative w-full flex items-center">
-                  <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 w-[18px] h-[18px] text-emerald-500 z-10" />
-                  <input
-                    type="text"
-                    placeholder="Search items or services..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    autoFocus
-                    className="pl-11 pr-10 h-10 bg-slate-900 border border-slate-800 focus-visible:ring-emerald-500/40 rounded-full text-sm w-full text-slate-200 placeholder:text-slate-500 transition-colors focus:outline-none shadow-inner"
-                  />
-                  {searchQuery && (
-                    <button onClick={() => setSearchQuery('')} className="absolute right-12 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-200 z-10 p-1 bg-slate-800/80 rounded-full hover:bg-slate-700 transition-colors">
-                      <Minus className="w-3 h-3 rotate-45" />
-                    </button>
-                  )}
-                  <button
-                    onClick={() => {
-                      setIsSearchExpanded(false);
-                      setSearchQuery('');
-                    }}
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2 text-slate-500 hover:text-red-400 p-2 hover:bg-red-500/10 rounded-full transition-colors"
-                    title="Close Search"
-                  >
-                    <X className="w-[18px] h-[18px] rotate-45" />
-                  </button>
-                </div>
-              )}
-            </div>
-
+          {/* Table / Grid Mode Toggle */}
+          <div className="flex bg-slate-900 border border-slate-800 p-1 rounded-xl">
             <button
-              onClick={() => {
-                if (refreshPOSData) refreshPOSData();
-                setCart([]);
-                setSearchQuery('');
-                setActiveCategoryIndex(0);
-                setCustomerName('');
-                setCashGiven('');
-                setShowPaymentModal(false);
-                setIsSearchExpanded(false);
-                notify.success("POS Items Refreshed!");
-              }}
-              onDoubleClick={() => {
-                if ('caches' in window) {
-                  caches.keys().then(names => {
-                    for (let name of names) caches.delete(name);
-                  });
-                }
-                window.location.reload();
-              }}
-              className="w-10 h-10 flex shrink-0 items-center justify-center text-slate-400 hover:text-emerald-400 rounded-full bg-slate-900 border border-slate-800 shadow-none transition-colors"
-              title="Refresh Items (Double click for Hard Reset)"
+              onClick={() => setViewMode('table')}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                viewMode === 'table' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm' : 'text-slate-400 hover:text-slate-200'
+              }`}
             >
-              <RefreshCw className="w-[18px] h-[18px]" />
+              <TableIcon className="w-3.5 h-3.5" />
+              <span>Table</span>
             </button>
-
-            {/* Today's Sales, Pending Dues, and Pending Orders */}
-            {!isSearchExpanded && (
-              <div className="hidden lg:flex items-center px-4 h-10 bg-slate-900 border border-slate-800 rounded-full shadow-inner relative">
-                <div 
-                  className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" 
-                  title={`Today's Sales (Yesterday: Rs ${yesterdaySalesSum.toFixed(2)})`}
-                  onClick={() => setShowRecentSalesDropdown(!showRecentSalesDropdown)}
-                >
-                  {todaySalesSum < yesterdaySalesSum ? (
-                    <TrendingDown className="w-[16px] h-[16px] text-red-500" />
-                  ) : (
-                    <TrendingUp className="w-[16px] h-[16px] text-emerald-500" />
-                  )}
-                  <span className={`text-sm font-black tracking-wide ${todaySalesSum < yesterdaySalesSum ? 'text-red-500' : 'text-emerald-400'}`}>
-                    Rs {(todaySalesSum || 0).toFixed(2)}
-                  </span>
-                </div>
-
-                {/* Recent Sales Dropdown */}
-                {showRecentSalesDropdown && (
-                  <div className="absolute top-12 left-0 w-80 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col">
-                    <div className="p-3 bg-slate-800 border-b border-slate-700 flex justify-between items-center">
-                      <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">Recent Sales (Today)</span>
-                      <button onClick={() => setShowRecentSalesDropdown(false)} className="text-slate-400 hover:text-red-400">
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                    <div className="max-h-64 overflow-y-auto no-scrollbar p-2">
-                      {salesHistory
-                        .filter(sale => {
-                          const today = new Date();
-                          let d = new Date();
-                          if (typeof sale.timestamp?.toDate === 'function') d = sale.timestamp.toDate();
-                          else if (sale.timestamp?.seconds) d = new Date(sale.timestamp.seconds * 1000);
-                          return d.toDateString() === today.toDateString();
-                        })
-                        .slice(0, 5)
-                        .map((sale, idx) => (
-                          <div key={idx} className="flex justify-between items-center py-2 px-3 hover:bg-slate-800/50 rounded-lg transition-colors border-b border-slate-800/50 last:border-0">
-                            <div className="flex items-center gap-2 truncate pr-2">
-                              <span className="text-[11px] font-medium text-slate-300 truncate">{sale.customerName || 'No Name Provided'}</span>
-                              <span className="text-[9px] text-slate-500 bg-slate-950 px-1.5 py-0.5 rounded-md shrink-0">{sale.cartItems?.length || 0} items</span>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <span className="text-[11px] font-black text-emerald-400">Rs {Number(sale.amount || 0).toFixed(0)}</span>
-                              <button
-                                onClick={(e) => handleDeleteSale(e, sale.id)}
-                                className="text-slate-500 hover:text-red-400 p-1 rounded hover:bg-red-500/10 transition-colors"
-                                title="Delete Sale"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                      ))}
-                      {salesHistory.filter(sale => {
-                        const today = new Date();
-                        let d = new Date();
-                        if (typeof sale.timestamp?.toDate === 'function') d = sale.timestamp.toDate();
-                        else if (sale.timestamp?.seconds) d = new Date(sale.timestamp.seconds * 1000);
-                        return d.toDateString() === today.toDateString();
-                      }).length === 0 && (
-                        <div className="p-4 text-center text-xs text-slate-500">No sales recorded today yet.</div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {pendingOrders.length > 0 && (
-                  <>
-                    <div className="w-px h-4 bg-slate-700 mx-3"></div>
-                    <div 
-                      className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" 
-                      title={`${pendingOrders.length} Pending Orders`}
-                      onClick={() => setShowPendingOrdersModal(true)}
-                    >
-                      <Package className="w-[16px] h-[16px] text-amber-400" />
-                      <span className="text-sm font-black text-amber-400 tracking-wide">Rs {pendingOrdersSum.toFixed(2)}</span>
-                    </div>
-                  </>
-                )}
-
-                <div className="w-px h-4 bg-slate-700 mx-3"></div>
-
-                <div 
-                  className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" 
-                  title="Pending Dues"
-                  onClick={() => setShowRecentDuesDropdown(!showRecentDuesDropdown)}
-                >
-                  <Clock className="w-[16px] h-[16px] text-rose-400" />
-                  <span className="text-sm font-black text-rose-400 tracking-wide">Rs {(totalPendingDues || 0).toFixed(2)}</span>
-                </div>
-
-                {/* Recent Dues Dropdown */}
-                {showRecentDuesDropdown && (
-                  <div className="absolute top-12 right-0 w-80 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col">
-                    <div className="p-3 bg-slate-800 border-b border-slate-700 flex justify-between items-center">
-                      <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">Customer Balances</span>
-                      <button onClick={() => setShowRecentDuesDropdown(false)} className="text-slate-400 hover:text-red-400">
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                    <div className="max-h-64 overflow-y-auto no-scrollbar p-2">
-                      {customerBalances.map((item, idx) => (
-                          <div key={idx} className="flex justify-between items-center py-2 px-3 hover:bg-slate-800/50 rounded-lg transition-colors border-b border-slate-800/50 last:border-0">
-                            <span className="text-[11px] font-medium text-slate-300 truncate flex-1 pr-2">{item.name}</span>
-                            <span className={`text-[11px] font-black shrink-0 ${item.type === 'Due' ? 'text-rose-400' : 'text-emerald-400'}`}>
-                              {item.type === 'Advance' ? 'Adv: ' : ''}Rs {item.amount.toFixed(0)}
-                            </span>
-                          </div>
-                      ))}
-                      {customerBalances.length === 0 && (
-                        <div className="p-4 text-center text-xs text-slate-500">No active dues or advances.</div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Custom Item Button */}
             <button
-              onClick={() => handleAddToCart({
-                id: 'custom-' + Date.now(),
-                name: 'Custom Service',
-                price: 0, // Triggers the manual price input field in the cart
-                qty: 1
-              })}
-              className="flex items-center gap-2 px-4 h-10 shrink-0 text-slate-200 hover:text-emerald-400 rounded-full bg-slate-900 border border-slate-800 hover:border-emerald-500/40 transition-all ml-auto group"
-              title="Add Custom Item"
+              onClick={() => setViewMode('grid')}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                viewMode === 'grid' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm' : 'text-slate-400 hover:text-slate-200'
+              }`}
             >
-              <Plus className="w-[18px] h-[18px] text-emerald-500 group-hover:scale-110 transition-transform" />
-              <span className="text-sm font-bold hidden sm:inline">Custom Service</span>
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>Grid Tiles</span>
             </button>
           </div>
 
-          {/* Middle Area: Items Grid (Background Icon Removed for Performance) */}
-          <POSItemsGrid
-            filteredItems={filteredItems}
-            handleAddToCart={handleAddToCart}
-            favoriteItemIds={favoriteItemIds}
-            toggleFavorite={toggleFavorite}
-            activeCategory={activeCategory}
-            searchQuery={searchQuery}
-          />
-
-          {/* Bottom Area: Category Tabs */}
-          <div className="relative group/slider mt-2 flex items-center">
+          {/* Pending Orders Button */}
+          {pendingOrders.length > 0 && (
             <button
-              onClick={() => scrollCategories('left')}
-              className="absolute left-0 -ml-3 z-20 w-8 h-8 bg-slate-800/80 backdrop-blur border border-slate-700 rounded-full flex items-center justify-center text-slate-300 opacity-0 group-hover/slider:opacity-100 transition-all duration-300 hover:bg-slate-700 hover:text-white shadow-xl hover:scale-110"
+              onClick={() => setShowPendingOrdersModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold transition-all cursor-pointer"
             >
-              <ChevronLeft className="w-5 h-5" />
+              <Package className="w-3.5 h-3.5" />
+              <span>Pending ({pendingOrders.length})</span>
             </button>
+          )}
 
-            <div
-              ref={categoryScrollRef}
-              className="flex overflow-x-auto gap-3 pb-2 snap-x snap-mandatory no-scrollbar flex-1 w-full scroll-smooth"
-              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-            >
-              {displayCategories.map((cat, idx) => (
-                <CategoryTab
-                  key={idx}
-                  cat={cat}
-                  isActive={activeCategoryIndex === idx}
-                  onClick={() => {
-                    setActiveCategoryIndex(idx);
-                    setSearchQuery('');
-                  }}
-                />
-              ))}
-            </div>
-
-            <button
-              onClick={() => scrollCategories('right')}
-              className="absolute right-0 -mr-3 z-20 w-8 h-8 bg-slate-800/80 backdrop-blur border border-slate-700 rounded-full flex items-center justify-center text-slate-300 opacity-0 group-hover/slider:opacity-100 transition-all duration-300 hover:bg-slate-700 hover:text-white shadow-xl hover:scale-110"
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
-          </div>
+          {/* Custom Item Button */}
+          <button
+            onClick={() => addToCart({
+              id: 'custom-' + Date.now(),
+              name: 'Custom Service / Item',
+              price: 0,
+              qty: 1
+            })}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Custom Item</span>
+          </button>
         </div>
       </div>
 
-      {/* Right Panel */}
-      <div className="w-full lg:w-[420px] bg-slate-950 border-l border-slate-800 p-6 flex flex-col shrink-0 z-20">
-
-        {/* Tabs */}
-        <div className="flex bg-slate-900 border border-slate-800 rounded-xl p-1 mb-6">
-          <button
-            onClick={() => setActiveRightTab('Cart')}
-            className={`flex-1 py-2 rounded-lg text-sm font-bold uppercase tracking-widest transition-all ${activeRightTab === 'Cart' ? 'bg-slate-800 text-emerald-400 shadow' : 'text-slate-500 hover:text-slate-300'}`}
-          >
-            Cart ({cart.length})
-          </button>
-          <button
-            onClick={() => setActiveRightTab('Pending')}
-            className={`flex-1 py-2 rounded-lg text-sm font-bold uppercase tracking-widest transition-all flex justify-center items-center gap-2 ${activeRightTab === 'Pending' ? 'bg-slate-800 text-orange-400 shadow' : 'text-slate-500 hover:text-slate-300'}`}
-          >
-            Pending
-            {pendingOrders.length > 0 && (
-              <span className="bg-orange-500 text-slate-900 px-1.5 py-0.5 rounded-full text-[10px]">{pendingOrders.length}</span>
-            )}
-          </button>
-        </div>
-
-        {activeRightTab === 'Cart' ? (
-          <>
-            <div className="flex justify-between items-center mb-4 border-b border-slate-800 pb-4">
-              <h2 className="text-sm font-extrabold text-slate-100 uppercase tracking-wide flex items-center gap-3">
-                Current Order
-              </h2>
-              {cart.length > 0 && (
-                <button
-                  onClick={() => setCart([])}
-                  className="h-7 flex items-center justify-center rounded-lg text-[10px] uppercase tracking-wider font-bold px-2 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white border border-red-900/30 transition-colors"
-                >
-                  <Trash2 className="w-3 h-3 mr-1" /> Clear
-                </button>
-              )}
-            </div>
-
-            <div className="flex text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 px-2">
-              <div className="flex-1">Name</div>
-              <div className="w-16 text-center">Qty</div>
-              <div className="w-20 text-right">Price</div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto space-y-2 no-scrollbar" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-              {cart.length === 0 ? (
-                <div className="text-slate-500 text-center mt-10 text-sm">Cart is empty</div>
-              ) : (
-                cart.map(item => (
-                  <CartItem
-                    key={item.id}
-                    item={item}
-                    updateCartItem={handleUpdateCartItem}
-                    removeFromCart={handleRemoveFromCart}
+      {/* Main 2-Column Split Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        {/* ======================================================== */}
+        {/* LEFT COLUMN: 68% Width (Customer + Products + Notes)     */}
+        {/* ======================================================== */}
+        <div className="lg:col-span-8 space-y-6">
+          
+          {/* CARD 1: Customer Details */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+            
+            {/* Customer Search & New Button */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2 flex-1 max-w-md">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-300 shrink-0">
+                  Customer Name <span className="text-red-400">*</span>
+                </label>
+                <div className="flex-1">
+                  <CustomerInput
+                    customerName={customerName}
+                    setCustomerName={setCustomerName}
+                    customersList={customersList}
+                    whatsappNumber={whatsappNumber}
+                    setWhatsappNumber={setWhatsappNumber}
+                    isCredit={isCredit}
+                    favoriteCustomers={favoriteCustomerNames}
                   />
-                ))
-              )}
-            </div>
-
-            <div className="pt-4 border-t border-slate-800/80 mt-4 flex flex-col gap-4">
-              <div className="flex justify-between items-center text-lg px-1">
-                <span className="text-slate-300 font-bold uppercase tracking-wider text-sm">Total</span>
-                <span className="text-2xl font-black text-emerald-400">Rs {cartTotal.toFixed(2)}</span>
+                </div>
               </div>
 
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowSavePendingModal(true)}
-                  disabled={cart.length === 0}
-                  className="flex-1 bg-slate-800 hover:bg-slate-700 shadow-md hover:shadow-lg text-slate-200 border border-slate-700 font-extrabold py-3 disabled:opacity-50 transition-all rounded-xl flex items-center justify-center text-xs uppercase tracking-wide gap-2"
-                >
-                  <Save className="w-4 h-4" /> Pending
-                </button>
-                <button
-                  onClick={() => {
-                    setKeepChangeAsAdvance(false);
-                    setShowPaymentModal(true);
-                  }}
-                  disabled={cart.length === 0}
-                  className="flex-[2] bg-emerald-500 hover:bg-emerald-400 shadow-md hover:shadow-lg text-slate-950 font-extrabold py-3 disabled:opacity-50 transition-all rounded-xl flex items-center justify-center text-sm uppercase tracking-wide"
-                >
-                  Checkout
-                </button>
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="flex-1 flex flex-col min-h-0">
-            <div className="overflow-y-auto flex-1 space-y-3 custom-scrollbar pr-1">
-              {pendingOrders.length === 0 ? (
-                <div className="text-center text-slate-500 py-10 text-sm font-bold uppercase tracking-widest">No pending orders</div>
-              ) : (
-                pendingOrders.map(order => (
-                  <div key={order.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex flex-col gap-3 group hover:border-slate-700 transition-colors">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h4 className="text-sm font-bold text-slate-200">{order.note}</h4>
-                        <p className="text-[11px] text-slate-500 font-medium">
-                          {order.items?.length || 0} items • {order.createdAt ? parseTimestamp(order.createdAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Just now'}
-                        </p>
-                      </div>
-                      <p className="text-sm font-black text-emerald-400">Rs {(order.totalAmount || 0).toFixed(2)}</p>
-                    </div>
-                    <div className="flex items-center gap-2 mt-2">
-                      <button
-                        onClick={() => handleOpenReminder(order)}
-                        className="p-2 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white transition-colors border border-blue-500/20"
-                        title="Send WhatsApp Reminder"
-                      >
-                        <MessageCircle className="w-[18px] h-[18px]" />
-                      </button>
-                      <div className="flex-1"></div>
-                      <button
-                        onClick={() => handleResumePending(order)}
-                        className="px-4 py-2 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white transition-colors border border-emerald-500/20 text-xs font-bold"
-                      >
-                        Resume
-                      </button>
-                      <button
-                        onClick={() => handleDeletePending(order.id)}
-                        className="px-3 py-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition-colors border border-red-500/20 text-xs font-bold"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Checkout Modal */}
-      {showPaymentModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/95">
-          <div className="bg-slate-900 border border-slate-700/50 rounded-3xl w-full max-w-5xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-950/80 shrink-0">
-              <h2 className="text-2xl font-black text-slate-100 uppercase tracking-widest flex items-center gap-3">
-                <ShoppingCart className="w-6 h-6 text-emerald-500" />
-                Complete Sale
-              </h2>
               <button
+                type="button"
                 onClick={() => {
-                  setKeepChangeAsAdvance(false);
-                  setShowPaymentModal(false);
+                  const newName = prompt("Enter New Customer Name:");
+                  if (newName && newName.trim()) {
+                    setCustomerName(newName.trim());
+                    notify.success(`Selected customer: ${newName.trim()}`);
+                  }
                 }}
-                className="text-slate-400 hover:text-red-400 transition-colors p-2 bg-slate-800/50 hover:bg-slate-800 rounded-full"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 hover:border-cyan-500/40 text-cyan-400 hover:text-cyan-300 text-xs font-bold transition-all shrink-0 cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>+ Add New Customer</span>
               </button>
             </div>
 
-            <div className="flex flex-col lg:flex-row h-full overflow-y-auto no-scrollbar" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            {/* Quick Profile Information Box matching screenshot */}
+            <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-4 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+              <div>
+                <span className="text-slate-500 font-bold uppercase tracking-wider text-[10px] block">Reference ID:</span>
+                <span className="text-slate-300 font-mono font-medium mt-0.5 block truncate">
+                  {selectedCustomerRecord?.id ? `CUST-${selectedCustomerRecord.id.substring(0, 6).toUpperCase()}` : '-'}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-500 font-bold uppercase tracking-wider text-[10px] block">Email:</span>
+                <span className="text-slate-300 font-medium mt-0.5 block truncate">
+                  {selectedCustomerRecord?.email || '-'}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-500 font-bold uppercase tracking-wider text-[10px] block">Contact No. 1:</span>
+                <span className="text-slate-300 font-mono font-medium mt-0.5 block truncate">
+                  {selectedCustomerRecord?.phone || whatsappNumber || '-'}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-500 font-bold uppercase tracking-wider text-[10px] block">Contact No. 2 (WhatsApp):</span>
+                <span className="text-slate-300 font-mono font-medium mt-0.5 block truncate">
+                  {whatsappNumber || '-'}
+                </span>
+              </div>
+              <div className="col-span-2 sm:col-span-4 pt-1 border-t border-slate-800/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Customer Address:</span>
+                  <span className="text-slate-300 font-medium">
+                    {selectedCustomerRecord?.area || selectedCustomerRecord?.address || '-'}
+                  </span>
+                </div>
 
-              {/* Left Column: Customer & Details */}
-              <div className="flex-1 p-6 lg:p-8 flex flex-col gap-6 lg:border-r border-slate-800/80">
-
-                {/* Top Customers Quick Add */}
-                {topCustomers.length > 0 && (
-                  <div className="flex flex-col gap-3">
-                    <span className="text-sm uppercase tracking-wider font-bold text-slate-500 flex items-center gap-2">
-                      <Star className="w-4 h-4 text-yellow-500 fill-yellow-500/20" /> Quick Select (Favorites)
-                    </span>
-                    <div className="flex flex-wrap gap-2">
-                      {topCustomers.map((name, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => {
-                            setCustomerName(name);
-                            const matchedCustomer = customersList?.find(c => c.name === name);
-                            if (matchedCustomer && matchedCustomer.phone && !whatsappNumber) {
-                              setWhatsappNumber(matchedCustomer.phone);
-                            }
-                          }}
-                          className={`text-sm font-bold px-4 py-2 rounded-xl border transition-all truncate max-w-[200px] shadow-sm ${
-                            customerName === name 
-                              ? 'bg-yellow-500/20 border-yellow-500 text-yellow-300' 
-                              : 'bg-slate-950 border-slate-800 text-slate-300 hover:text-yellow-400 hover:border-yellow-500/50 hover:bg-yellow-500/10'
-                          }`}
-                          title={name}
-                        >
-                          {name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Customer Details */}
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm uppercase tracking-wider font-bold text-slate-500">Customer Details</span>
-                    {customerName.trim() && (
-                      <button
-                        type="button"
-                        onClick={() => toggleCustomerFavorite(customerName.trim())}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
-                          isCurrentCustomerFavorite
-                            ? 'bg-yellow-500/10 border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/20 shadow-[0_0_12px_rgba(234,179,8,0.2)]'
-                            : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:text-yellow-400 hover:border-yellow-500/40'
-                        }`}
-                        title={isCurrentCustomerFavorite ? "Remove from Favorites" : "Add to Favorites"}
-                      >
-                        <Star className={`w-3.5 h-3.5 ${isCurrentCustomerFavorite ? 'fill-yellow-400 text-yellow-400' : 'text-slate-400'}`} />
-                        <span>{isCurrentCustomerFavorite ? 'Favorited' : 'Add to Favorites'}</span>
-                      </button>
-                    )}
-                  </div>
-                  <div className="flex gap-4">
-                    <CustomerInput
-                      customerName={customerName}
-                      setCustomerName={setCustomerName}
-                      customersList={customersList}
-                      whatsappNumber={whatsappNumber}
-                      setWhatsappNumber={setWhatsappNumber}
-                      isCredit={isCredit}
-                      favoriteCustomers={favoriteCustomerNames}
-                      onToggleFavorite={toggleCustomerFavorite}
-                    />
-                    <div className="w-36 relative">
-                      <input
-                        type="number"
-                        placeholder="Discount"
-                        value={discount}
-                        onChange={(e) => setDiscount(e.target.value)}
-                        className="w-full text-base bg-slate-950 border border-slate-800 text-slate-200 rounded-xl px-5 py-4 focus:outline-none focus:border-emerald-500/50 transition-all text-right shadow-inner"
-                      />
-                    </div>
-                  </div>
+                {/* Arrears / Advance status pills */}
+                <div className="flex items-center gap-2">
                   {currentCustomerArrears > 0 && (
-                    <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex justify-between items-center mt-2 shadow-inner">
-                      <span className="text-sm font-bold text-red-400 uppercase tracking-wider">Previous Arrears:</span>
-                      <span className="text-xl font-black text-red-400 flex items-baseline gap-1"><span className="text-xs font-bold opacity-75">Rs</span>{currentCustomerArrears.toFixed(2)}</span>
-                    </div>
+                    <span className="text-[11px] font-bold text-red-400 bg-red-500/10 border border-red-500/30 px-2 py-0.5 rounded-md">
+                      Due Arrears: Rs {currentCustomerArrears.toFixed(2)}
+                    </span>
                   )}
                   {currentCustomerAdvance > 0 && (
-                    <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 flex justify-between items-center mt-2 shadow-inner">
-                      <span className="text-sm font-bold text-emerald-400 uppercase tracking-wider">Available Advance:</span>
-                      <span className="text-xl font-black text-emerald-400 flex items-baseline gap-1"><span className="text-xs font-bold opacity-75">Rs</span>{currentCustomerAdvance.toFixed(2)}</span>
-                    </div>
+                    <span className="text-[11px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-md">
+                      Advance: Rs {currentCustomerAdvance.toFixed(2)}
+                    </span>
                   )}
                 </div>
+              </div>
+            </div>
 
-                {/* Credit Toggle */}
-                <div className="flex flex-col gap-4 px-2 py-2">
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setIsCredit(!isCredit)}
-                      className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none ${isCredit ? 'bg-emerald-500' : 'bg-slate-700'}`}
-                    >
-                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isCredit ? 'translate-x-6' : 'translate-x-1'}`} />
-                    </button>
-                    <label className="text-base font-semibold text-slate-300 cursor-pointer select-none" onClick={() => setIsCredit(!isCredit)}>
-                      Save as Credit Sale (Add to Due/Advance Customer)
-                    </label>
-                  </div>
+          </div>
 
-                  {currentCustomerArrears > 0 && (
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setIncludePreviousArrears(!includePreviousArrears)}
-                        className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none ${includePreviousArrears ? 'bg-blue-500' : 'bg-slate-700'}`}
-                      >
-                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${includePreviousArrears ? 'translate-x-6' : 'translate-x-1'}`} />
-                      </button>
-                      <label className="text-base font-semibold text-slate-300 cursor-pointer select-none" onClick={() => setIncludePreviousArrears(!includePreviousArrears)}>
-                        Add previous arrears to this bill? (Rs {currentCustomerArrears.toFixed(2)})
-                      </label>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex-1"></div> {/* Spacer */}
-
+          {/* CARD 2: Product Details & Items Table */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+            
+            {/* Product Details Header & Dropdown Selection */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Package className="w-5 h-5 text-cyan-400" />
+                <h2 className="text-base font-bold text-slate-100">Product Details</h2>
               </div>
 
-              {/* Right Column: Payment & Summary */}
-              <div className="w-full lg:w-[420px] bg-slate-950/40 p-6 lg:p-8 flex flex-col gap-6 shrink-0">
-
-                {/* Cash & Balance */}
-                <div className="flex flex-col gap-5 bg-slate-900/80 p-6 rounded-2xl border border-slate-800/80 shadow-inner">
-                  {(() => {
-                    const payableAmount = Math.max(0, Math.max(0, cartTotal - Number(discount || 0)) - currentCustomerAdvance) + (includePreviousArrears ? currentCustomerArrears : 0);
-                    const formattedPayable = payableAmount % 1 === 0 ? payableAmount.toString() : payableAmount.toFixed(2);
-
-                    return (
-                      <div className="relative">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm text-slate-400 uppercase tracking-wider font-bold">Cash Given</span>
-                          <button
-                            type="button"
-                            onClick={() => setCashGiven(formattedPayable)}
-                            className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-slate-950 border border-emerald-500/30 rounded-lg text-xs font-black tracking-wider uppercase transition-all duration-200 active:scale-95 flex items-center gap-1 shadow-sm"
-                            title={`Fill exact payable amount (Rs ${payableAmount.toFixed(2)})`}
-                          >
-                            <span>Exact (Rs {payableAmount.toFixed(2)})</span>
-                          </button>
-                        </div>
-                        <div className="relative">
-                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500 font-black text-xl">Rs</span>
-                          <input
-                            type="number"
-                            placeholder="0.00"
-                            value={cashGiven}
-                            onChange={(e) => setCashGiven(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Tab' && cashGiven === '') {
-                                setCashGiven(formattedPayable);
-                              }
-                            }}
-                            className="w-full text-2xl bg-slate-950 border border-slate-700 text-emerald-400 font-black rounded-xl pl-14 pr-24 py-4 focus:outline-none focus:border-emerald-500/50 transition-all shadow-inner"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setCashGiven(formattedPayable)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-emerald-500/15 hover:bg-emerald-500 text-emerald-400 hover:text-slate-950 border border-emerald-500/40 hover:border-emerald-500 rounded-lg text-xs font-black tracking-wider uppercase transition-all duration-200 active:scale-95 shadow-sm"
-                            title={`Fill exact amount (Rs ${payableAmount.toFixed(2)})`}
-                          >
-                            Exact
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  <div className="h-px bg-slate-800 w-full"></div>
-
-                  <div className="text-right">
-                    {(() => {
-                      // Apply advance automatically to the bill if they have it
-                      let billAfterAdvance = Math.max(0, cartTotal - Number(discount || 0)) - currentCustomerAdvance;
-                      billAfterAdvance = Math.max(0, billAfterAdvance); // Bill can't be negative
-
-                      const finalTotal = billAfterAdvance + (includePreviousArrears ? currentCustomerArrears : 0);
-                      const cash = cashGiven === '' ? 0 : Number(cashGiven);
-                      const diff = cash - finalTotal;
-
-                      let colorClass = 'text-red-400';
-                      let label = 'Amount Due';
-                      let displayDiff = '0.00';
-                      let showKeepAdvanceCheckbox = false;
-                      let checkboxAmount = 0;
-
-                      if (cashGiven === '') {
-                        if (currentCustomerAdvance > 0 && (currentCustomerAdvance - Math.max(0, cartTotal - Number(discount || 0))) > 0) {
-                          const remainingAdvance = currentCustomerAdvance - Math.max(0, cartTotal - Number(discount || 0));
-                          colorClass = 'text-blue-400';
-                          label = 'Change Due (Give Back / Keep)';
-                          displayDiff = remainingAdvance.toFixed(2);
-                          showKeepAdvanceCheckbox = true;
-                          checkboxAmount = remainingAdvance;
-                        } else {
-                          colorClass = 'text-slate-300';
-                          label = 'Pending Amount';
-                          displayDiff = finalTotal.toFixed(2);
-                        }
-                      } else {
-                        if (diff === 0) {
-                          colorClass = 'text-emerald-400';
-                          label = 'No Change';
-                          displayDiff = '0.00';
-                        } else if (diff > 0) {
-                          colorClass = 'text-blue-400';
-                          label = 'Change Due (Give Back)';
-                          displayDiff = diff.toFixed(2);
-                          showKeepAdvanceCheckbox = true;
-                          checkboxAmount = diff;
-                        } else {
-                          colorClass = 'text-red-400';
-                          label = 'Short Amount (Need More)';
-                          displayDiff = Math.abs(diff).toFixed(2);
-                        }
-                      }
-
-                      return (
-                        <>
-                          <span className="text-sm text-slate-400 uppercase tracking-wider block mb-1 font-bold">{label}</span>
-                          <span className={`text-4xl font-black ${colorClass} flex items-baseline justify-end gap-1.5`}>
-                            <span className="text-xl font-bold opacity-75">Rs</span>
-                            {displayDiff}
-                          </span>
-
-                          {showKeepAdvanceCheckbox && customerName.trim() !== '' && (
-                            <div className="mt-4 flex items-center justify-end gap-3 px-2 py-1">
-                              <input
-                                type="checkbox"
-                                id="keepChangeAsAdvance"
-                                checked={keepChangeAsAdvance}
-                                onChange={(e) => setKeepChangeAsAdvance(e.target.checked)}
-                                className="w-4 h-4 rounded border-slate-700 text-blue-500 focus:ring-blue-500/50 bg-slate-950 cursor-pointer"
-                              />
-                              <label htmlFor="keepChangeAsAdvance" className="text-sm font-semibold text-slate-300 cursor-pointer select-none">
-                                Keep Change (Rs {checkboxAmount.toFixed(2)}) as Advance
-                              </label>
-                            </div>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </div>
+              {/* Autocomplete / Select Product Dropdown */}
+              <div className="relative w-full sm:w-72">
+                <div className="relative">
+                  <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
+                  <input
+                    type="text"
+                    placeholder="Select or Search Product..."
+                    value={selectedProductSearch}
+                    onChange={(e) => {
+                      setSelectedProductSearch(e.target.value);
+                      setIsProductDropdownOpen(true);
+                    }}
+                    onFocus={() => setIsProductDropdownOpen(true)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-8 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500/50"
+                  />
+                  <ChevronDown className="absolute right-3 top-2.5 w-4 h-4 text-slate-500 pointer-events-none" />
                 </div>
 
-                <div className="flex-1"></div>
-
-                {/* Total & Submit */}
-                <div className="flex flex-col gap-4">
-                  <div className="flex justify-between items-end pt-2 pb-2">
-                    <span className="text-sm text-slate-400 font-extrabold uppercase tracking-widest mb-1">Final Total</span>
-                    <span className="text-4xl font-black text-emerald-400 drop-shadow-sm flex items-baseline gap-2">
-                      <span className="text-xl font-bold opacity-75">Rs</span>
-                      {(Math.max(0, cartTotal - Number(discount || 0)) + (includePreviousArrears ? currentCustomerArrears : 0)).toFixed(2)}
-                    </span>
-                  </div>
-
-                  {(() => {
-                    const finalTotalForButton = Math.max(0, Math.max(0, cartTotal - Number(discount || 0)) - currentCustomerAdvance) + (includePreviousArrears ? currentCustomerArrears : 0);
-                    const cashValForButton = cashGiven === '' ? 0 : Number(cashGiven);
-                    const isShortForButton = cashGiven !== '' && cashValForButton < finalTotalForButton;
-                    const isExplicitlyZero = cashGiven !== '' && Number(cashGiven) === 0;
-                    const isCashEmpty = cashGiven === '';
-                    const needsPayment = finalTotalForButton > 0;
-                    
-                    const isButtonDisabled = cart.length === 0 || 
-                                             checkoutLoading || 
-                                             (!isCredit && (isExplicitlyZero || isCashEmpty) && needsPayment) || 
-                                             (!customerName.trim() && (isCredit || isShortForButton));
-                    
-                    let buttonBgClass = 'bg-emerald-500 hover:bg-emerald-400';
-                    let buttonText = 'Confirm Order & Pay';
-
-                    if (checkoutLoading) {
-                      buttonText = 'Processing...';
-                    } else if (isCredit) {
-                      buttonBgClass = 'bg-red-500 hover:bg-red-400';
-                      buttonText = 'Confirm Credit Sale';
-                    } else if (isShortForButton) {
-                      buttonBgClass = 'bg-orange-500 hover:bg-orange-400';
-                      buttonText = 'Confirm Partial & Add to Due';
-                    }
-
-                    return (
+                {/* Dropdown Options */}
+                {isProductDropdownOpen && (
+                  <div className="absolute left-0 right-0 top-11 bg-slate-950 border border-slate-700 rounded-xl shadow-2xl max-h-60 overflow-y-auto z-40 p-1">
+                    {searchedProducts.map((p) => (
                       <button
-                        onClick={async () => {
-                          const success = await handleCheckout(customerName, discount, isCredit, cashGiven, includePreviousArrears ? currentCustomerArrears : 0, currentCustomerAdvance, keepChangeAsAdvance);
-                          if (success) {
-                            setShowPaymentModal(false);
-                            setCashGiven('');
-                            setCustomerName('');
-                            setDiscount('');
-                            setIsCredit(false);
-                            setKeepChangeAsAdvance(false);
-                            setIncludePreviousArrears(true);
-                          }
+                        key={p.id}
+                        type="button"
+                        onClick={() => {
+                          addToCart(p);
+                          setSelectedProductSearch('');
+                          setIsProductDropdownOpen(false);
+                          notify.success(`Added ${p.name} to cart`);
                         }}
-                        disabled={isButtonDisabled}
-                        className={`w-full mt-2 ${buttonBgClass} shadow-md hover:shadow-lg text-slate-950 font-black py-5 disabled:opacity-50 transition-all rounded-2xl flex items-center justify-center text-xl uppercase tracking-wide`}
+                        className="w-full px-3 py-2 text-left hover:bg-slate-800 rounded-lg flex items-center justify-between text-xs text-slate-200 transition-colors cursor-pointer"
                       >
-                        {buttonText}
+                        <span className="font-semibold truncate">{p.name}</span>
+                        <span className="font-mono text-cyan-400 font-bold ml-2 shrink-0">
+                          Rs {p.price ? p.price.toFixed(2) : 'Custom'}
+                        </span>
                       </button>
-                    );
-                  })()}
+                    ))}
+                    {searchedProducts.length === 0 && (
+                      <div className="p-3 text-center text-xs text-slate-500">No matching products found.</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* View Mode: TABLE MODE (Matches Reference Screenshot) */}
+            {viewMode === 'table' ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-800 text-slate-400 uppercase tracking-wider font-bold text-[11px]">
+                      <th className="py-3 px-3">Product Name</th>
+                      <th className="py-3 px-3 text-center w-28">Quantity</th>
+                      <th className="py-3 px-3 text-right w-32">Selling Price</th>
+                      <th className="py-3 px-3 text-right w-32">Sub Total</th>
+                      <th className="py-3 px-3 text-center w-12"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cart.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-16 text-center text-slate-500 text-sm font-semibold italic bg-slate-950/30 rounded-xl">
+                          Please, Select the Product
+                        </td>
+                      </tr>
+                    ) : (
+                      cart.map((item) => {
+                        const itemSub = (Number(item.price) || 0) * (Number(item.qty) || 1);
+                        return (
+                          <tr key={item.id} className="border-b border-slate-800/60 hover:bg-slate-950/40 transition-colors">
+                            <td className="py-3 px-3">
+                              <span className="font-bold text-slate-200 text-sm block">{item.name}</span>
+                              {item.category && (
+                                <span className="text-[10px] text-slate-500 uppercase">{item.category}</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-3">
+                              <div className="flex items-center justify-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => updateCartItem(item.id, 'qty', Math.max(1, (Number(item.qty) || 1) - 1))}
+                                  className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold flex items-center justify-center cursor-pointer"
+                                >
+                                  -
+                                </button>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={item.qty}
+                                  onChange={(e) => updateCartItem(item.id, 'qty', Math.max(1, parseInt(e.target.value) || 1))}
+                                  className="w-12 text-center bg-slate-950 border border-slate-800 rounded py-1 text-xs text-slate-200 font-bold focus:outline-none focus:border-cyan-500"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => updateCartItem(item.id, 'qty', (Number(item.qty) || 1) + 1)}
+                                  className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold flex items-center justify-center cursor-pointer"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </td>
+                            <td className="py-3 px-3 text-right">
+                              <input
+                                type="number"
+                                min="0"
+                                value={item.price}
+                                onChange={(e) => updateCartItem(item.id, 'price', parseFloat(e.target.value) || 0)}
+                                className="w-24 text-right bg-slate-950 border border-slate-800 rounded py-1 px-2 text-xs text-slate-200 font-mono font-bold focus:outline-none focus:border-cyan-500"
+                              />
+                            </td>
+                            <td className="py-3 px-3 text-right font-mono font-bold text-sm text-cyan-400">
+                              Rs {itemSub.toFixed(2)}
+                            </td>
+                            <td className="py-3 px-3 text-center">
+                              <button
+                                type="button"
+                                onClick={() => removeFromCart(item.id)}
+                                className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
+                                title="Remove item"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              /* GRID MODE (Visual Tiles) */
+              <div className="space-y-4">
+                <POSItemsGrid
+                  filteredItems={filteredItems}
+                  handleAddToCart={addToCart}
+                  favoriteItemIds={favoriteItemIds}
+                  toggleFavorite={toggleFavorite}
+                  activeCategory={activeCategory}
+                  searchQuery={searchQuery}
+                />
+                
+                {/* Category Slider */}
+                <div className="flex overflow-x-auto gap-2 pb-2 no-scrollbar">
+                  {displayCategories.map((cat, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setActiveCategoryIndex(idx)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors cursor-pointer ${
+                        activeCategoryIndex === idx ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-slate-950 text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      {cat.category}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+          </div>
+
+          {/* CARD 3: Custom Fields & Notes matching reference */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3">
+            <h3 className="font-bold text-slate-200 text-sm">Custom Fields & Order Remarks</h3>
+            <textarea
+              rows={2}
+              placeholder="Add optional notes, repair job reference, or delivery instructions here..."
+              value={orderNotes}
+              onChange={(e) => setOrderNotes(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 resize-none"
+            />
+          </div>
+
+        </div>
+
+        {/* ======================================================== */}
+        {/* RIGHT COLUMN: 32% Width (Sticky Order Details & Billing) */}
+        {/* ======================================================== */}
+        <div className="lg:col-span-4 space-y-5 lg:sticky lg:top-20">
+          
+          {/* Order Details Meta Card */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+            <div className="flex items-center gap-2 pb-3 border-b border-slate-800">
+              <ShoppingCart className="w-5 h-5 text-cyan-400" />
+              <h3 className="font-bold text-slate-100 text-base">Order Details</h3>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              {/* Order Date */}
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 font-medium">Order Date:</span>
+                <span className="text-slate-200 font-mono font-semibold">
+                  {new Date().toLocaleDateString('en-GB')} at {new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+
+              {/* Source Dropdown */}
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-slate-400 font-medium shrink-0">Source:</span>
+                <select
+                  value={orderSource}
+                  onChange={(e) => setOrderSource(e.target.value)}
+                  className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-slate-200 focus:outline-none focus:border-cyan-500 text-xs"
+                >
+                  <option value="Walk-in Shop">Walk-in Shop</option>
+                  <option value="WhatsApp">WhatsApp</option>
+                  <option value="Facebook">Facebook</option>
+                  <option value="DESH Edu Hub">DESH Edu Hub</option>
+                  <option value="Phone Call">Phone Call</option>
+                </select>
+              </div>
+
+              {/* Assignee */}
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-slate-400 font-medium shrink-0">Assignee:</span>
+                <span className="text-slate-200 font-semibold">{assignee}</span>
+              </div>
+
+              {/* Business Location */}
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-slate-400 font-medium shrink-0">Business Location:</span>
+                <span className="text-slate-200 font-semibold">{businessLocation}</span>
+              </div>
+
+              {/* Payment Type */}
+              <div className="pt-2 border-t border-slate-800">
+                <label className="text-slate-400 font-medium block mb-1.5">Payment Method:</label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setIsCredit(false)}
+                    className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      !isCredit ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-slate-950 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Cash / Direct
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsCredit(true)}
+                    className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      isCredit ? 'bg-red-500/20 text-red-300 border border-red-500/40' : 'bg-slate-950 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Credit (ණයට)
+                  </button>
                 </div>
               </div>
             </div>
           </div>
+
+          {/* Calculations Card */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3.5 text-xs">
+            <div className="flex items-center justify-between text-slate-300">
+              <span>Sub Total:</span>
+              <span className="font-mono font-bold text-sm">Rs {rawSubTotal.toFixed(2)}</span>
+            </div>
+
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-slate-400">Discount (Rs):</span>
+              <input
+                type="number"
+                min="0"
+                placeholder="0.00"
+                value={discount}
+                onChange={(e) => setDiscount(e.target.value)}
+                className="w-24 text-right bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-slate-200 font-mono text-xs focus:outline-none focus:border-cyan-500"
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-slate-400">Delivery Charge:</span>
+              <input
+                type="number"
+                min="0"
+                placeholder="0.00"
+                value={deliveryCharge}
+                onChange={(e) => setDeliveryCharge(e.target.value)}
+                className="w-24 text-right bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-slate-200 font-mono text-xs focus:outline-none focus:border-cyan-500"
+              />
+            </div>
+
+            {/* If Cash: Cash Given & Balance Change */}
+            {!isCredit && (
+              <div className="pt-2 border-t border-slate-800 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-slate-300 font-bold">Cash Given:</span>
+                    <button
+                      type="button"
+                      onClick={() => setCashGiven(finalPayable.toFixed(2))}
+                      className="text-[10px] text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/30 hover:bg-cyan-500/20"
+                    >
+                      Exact
+                    </button>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="0.00"
+                    value={cashGiven}
+                    onChange={(e) => setCashGiven(e.target.value)}
+                    className="w-28 text-right bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-emerald-400 font-mono font-bold text-sm focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                {cashGiven !== '' && (
+                  <div className="flex items-center justify-between text-xs pt-1">
+                    <span className="text-slate-400 font-semibold">
+                      {cashDiff >= 0 ? 'Change Due:' : 'Short Amount:'}
+                    </span>
+                    <span className={`font-mono font-black ${cashDiff >= 0 ? 'text-blue-400' : 'text-red-400'}`}>
+                      Rs {Math.abs(cashDiff).toFixed(2)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Big Prominent Total Payable Banner (Matches Reference Screenshot) */}
+          <div className="bg-gradient-to-r from-blue-900/90 via-slate-900 to-cyan-900/90 border border-cyan-500/30 rounded-2xl p-5 shadow-2xl flex items-center justify-between">
+            <div>
+              <span className="text-[11px] font-black uppercase tracking-widest text-cyan-300 block">
+                Total Payable
+              </span>
+              <span className="text-xs text-slate-400 font-medium">Net Bill Amount</span>
+            </div>
+            <div className="text-right">
+              <span className="text-2xl sm:text-3xl font-black text-white font-mono drop-shadow">
+                Rs {finalPayable.toFixed(2)}
+              </span>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="space-y-2.5">
+            <button
+              type="button"
+              onClick={handleCompleteOrder}
+              disabled={cart.length === 0 || checkoutLoading}
+              className="w-full py-4 rounded-xl font-black text-base bg-gradient-to-r from-cyan-500 via-blue-600 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 shadow-[0_0_20px_rgba(6,182,212,0.4)] disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Printer className="w-5 h-5" />
+              <span>{checkoutLoading ? 'Processing...' : (isCredit ? 'Confirm Credit Sale & Bill' : 'Complete Sale & Print Bill')}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowSavePendingModal(true)}
+              disabled={cart.length === 0}
+              className="w-full py-2.5 rounded-xl font-bold text-xs bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40"
+            >
+              <Save className="w-3.5 h-3.5" />
+              <span>Save as Pending Order</span>
+            </button>
+          </div>
+
         </div>
-      )}
-      {/* Save Pending Modal */}
+
+      </div>
+
+      {/* Modals */}
       <SavePendingModal
         isOpen={showSavePendingModal}
         onClose={() => setShowSavePendingModal(false)}
-        pendingCustomerName={pendingCustomerName}
+        pendingCustomerName={pendingCustomerName || customerName}
         setPendingCustomerName={setPendingCustomerName}
         customersList={customersList}
-        pendingWhatsappNumber={pendingWhatsappNumber}
+        pendingWhatsappNumber={pendingWhatsappNumber || whatsappNumber}
         setPendingWhatsappNumber={setPendingWhatsappNumber}
         favoriteCustomerNames={favoriteCustomerNames}
-        toggleCustomerFavorite={toggleCustomerFavorite}
         handleSavePending={handleSavePending}
         pendingLoading={pendingLoading}
       />
@@ -1337,18 +984,18 @@ export default function POS({
         onClose={() => setSaleToDelete(null)}
         onConfirm={confirmDeleteSale}
         title="Delete Sale?"
-        message="Are you sure you want to delete this sale? This action cannot be undone and will affect today's sales sum."
+        message="Are you sure you want to delete this sale? This action cannot be undone."
       />
 
-      {/* WhatsApp Reminder Modal */}
       <POSReminderModal
         data={reminderModalData}
         onClose={() => setReminderModalData(null)}
         reminderWhatsapp={reminderWhatsapp}
         setReminderWhatsapp={setReminderWhatsapp}
-        handleSendReminder={handleSendReminder}
-        isUpdatingCustomer={isUpdatingCustomer}
+        handleSendReminder={() => {}}
+        isUpdatingCustomer={false}
       />
+
     </div>
   );
 }

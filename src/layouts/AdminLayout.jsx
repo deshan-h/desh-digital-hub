@@ -1,5 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, ShoppingCart, History, LogOut, Menu, Wrench, UserCog, User, ChevronDown, Users, Wallet, RefreshCw, Tags, Contact, Settings, TrendingUp, Clock, ChevronRight, ChevronLeft, BarChart3, Calculator } from 'lucide-react';
+import { 
+  LayoutDashboard, 
+  ShoppingCart, 
+  History, 
+  LogOut, 
+  Wrench, 
+  UserCog, 
+  User, 
+  Users, 
+  Wallet, 
+  RefreshCw, 
+  Tags, 
+  Settings, 
+  ChevronRight, 
+  ChevronLeft, 
+  BarChart3, 
+  Calculator,
+  Bell,
+  HelpCircle,
+  ExternalLink,
+  Plus
+} from 'lucide-react';
 import CalculatorDropdown from '../components/common/CalculatorDropdown';
 
 export default function AdminLayout({ 
@@ -48,178 +69,190 @@ export default function AdminLayout({
     window.location.reload(true);
   };
 
+  // Nav Items definition matching Enterprise ERP style
+  const navItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, color: 'text-blue-400', activeBg: 'bg-blue-500/15 text-blue-400 border-blue-500/40' },
+    { id: 'pos', label: 'Orders / POS', icon: ShoppingCart, color: 'text-cyan-400', activeBg: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/40' },
+    { id: 'repairs', label: 'Repairs', icon: Wrench, color: 'text-orange-400', activeBg: 'bg-orange-500/15 text-orange-400 border-orange-500/40' },
+    { id: 'customers', label: 'Customers', icon: Users, color: 'text-purple-400', activeBg: 'bg-purple-500/15 text-purple-400 border-purple-500/40' },
+    { id: 'expenses', label: 'Expenses', icon: Wallet, color: 'text-rose-400', activeBg: 'bg-rose-500/15 text-rose-400 border-rose-500/40' },
+    ...(isAdmin ? [{ id: 'items', label: 'Products', icon: Tags, color: 'text-amber-400', activeBg: 'bg-amber-500/15 text-amber-400 border-amber-500/40' }] : []),
+    { id: 'history', label: 'Sales History', icon: History, color: 'text-emerald-400', activeBg: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40' },
+    { id: 'reports', label: 'Reports', icon: BarChart3, color: 'text-teal-400', activeBg: 'bg-teal-500/15 text-teal-400 border-teal-500/40' },
+    { id: 'settings', label: 'Settings', icon: Settings, color: 'text-slate-300', activeBg: 'bg-slate-500/15 text-slate-300 border-slate-500/40' },
+  ];
+
+  // Breadcrumbs text helper
+  const getBreadcrumbs = () => {
+    switch (activeTab) {
+      case 'pos': return { section: 'Sales Order Management', page: 'Point of Sale (POS) / Add New Sale' };
+      case 'dashboard': return { section: 'Executive Overview', page: 'Main Dashboard' };
+      case 'repairs': return { section: 'Technical Services', page: 'PC & Hardware Repair Management' };
+      case 'customers': return { section: 'CRM & Client Records', page: 'Customer Directory' };
+      case 'expenses': return { section: 'Accounting & Finance', page: 'Shop Expenses' };
+      case 'items': return { section: 'Inventory Management', page: 'Products, Stock & Pricing' };
+      case 'history': return { section: 'Sales Invoices', page: 'Sales History & Receipts' };
+      case 'reports': return { section: 'Analytics & Insights', page: 'Performance Reports' };
+      case 'settings': return { section: 'System Configuration', page: 'Wallpaper Banners & Settings' };
+      default: return { section: 'DESH Management', page: 'Administration' };
+    }
+  };
+
+  const breadcrumb = getBreadcrumbs();
+
   return (
-    <div className="flex h-screen bg-slate-900 overflow-hidden text-slate-200 selection:bg-emerald-500/30 selection:text-white print:hidden">
+    <div className="flex h-screen bg-slate-950 overflow-hidden text-slate-200 selection:bg-cyan-500/30 selection:text-white print:hidden">
 
-      {/* Sidebar */}
-      <div className={`${isSidebarOpen ? 'w-48' : 'w-[56px]'} bg-slate-950/40 backdrop-blur-3xl border-r border-white/5 flex flex-col justify-between shrink-0 transition-all duration-300 z-40 shadow-2xl relative hidden sm:flex`}>
-        <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent opacity-50 pointer-events-none"></div>
-        <div className="relative z-10">
-          
-          {/* Toggle Button */}
-          <div className="h-[52px] flex items-center justify-center mt-4 border-b border-white/5 pb-4">
-            <button
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-1.5 rounded-lg bg-slate-800/50 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
-            >
-              {isSidebarOpen ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
-            </button>
-          </div>
-
-          <nav className="p-2 space-y-2 mt-2">
-              <button
-                onClick={() => setActiveTab('dashboard')}
-                className={`group relative w-full flex items-center ${isSidebarOpen ? 'justify-start px-3' : 'justify-center'} py-2.5 rounded-xl transition-all duration-300 ${activeTab === 'dashboard' ? 'bg-blue-500/15 text-blue-400 shadow-[inset_3px_0_0_0_#3b82f6] ring-1 ring-blue-500/20' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}
-              >
-                <LayoutDashboard className="w-5 h-5 shrink-0 text-blue-400" />
-                {isSidebarOpen && <span className="ml-3 font-semibold text-sm whitespace-nowrap">Dashboard</span>}
-                {!isSidebarOpen && (
-                  <div className="absolute left-16 hidden group-hover:block bg-slate-900/95 backdrop-blur-xl text-slate-100 text-xs font-semibold px-4 py-2 rounded-lg border border-white/10 whitespace-nowrap z-50 shadow-[0_8px_30px_rgb(0,0,0,0.3)]">
-                    Dashboard
-                  </div>
-                )}
-              </button>
-
-              <button
-                onClick={() => setActiveTab('pos')}
-                className={`group relative w-full flex items-center ${isSidebarOpen ? 'justify-start px-3' : 'justify-center'} py-2.5 rounded-xl transition-all duration-300 ${activeTab === 'pos' ? 'bg-cyan-500/15 text-cyan-400 shadow-[inset_3px_0_0_0_#06b6d4] ring-1 ring-cyan-500/20' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}
-              >
-                <ShoppingCart className="w-5 h-5 shrink-0 text-cyan-400" />
-                {isSidebarOpen && <span className="ml-3 font-semibold text-sm whitespace-nowrap">Point of Sale</span>}
-                {!isSidebarOpen && (
-                  <div className="absolute left-16 hidden group-hover:block bg-slate-900/95 backdrop-blur-xl text-slate-100 text-xs font-semibold px-4 py-2 rounded-lg border border-white/10 whitespace-nowrap z-50 shadow-[0_8px_30px_rgb(0,0,0,0.3)]">
-                    Point of Sale
-                  </div>
-                )}
-              </button>
-
-            <button
-              onClick={() => setActiveTab('repairs')}
-              className={`group relative w-full flex items-center ${isSidebarOpen ? 'justify-start px-3' : 'justify-center'} py-2.5 rounded-xl transition-all duration-300 ${activeTab === 'repairs' ? 'bg-orange-500/15 text-orange-400 shadow-[inset_3px_0_0_0_#f97316] ring-1 ring-orange-500/20' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}
-            >
-              <Wrench className="w-5 h-5 shrink-0 text-orange-400" />
-              {isSidebarOpen && <span className="ml-3 font-semibold text-sm whitespace-nowrap">PC Repairs</span>}
-              {!isSidebarOpen && (
-                <div className="absolute left-16 hidden group-hover:block bg-slate-900/95 backdrop-blur-xl text-slate-100 text-xs font-semibold px-4 py-2 rounded-lg border border-white/10 whitespace-nowrap z-50 shadow-[0_8px_30px_rgb(0,0,0,0.3)]">
-                  PC Repairs
+      {/* Slim Icon-First ERP Vertical Sidebar */}
+      <aside 
+        className={`${
+          isSidebarOpen ? 'w-52' : 'w-[72px]'
+        } bg-slate-950 border-r border-slate-800/80 flex flex-col justify-between shrink-0 transition-all duration-300 z-40 shadow-2xl relative hidden sm:flex`}
+      >
+        <div className="flex flex-col h-full">
+          {/* Sidebar Top: Collapse/Expand Header */}
+          <div className="h-14 flex items-center justify-between px-3 border-b border-slate-800/80">
+            {isSidebarOpen ? (
+              <div className="flex items-center gap-2 overflow-hidden">
+                <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 font-black text-sm">
+                  DH
                 </div>
-              )}
-            </button>
-
-            <button
-              onClick={() => setActiveTab('customers')}
-              className={`group relative w-full flex items-center ${isSidebarOpen ? 'justify-start px-3' : 'justify-center'} py-2.5 rounded-xl transition-all duration-300 ${activeTab === 'customers' ? 'bg-purple-500/15 text-purple-400 shadow-[inset_3px_0_0_0_#a855f7] ring-1 ring-purple-500/20' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}
-            >
-              <Users className="w-5 h-5 shrink-0 text-purple-400" />
-              {isSidebarOpen && <span className="ml-3 font-semibold text-sm whitespace-nowrap">Customers</span>}
-              {!isSidebarOpen && (
-                <div className="absolute left-16 hidden group-hover:block bg-slate-900/95 backdrop-blur-xl text-slate-100 text-xs font-semibold px-4 py-2 rounded-lg border border-white/10 whitespace-nowrap z-50 shadow-[0_8px_30px_rgb(0,0,0,0.3)]">
-                  Customers
+                <span className="font-extrabold text-xs tracking-wider text-slate-200 uppercase truncate">
+                  DESH Hub
+                </span>
+              </div>
+            ) : (
+              <div className="w-full flex justify-center">
+                <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 font-black text-sm">
+                  DH
                 </div>
-              )}
-            </button>
-
-
-
-            <button
-              onClick={() => setActiveTab('expenses')}
-              className={`group relative w-full flex items-center ${isSidebarOpen ? 'justify-start px-3' : 'justify-center'} py-2.5 rounded-xl transition-all duration-300 ${activeTab === 'expenses' ? 'bg-rose-500/15 text-rose-400 shadow-[inset_3px_0_0_0_#f43f5e] ring-1 ring-rose-500/20' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}
-            >
-              <Wallet className="w-5 h-5 shrink-0 text-rose-400" />
-              {isSidebarOpen && <span className="ml-3 font-semibold text-sm whitespace-nowrap">Shop Expenses</span>}
-              {!isSidebarOpen && (
-                <div className="absolute left-16 hidden group-hover:block bg-slate-900/95 backdrop-blur-xl text-slate-100 text-xs font-semibold px-4 py-2 rounded-lg border border-white/10 whitespace-nowrap z-50 shadow-[0_8px_30px_rgb(0,0,0,0.3)]">
-                  Shop Expenses
-                </div>
-              )}
-            </button>
-
-            {isAdmin && (
-              <button
-                onClick={() => setActiveTab('items')}
-                className={`group relative w-full flex items-center ${isSidebarOpen ? 'justify-start px-3' : 'justify-center'} py-2.5 rounded-xl transition-all duration-300 ${activeTab === 'items' ? 'bg-amber-500/15 text-amber-400 shadow-[inset_3px_0_0_0_#f59e0b] ring-1 ring-amber-500/20' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}
-              >
-                <Tags className="w-5 h-5 shrink-0 text-amber-400" />
-                {isSidebarOpen && <span className="ml-3 font-semibold text-sm whitespace-nowrap">Items & Prices</span>}
-                {!isSidebarOpen && (
-                  <div className="absolute left-16 hidden group-hover:block bg-slate-900/95 backdrop-blur-xl text-slate-100 text-xs font-semibold px-4 py-2 rounded-lg border border-white/10 whitespace-nowrap z-50 shadow-[0_8px_30px_rgb(0,0,0,0.3)]">
-                    Items & Prices
-                  </div>
-                )}
-              </button>
+              </div>
             )}
 
             <button
-              onClick={() => setActiveTab('history')}
-              className={`group relative w-full flex items-center ${isSidebarOpen ? 'justify-start px-3' : 'justify-center'} py-2.5 rounded-xl transition-all duration-300 ${activeTab === 'history' ? 'bg-emerald-500/15 text-emerald-400 shadow-[inset_3px_0_0_0_#10b981] ring-1 ring-emerald-500/20' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white transition-colors border border-slate-800 cursor-pointer"
+              title={isSidebarOpen ? "Collapse Sidebar" : "Expand Sidebar"}
             >
-              <History className="w-5 h-5 shrink-0 text-emerald-400" />
-              {isSidebarOpen && <span className="ml-3 font-semibold text-sm whitespace-nowrap">Sales History</span>}
-              {!isSidebarOpen && (
-                <div className="absolute left-16 hidden group-hover:block bg-slate-900/95 backdrop-blur-xl text-slate-100 text-xs font-semibold px-4 py-2 rounded-lg border border-white/10 whitespace-nowrap z-50 shadow-[0_8px_30px_rgb(0,0,0,0.3)]">
-                  Sales History
-                </div>
-              )}
+              {isSidebarOpen ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
             </button>
-
-            <button
-              onClick={() => setActiveTab('reports')}
-              className={`group relative w-full flex items-center ${isSidebarOpen ? 'justify-start px-3' : 'justify-center'} py-2.5 rounded-xl transition-all duration-300 ${activeTab === 'reports' ? 'bg-teal-500/15 text-teal-400 shadow-[inset_3px_0_0_0_#14b8a6] ring-1 ring-teal-500/20' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}
-            >
-              <BarChart3 className="w-5 h-5 shrink-0 text-teal-400" />
-              {isSidebarOpen && <span className="ml-3 font-semibold text-sm whitespace-nowrap">Reports</span>}
-              {!isSidebarOpen && (
-                <div className="absolute left-16 hidden group-hover:block bg-slate-900/95 backdrop-blur-xl text-slate-100 text-xs font-semibold px-4 py-2 rounded-lg border border-white/10 whitespace-nowrap z-50 shadow-[0_8px_30px_rgb(0,0,0,0.3)]">
-                  Reports
-                </div>
-              )}
-            </button>
-            
-            <button
-              onClick={() => setActiveTab('settings')}
-              className={`group relative w-full flex items-center ${isSidebarOpen ? 'justify-start px-3' : 'justify-center'} py-2.5 rounded-xl transition-all duration-300 ${activeTab === 'settings' ? 'bg-slate-500/15 text-slate-300 shadow-[inset_3px_0_0_0_#94a3b8] ring-1 ring-slate-500/20' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}
-            >
-              <Settings className="w-5 h-5 shrink-0 text-slate-300" />
-              {isSidebarOpen && <span className="ml-3 font-semibold text-sm whitespace-nowrap">Settings</span>}
-              {!isSidebarOpen && (
-                <div className="absolute left-16 hidden group-hover:block bg-slate-900/95 backdrop-blur-xl text-slate-100 text-xs font-semibold px-4 py-2 rounded-lg border border-white/10 whitespace-nowrap z-50 shadow-[0_8px_30px_rgb(0,0,0,0.3)]">
-                  Settings
-                </div>
-              )}
-            </button>
-          </nav>
-        </div>
-      </div>
-
-      {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto bg-slate-950 relative flex flex-col">
-        {/* Top Header */}
-        <div className="h-[52px] mx-4 mt-4 rounded-xl flex items-center justify-between px-5 bg-gradient-to-r from-slate-900/70 via-slate-950/70 to-slate-900/70 backdrop-blur-2xl sticky top-4 z-30 border border-white/5 border-t-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)] gap-3">
-          
-          <div className="flex items-center gap-4 flex-1">
-            {/* Sales and Pending badges moved to POS Search row */}
           </div>
 
-          <h1 className="hidden sm:flex items-center absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 text-lg font-extrabold tracking-tight gap-2.5 hover:scale-105 transition-transform duration-500 cursor-pointer">
-            <div className="relative">
-              <div className="absolute inset-0 bg-cyan-500/20 blur-xl rounded-full"></div>
-              <img src="/pwa-192x192.png" alt="DESH Digital Hub Logo" className="w-7 h-7 object-contain drop-shadow-lg relative z-10" />
-            </div>
-            <span className="bg-gradient-to-r from-slate-100 via-white to-slate-400 bg-clip-text text-transparent drop-shadow-sm">DESH Digital Hub</span>
-          </h1>
+          {/* Navigation Items (Stacked Icon + Micro-label) */}
+          <nav className="flex-1 py-3 px-2 space-y-1.5 overflow-y-auto no-scrollbar">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
 
-          <div className="flex items-center justify-end gap-3 flex-1">
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={`group relative w-full flex rounded-xl transition-all duration-200 cursor-pointer ${
+                    isSidebarOpen 
+                      ? 'items-center px-3 py-2.5 gap-3' 
+                      : 'flex-col items-center justify-center py-2 px-1 gap-1 text-center'
+                  } ${
+                    isActive 
+                      ? `${item.activeBg} border shadow-sm font-bold` 
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-transparent'
+                  }`}
+                >
+                  <Icon className={`w-5 h-5 shrink-0 ${isActive ? item.color : 'text-slate-400 group-hover:text-slate-200'}`} />
+                  
+                  {isSidebarOpen ? (
+                    <span className="text-xs font-semibold whitespace-nowrap truncate">{item.label}</span>
+                  ) : (
+                    <span className="text-[10px] font-medium leading-tight tracking-tight text-slate-400 group-hover:text-slate-200 line-clamp-1 w-full truncate">
+                      {item.label.split('/')[0]}
+                    </span>
+                  )}
+
+                  {/* Tooltip on hover when collapsed */}
+                  {!isSidebarOpen && (
+                    <div className="absolute left-16 hidden group-hover:block bg-slate-900 text-slate-100 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-700 whitespace-nowrap z-50 shadow-xl pointer-events-none">
+                      {item.label}
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* Sidebar Footer: Version & Support */}
+          <div className="p-2.5 border-t border-slate-800/80 bg-slate-950/60">
+            {isSidebarOpen ? (
+              <div className="flex items-center justify-between text-[11px] text-slate-500 px-1">
+                <span className="font-mono">v1.25.1</span>
+                <span className="text-emerald-500 font-bold flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Online
+                </span>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-1 text-[9px] text-slate-500">
+                <span className="font-mono">v1.25</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              </div>
+            )}
+          </div>
+        </div>
+      </aside>
+
+      {/* Main Workspace Area */}
+      <div className="flex-1 overflow-y-auto bg-slate-950 flex flex-col min-w-0">
+        
+        {/* Top ERP Breadcrumb & Utility Header */}
+        <header className="h-14 px-4 sm:px-6 bg-slate-950/90 backdrop-blur-xl border-b border-slate-800/80 sticky top-0 z-30 flex items-center justify-between gap-4">
+          
+          {/* Left: Breadcrumbs & Page Subtitle */}
+          <div className="flex items-center gap-2 min-w-0">
+            {/* Mobile menu toggle */}
+            <button
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="sm:hidden p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-white"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+
+            <div className="flex flex-col">
+              <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-medium truncate">
+                <span className="text-cyan-400 hover:underline cursor-pointer" onClick={() => setActiveTab('dashboard')}>
+                  {breadcrumb.section}
+                </span>
+                <span className="text-slate-600">&gt;</span>
+                <span className="text-slate-300 font-semibold truncate">{breadcrumb.page}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Actions, Calculator, Refresh, Profile */}
+          <div className="flex items-center justify-end gap-2.5 shrink-0">
+            
+            {/* Quick Action Button for POS */}
+            {activeTab === 'pos' && (
+              <button
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent('pos-reset-sale'));
+                }}
+                className="hidden sm:flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs shadow-sm transition-all cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>New Sale Order</span>
+              </button>
+            )}
+
+            {/* Quick Calculator Dropdown */}
             <div className="relative" ref={calculatorRef}>
               <button 
                 onClick={() => setIsCalculatorOpen(!isCalculatorOpen)}
-                title="Calculator"
-                className={`flex items-center justify-center p-2 rounded-full transition-all duration-300 shadow-inner group cursor-pointer ${
+                title="Quick Calculator"
+                className={`flex items-center justify-center p-2 rounded-xl transition-all cursor-pointer border ${
                   isCalculatorOpen 
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-[0_0_12px_rgba(16,185,129,0.3)]' 
-                    : 'bg-slate-950/40 border border-white/5 text-slate-400 hover:text-emerald-400 hover:bg-white/10 hover:border-white/10'
+                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 shadow-sm' 
+                    : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-emerald-400 hover:border-slate-700'
                 }`}
               >
-                <Calculator className="w-3.5 h-3.5 group-hover:scale-110 transition-transform duration-300" />
+                <Calculator className="w-4 h-4" />
               </button>
 
               {isCalculatorOpen && (
@@ -227,71 +260,67 @@ export default function AdminLayout({
               )}
             </div>
 
+            {/* Hard Refresh button */}
             <button 
               onClick={handleHardRefresh}
-              title="Hard Refresh"
-              className="flex items-center justify-center p-2 bg-slate-950/40 border border-white/5 rounded-full hover:bg-white/10 hover:border-white/10 transition-all duration-300 text-slate-400 hover:text-slate-200 shadow-inner group cursor-pointer"
+              title="Hard Refresh Cache"
+              className="flex items-center justify-center p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700 transition-colors cursor-pointer group"
             >
-              <RefreshCw className="w-3.5 h-3.5 group-hover:rotate-180 transition-transform duration-500" />
+              <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
             </button>
 
-          {user && (
-            <div className="relative" ref={dropdownRef}>
-              <button 
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className="hidden sm:flex items-center gap-2.5 pl-1 pr-3 py-1 bg-slate-950/40 border border-white/5 rounded-full shadow-inner cursor-pointer hover:bg-white/10 hover:border-white/10 transition-all duration-300 focus:outline-none"
-              >
-                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center border border-white/10 shadow-md">
-                  {isAdmin ? <UserCog className="w-3.5 h-3.5 text-emerald-400 drop-shadow-md" /> : <User className="w-3.5 h-3.5 text-blue-400 drop-shadow-md" />}
-                </div>
-                <div className="flex flex-col items-start justify-center -space-y-0.5">
-                  <span className="text-[12px] font-bold text-slate-200 tracking-wide">
-                    {isAdmin ? 'Admin' : 'Sales'}
-                  </span>
-                  <span className="text-[9px] font-medium text-emerald-400 flex items-center gap-1.5">
-                    <div className="w-1 h-1 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse"></div>
-                    Online
-                  </span>
-                </div>
-                <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform duration-300 ml-0.5 ${isDropdownOpen ? 'rotate-180 text-white' : ''}`} />
-              </button>
-
-              {isDropdownOpen && (
-                <div className="absolute right-0 mt-3 w-56 bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.6)] py-2 z-50 animate-in fade-in slide-in-from-top-2 origin-top-right">
-                  <div className="px-5 py-3 border-b border-white/5 mb-1 bg-white/5">
-                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Signed in as</p>
-                    <p className="text-sm font-black text-slate-200 truncate">{user.email}</p>
+            {/* User Profile Avatar & Role */}
+            {user && (
+              <div className="relative" ref={dropdownRef}>
+                <button 
+                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                  className="flex items-center gap-2 pl-1.5 pr-3 py-1 bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-xl cursor-pointer transition-colors"
+                >
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-cyan-600 to-blue-700 text-white font-black text-xs flex items-center justify-center shadow-sm">
+                    {isAdmin ? 'AD' : 'SA'}
                   </div>
-                  <button
-                    onClick={() => {
-                      setIsDropdownOpen(false);
-                      handleLogout();
-                    }}
-                    className="w-full text-left px-5 py-3 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors flex items-center gap-3 font-bold mt-1 group"
-                  >
-                    <LogOut className="w-4 h-4 group-hover:-translate-x-1 transition-transform" /> Sign out
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+                  <div className="hidden md:flex flex-col text-left -space-y-0.5">
+                    <span className="text-xs font-bold text-slate-200 leading-tight">
+                      {user.email ? user.email.split('@')[0] : (isAdmin ? 'Admin' : 'Sales')}
+                    </span>
+                    <span className="text-[10px] text-cyan-400 font-semibold uppercase">
+                      {isAdmin ? 'System Owner' : 'Sales Staff'}
+                    </span>
+                  </div>
+                </button>
+
+                {/* Profile Dropdown */}
+                {isDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-52 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl py-2 z-50">
+                    <div className="px-4 py-2 border-b border-slate-800">
+                      <p className="text-xs font-bold text-slate-200 truncate">{user.email || 'DESH Admin'}</p>
+                      <p className="text-[10px] text-cyan-400">{isAdmin ? 'Administrator' : 'Staff'}</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setIsDropdownOpen(false);
+                        handleLogout();
+                      }}
+                      className="w-full flex items-center gap-2 px-4 py-2 text-xs font-semibold text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Log Out</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
           </div>
-        </div>
+        </header>
 
-        <div className="absolute inset-0 top-16 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at center, #64748b 1px, transparent 1px)', backgroundSize: '48px 48px' }}></div>
-
-        <div className="w-full relative z-10 flex-1 pt-1">
+        {/* Content Body */}
+        <main className="flex-1 p-4 sm:p-5 lg:p-6 overflow-y-auto">
           {children}
-        </div>
+        </main>
 
-        <footer className="w-full flex items-center justify-center gap-3 py-10 mt-8 border-t border-slate-800/30 text-slate-400 text-sm font-medium bg-slate-950/20 backdrop-blur-sm relative z-20 shrink-0">
-          <span className="tracking-wide">Developed By</span>
-          <div className="flex items-center gap-2 bg-slate-900/50 px-3 py-1.5 rounded-full border border-slate-800 shadow-inner">
-            <img src={`${import.meta.env.BASE_URL}desh-logo.png`} alt="DEH Logo" className="h-6 w-auto object-contain drop-shadow-md" />
-            <span className="text-slate-200 font-black tracking-widest uppercase">Desh</span>
-          </div>
-        </footer>
       </div>
+
     </div>
   );
 }
