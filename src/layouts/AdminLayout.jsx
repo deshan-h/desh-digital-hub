@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { LayoutDashboard, ShoppingCart, History, LogOut, Menu, Wrench, UserCog, User, ChevronDown, Users, Wallet, RefreshCw, Tags, Contact, Settings, TrendingUp, Clock, ChevronRight, ChevronLeft, BarChart3, Calculator } from 'lucide-react';
-import CalculatorModal from '../components/common/CalculatorModal';
+import CalculatorDropdown from '../components/common/CalculatorDropdown';
 
 export default function AdminLayout({ 
   children, 
@@ -9,21 +9,25 @@ export default function AdminLayout({
   isAdmin, 
   isSidebarOpen, 
   setIsSidebarOpen, 
-  handleLogout,
-  user,
-  todaySalesSum,
-  totalPendingDues,
-  pendingOrders = [],
-  setShowPendingOrdersModal
+  handleLogout, 
+  user, 
+  todaySalesSum, 
+  totalPendingDues, 
+  pendingOrders = [], 
+  setShowPendingOrdersModal 
 }) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const calculatorRef = useRef(null);
 
   useEffect(() => {
     function handleClickOutside(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsDropdownOpen(false);
+      }
+      if (calculatorRef.current && !calculatorRef.current.contains(event.target)) {
+        setIsCalculatorOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -205,13 +209,23 @@ export default function AdminLayout({
           </h1>
 
           <div className="flex items-center justify-end gap-3 flex-1">
-            <button 
-              onClick={() => setIsCalculatorOpen(true)}
-              title="Calculator"
-              className="flex items-center justify-center p-2 bg-slate-950/40 border border-white/5 rounded-full hover:bg-white/10 hover:border-white/10 transition-all duration-300 text-slate-400 hover:text-emerald-400 shadow-inner group cursor-pointer"
-            >
-              <Calculator className="w-3.5 h-3.5 group-hover:scale-110 transition-transform duration-300" />
-            </button>
+            <div className="relative" ref={calculatorRef}>
+              <button 
+                onClick={() => setIsCalculatorOpen(!isCalculatorOpen)}
+                title="Calculator"
+                className={`flex items-center justify-center p-2 rounded-full transition-all duration-300 shadow-inner group cursor-pointer ${
+                  isCalculatorOpen 
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-[0_0_12px_rgba(16,185,129,0.3)]' 
+                    : 'bg-slate-950/40 border border-white/5 text-slate-400 hover:text-emerald-400 hover:bg-white/10 hover:border-white/10'
+                }`}
+              >
+                <Calculator className="w-3.5 h-3.5 group-hover:scale-110 transition-transform duration-300" />
+              </button>
+
+              {isCalculatorOpen && (
+                <CalculatorDropdown onClose={() => setIsCalculatorOpen(false)} />
+              )}
+            </div>
 
             <button 
               onClick={handleHardRefresh}
@@ -278,12 +292,6 @@ export default function AdminLayout({
           </div>
         </footer>
       </div>
-
-      {/* Floating Quick Calculator Modal */}
-      <CalculatorModal 
-        isOpen={isCalculatorOpen} 
-        onClose={() => setIsCalculatorOpen(false)} 
-      />
     </div>
   );
 }
