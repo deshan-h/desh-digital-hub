@@ -359,6 +359,7 @@ export default function POS({
               >
                 {displayCategories.map((cat, idx) => {
                   const isActive = activeCategoryIndex === idx;
+                  const isFav = cat.id === 'favorites' || cat.category === 'Favorites';
                   return (
                     <button
                       key={idx}
@@ -366,13 +367,14 @@ export default function POS({
                         setActiveCategoryIndex(idx);
                         setSearchQuery('');
                       }}
-                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0 cursor-pointer ${
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
                         isActive 
                           ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white shadow-md shadow-blue-600/30 border border-blue-400/30' 
                           : 'bg-[#090d16] hover:bg-slate-800/80 text-slate-400 hover:text-slate-200 border border-slate-800/70 font-semibold'
                       }`}
                     >
-                      {cat.category}
+                      {isFav && <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0" />}
+                      <span>{cat.category}</span>
                     </button>
                   );
                 })}
@@ -407,53 +409,7 @@ export default function POS({
         {/* ======================================================== */}
         <div className="lg:col-span-5 xl:col-span-4 space-y-4 lg:sticky lg:top-20">
           
-          {/* BOX 1: Customer Details (Right Top) */}
-          <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-4 shadow-xl space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                Customer Details <span className="text-rose-400">*</span>
-              </span>
-              {currentCustomerArrears > 0 && (
-                <span className="text-[11px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/30 px-2 py-0.5 rounded-md">
-                  Due: Rs {currentCustomerArrears.toFixed(0)}
-                </span>
-              )}
-            </div>
-
-            <CustomerInput
-              customerName={customerName}
-              setCustomerName={setCustomerName}
-              customersList={customersList}
-              whatsappNumber={whatsappNumber}
-              setWhatsappNumber={setWhatsappNumber}
-              isCredit={isCredit}
-              favoriteCustomers={favoriteCustomerNames}
-            />
-
-            {/* Favorite Customers Quick-Pill Selection */}
-            {favoriteCustomerNames.length > 0 && !customerName && (
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {favoriteCustomerNames.slice(0, 5).map((name, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => {
-                      setCustomerName(name);
-                      const matched = customersList.find(c => c.name?.toLowerCase() === name.toLowerCase());
-                      if (matched && matched.phone && !whatsappNumber) {
-                        setWhatsappNumber(matched.phone);
-                      }
-                    }}
-                    className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-[#090d16] border border-slate-800/80 text-slate-300 hover:text-sky-400 hover:border-sky-500/40 transition-colors cursor-pointer"
-                  >
-                    {name}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* BOX 2: Current Order / Cart Box */}
+          {/* BOX 1: Current Order / Cart Box (Top Right) */}
           <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-4 shadow-xl space-y-3">
             <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
               <div className="flex items-center gap-2">
@@ -531,6 +487,52 @@ export default function POS({
             </div>
           </div>
 
+          {/* BOX 2: Customer Details (Under Items / Cart Box) */}
+          <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-4 shadow-xl space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                Customer Details <span className="text-rose-400">*</span>
+              </span>
+              {currentCustomerArrears > 0 && (
+                <span className="text-[11px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/30 px-2 py-0.5 rounded-md">
+                  Due: Rs {currentCustomerArrears.toFixed(0)}
+                </span>
+              )}
+            </div>
+
+            <CustomerInput
+              customerName={customerName}
+              setCustomerName={setCustomerName}
+              customersList={customersList}
+              whatsappNumber={whatsappNumber}
+              setWhatsappNumber={setWhatsappNumber}
+              isCredit={isCredit}
+              favoriteCustomers={favoriteCustomerNames}
+            />
+
+            {/* Favorite Customers Quick-Pill Selection */}
+            {favoriteCustomerNames.length > 0 && !customerName && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {favoriteCustomerNames.slice(0, 5).map((name, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => {
+                      setCustomerName(name);
+                      const matched = customersList.find(c => c.name?.toLowerCase() === name.toLowerCase());
+                      if (matched && matched.phone && !whatsappNumber) {
+                        setWhatsappNumber(matched.phone);
+                      }
+                    }}
+                    className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-[#090d16] border border-slate-800/80 text-slate-300 hover:text-sky-400 hover:border-sky-500/40 transition-colors cursor-pointer"
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* BOX 3: Total & Cash Given / Payment Box */}
           <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-4.5 shadow-xl space-y-3.5 text-xs">
             
@@ -576,7 +578,7 @@ export default function POS({
                       : 'bg-[#090d16] text-slate-400 border border-slate-800/80 hover:text-slate-300'
                   }`}
                 >
-                  Credit (ණයට)
+                  Credit
                 </button>
               </div>
             </div>
