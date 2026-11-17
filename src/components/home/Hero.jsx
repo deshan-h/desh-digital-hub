@@ -138,12 +138,12 @@ export default function Hero() {
         </motion.a>
       </div>
 
-      {/* Right Column (Banner / Wallpaper Carousel) */}
+      {/* Right Column (Banner / Wallpaper Carousel - 1:1 Square) */}
       <motion.div 
         initial={{ opacity: 0, x: 40 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.8, delay: 0.4 }}
-        className="w-full lg:w-[42%] relative"
+        className="w-full lg:w-[44%] flex justify-center lg:justify-end relative"
       >
         <BannerCarousel />
       </motion.div>

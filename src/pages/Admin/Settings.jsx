@@ -125,10 +125,6 @@ export default function Settings({ isAdmin }) {
       notify.error('Please upload an image or provide an image URL first.');
       return;
     }
-    if (!newBanner.title.trim()) {
-      notify.error('Please enter a banner title.');
-      return;
-    }
 
     const item = {
       id: 'banner_' + Date.now(),
@@ -419,7 +415,7 @@ export default function Settings({ isAdmin }) {
                         {uploading ? 'Uploading to Cloudflare R2...' : 'Click or drop banner image here'}
                       </p>
                       <p className="text-xs text-slate-500">
-                        PNG, JPG, WebP up to 10MB (Landscape 16:9 recommended)
+                        PNG, JPG, WebP up to 10MB (Square 1:1 ratio / 1080x1080 px recommended)
                       </p>
                     </div>
                   </div>
@@ -435,21 +431,21 @@ export default function Settings({ isAdmin }) {
                   </div>
                 )}
 
-                {/* Image Live Preview */}
+                {/* 1:1 Square Image Live Preview */}
                 {newBanner.imageUrl && (
-                  <div className="relative rounded-xl overflow-hidden border border-slate-700 h-36 bg-slate-950 group">
+                  <div className="relative rounded-2xl overflow-hidden border border-slate-700 aspect-square max-w-[240px] mx-auto bg-slate-950 group shadow-lg">
                     <img
                       src={newBanner.imageUrl}
                       alt="Banner Preview"
                       className="w-full h-full object-cover"
                       onError={(e) => {
                         e.target.onerror = null;
-                        e.target.src = 'https://placehold.co/600x300/020617/38bdf8?text=Image+Load+Failed';
+                        e.target.src = 'https://placehold.co/600x600/020617/38bdf8?text=Image+Load+Failed';
                       }}
                     />
                     <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                       <span className="text-xs font-bold text-white bg-slate-900/90 px-3 py-1 rounded-full border border-white/20">
-                        Live Preview
+                        1:1 Preview
                       </span>
                     </div>
                   </div>
@@ -487,11 +483,11 @@ export default function Settings({ isAdmin }) {
 
                 <div>
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-300 block mb-1.5">
-                    Banner Title *
+                    Banner Title (Optional for flyers with text)
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Next-Gen POS Software Launch 2026"
+                    placeholder="e.g. Next-Gen POS Software (Leave blank if poster has text)"
                     value={newBanner.title}
                     onChange={(e) => setNewBanner({ ...newBanner, title: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-200 placeholder-slate-500 text-sm focus:outline-none focus:border-cyan-500/50"
@@ -600,15 +596,15 @@ export default function Settings({ isAdmin }) {
                       </button>
                     </div>
 
-                    {/* Image Thumbnail */}
-                    <div className="w-24 h-16 rounded-lg overflow-hidden border border-slate-800 flex-shrink-0 bg-slate-900">
+                    {/* 1:1 Square Image Thumbnail */}
+                    <div className="w-16 h-16 rounded-xl overflow-hidden border border-slate-800 flex-shrink-0 bg-slate-900 aspect-square">
                       <img
                         src={item.imageUrl}
-                        alt={item.title}
+                        alt={item.title || 'Banner'}
                         className="w-full h-full object-cover"
                         onError={(e) => {
                           e.target.onerror = null;
-                          e.target.src = 'https://placehold.co/100x60/020617/38bdf8?text=Image';
+                          e.target.src = 'https://placehold.co/100x100/020617/38bdf8?text=Image';
                         }}
                       />
                     </div>

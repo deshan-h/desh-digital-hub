@@ -152,10 +152,10 @@ export default function BannerCarousel() {
       onTouchEnd={() => setIsPaused(false)}
     >
       {/* Ambient Neon Glow behind the Carousel */}
-      <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500 via-blue-500 to-emerald-500 rounded-3xl blur-lg opacity-30 group-hover:opacity-60 transition duration-700 pointer-events-none animate-gradient-x"></div>
+      <div className="absolute -inset-1.5 bg-gradient-to-r from-cyan-500 via-blue-500 to-emerald-500 rounded-3xl blur-xl opacity-30 group-hover:opacity-60 transition duration-700 pointer-events-none animate-gradient-x"></div>
 
-      {/* Main Carousel Container */}
-      <div className="relative w-full h-[320px] sm:h-[350px] lg:h-[370px] rounded-2xl overflow-hidden bg-slate-950 border border-white/10 shadow-2xl">
+      {/* Main Carousel Container - Fixed 1:1 Aspect Ratio (Square) */}
+      <div className="relative w-full max-w-[380px] sm:max-w-[430px] lg:max-w-[460px] aspect-square mx-auto rounded-3xl overflow-hidden bg-slate-950 border border-white/10 shadow-2xl">
         <AnimatePresence initial={false} custom={direction} mode="wait">
           <motion.div
             key={currentBanner.id || currentIndex}
@@ -166,69 +166,129 @@ export default function BannerCarousel() {
             exit="exit"
             className="absolute inset-0 w-full h-full"
           >
-            {/* Wallpaper Image */}
-            <img
-              src={currentBanner.imageUrl}
-              alt={currentBanner.title || 'Promotion Banner'}
-              className="w-full h-full object-cover object-center transform transition-transform duration-700 group-hover:scale-105"
-              loading="lazy"
-              onError={(e) => {
-                // Fallback to high tech image if URL fails
-                e.target.onerror = null;
-                e.target.src = DEFAULT_BANNERS[0].imageUrl;
-              }}
-            />
+            {/* Clickable Banner Wrapper if linkUrl exists */}
+            {currentBanner.linkUrl ? (
+              <a
+                href={currentBanner.linkUrl}
+                target={currentBanner.linkUrl.startsWith('http') ? '_blank' : '_self'}
+                rel="noopener noreferrer"
+                className="block w-full h-full relative cursor-pointer"
+              >
+                {/* 1:1 Wallpaper Image */}
+                <img
+                  src={currentBanner.imageUrl}
+                  alt={currentBanner.title || 'Promotion Graphic'}
+                  className="w-full h-full object-cover object-center transform transition-transform duration-700 group-hover:scale-105"
+                  loading="lazy"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = DEFAULT_BANNERS[0].imageUrl;
+                  }}
+                />
 
-            {/* Dark Tech Vignette & Gradient Overlays for High Legibility */}
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-slate-950/20 pointer-events-none" />
-            <div className="absolute inset-0 bg-gradient-to-r from-slate-950/80 via-slate-950/30 to-transparent pointer-events-none" />
+                {/* Scrim Overlay: Only subtle bottom gradient so 1:1 poster graphic art stays vibrant */}
+                <div className={`absolute inset-0 pointer-events-none transition-opacity ${
+                  currentBanner.title ? 'bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-transparent' : 'bg-gradient-to-t from-slate-950/60 via-transparent to-transparent'
+                }`} />
 
-            {/* Content Overlay */}
-            <div className="absolute inset-0 p-5 sm:p-6 md:p-7 flex flex-col justify-between z-10">
-              
-              {/* Top Badge / Category */}
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/80 backdrop-blur-md border border-cyan-500/40 text-cyan-300 shadow-md">
-                  <Sparkles className="w-3 h-3 text-cyan-400 animate-pulse" />
-                  <span className="text-[10px] sm:text-xs font-black tracking-widest uppercase">
-                    {currentBanner.badge || 'PROMOTION'}
-                  </span>
-                </div>
+                {/* Content Overlay */}
+                <div className="absolute inset-0 p-4 sm:p-5 md:p-6 flex flex-col justify-between z-10 pointer-events-none">
+                  
+                  {/* Top Badge & Counter */}
+                  <div className="flex items-center justify-between gap-2 pointer-events-auto">
+                    {currentBanner.badge ? (
+                      <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/80 backdrop-blur-md border border-cyan-500/40 text-cyan-300 shadow-lg">
+                        <Sparkles className="w-3 h-3 text-cyan-400 animate-pulse" />
+                        <span className="text-[10px] sm:text-xs font-black tracking-widest uppercase">
+                          {currentBanner.badge}
+                        </span>
+                      </div>
+                    ) : <div />}
 
-                {/* Counter indicator */}
-                <div className="px-2.5 py-0.5 rounded-full bg-slate-950/70 backdrop-blur-md border border-slate-700/60 text-[10px] font-mono text-slate-400">
-                  {currentIndex + 1} / {banners.length}
-                </div>
-              </div>
-
-              {/* Bottom Information & CTA Button */}
-              <div className="space-y-2">
-                <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-snug drop-shadow-md">
-                  {currentBanner.title}
-                </h3>
-
-                {currentBanner.subtitle && (
-                  <p className="text-xs sm:text-sm text-slate-300 line-clamp-2 leading-relaxed drop-shadow max-w-[90%]">
-                    {currentBanner.subtitle}
-                  </p>
-                )}
-
-                {/* Call to action button */}
-                {currentBanner.linkUrl && (
-                  <div className="pt-2">
-                    <a
-                      href={currentBanner.linkUrl}
-                      target={currentBanner.linkUrl.startsWith('http') ? '_blank' : '_self'}
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 hover:text-white transition-all shadow-[0_0_15px_rgba(6,182,212,0.4)] group/btn"
-                    >
-                      <span>{currentBanner.linkText || 'View Details'}</span>
-                      <ExternalLink className="w-3.5 h-3.5 group-hover/btn:translate-x-0.5 transition-transform" />
-                    </a>
+                    <div className="px-2.5 py-0.5 rounded-full bg-slate-950/80 backdrop-blur-md border border-slate-700/60 text-[10px] font-mono text-slate-300">
+                      {currentIndex + 1} / {banners.length}
+                    </div>
                   </div>
-                )}
+
+                  {/* Bottom Information (If Title / Subtitle is provided) */}
+                  <div className="space-y-1.5 pointer-events-auto">
+                    {currentBanner.title && (
+                      <h3 className="text-lg sm:text-xl md:text-2xl font-black text-white tracking-tight leading-snug drop-shadow-md">
+                        {currentBanner.title}
+                      </h3>
+                    )}
+
+                    {currentBanner.subtitle && (
+                      <p className="text-xs sm:text-sm text-slate-300 line-clamp-2 leading-relaxed drop-shadow max-w-[95%]">
+                        {currentBanner.subtitle}
+                      </p>
+                    )}
+
+                    {currentBanner.linkUrl && (
+                      <div className="pt-1.5">
+                        <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 shadow-md">
+                          <span>{currentBanner.linkText || 'View Details'}</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </a>
+            ) : (
+              <div className="w-full h-full relative">
+                {/* 1:1 Wallpaper Image */}
+                <img
+                  src={currentBanner.imageUrl}
+                  alt={currentBanner.title || 'Promotion Graphic'}
+                  className="w-full h-full object-cover object-center transform transition-transform duration-700 group-hover:scale-105"
+                  loading="lazy"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = DEFAULT_BANNERS[0].imageUrl;
+                  }}
+                />
+
+                {/* Scrim Overlay */}
+                <div className={`absolute inset-0 pointer-events-none transition-opacity ${
+                  currentBanner.title ? 'bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-transparent' : 'bg-gradient-to-t from-slate-950/60 via-transparent to-transparent'
+                }`} />
+
+                {/* Content Overlay */}
+                <div className="absolute inset-0 p-4 sm:p-5 md:p-6 flex flex-col justify-between z-10 pointer-events-none">
+                  {/* Top Badge & Counter */}
+                  <div className="flex items-center justify-between gap-2 pointer-events-auto">
+                    {currentBanner.badge ? (
+                      <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/80 backdrop-blur-md border border-cyan-500/40 text-cyan-300 shadow-lg">
+                        <Sparkles className="w-3 h-3 text-cyan-400 animate-pulse" />
+                        <span className="text-[10px] sm:text-xs font-black tracking-widest uppercase">
+                          {currentBanner.badge}
+                        </span>
+                      </div>
+                    ) : <div />}
+
+                    <div className="px-2.5 py-0.5 rounded-full bg-slate-950/80 backdrop-blur-md border border-slate-700/60 text-[10px] font-mono text-slate-300">
+                      {currentIndex + 1} / {banners.length}
+                    </div>
+                  </div>
+
+                  {/* Bottom Information */}
+                  {currentBanner.title && (
+                    <div className="space-y-1.5 pointer-events-auto">
+                      <h3 className="text-lg sm:text-xl md:text-2xl font-black text-white tracking-tight leading-snug drop-shadow-md">
+                        {currentBanner.title}
+                      </h3>
+
+                      {currentBanner.subtitle && (
+                        <p className="text-xs sm:text-sm text-slate-300 line-clamp-2 leading-relaxed drop-shadow max-w-[95%]">
+                          {currentBanner.subtitle}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </motion.div>
         </AnimatePresence>
 
