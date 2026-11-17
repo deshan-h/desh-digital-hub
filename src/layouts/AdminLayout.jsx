@@ -125,31 +125,29 @@ export default function AdminLayout({
         <div className="flex flex-col h-full">
           
           {/* Sidebar Top: Logo Branding + Menu Toggle Button */}
-          <div className="h-16 flex items-center justify-between px-4 border-b border-white/15">
+          <div className="h-16 flex items-center justify-between px-3.5 border-b border-white/15">
             {isSidebarOpen ? (
-              <div className="flex flex-col">
-                <div className="flex items-center gap-1.5 cursor-pointer" onClick={() => setActiveTab('dashboard')}>
-                  <span className="text-xl font-black text-white tracking-tight">
-                    DESH<span className="text-cyan-200">mate</span>
+              <div className="flex items-center gap-2.5 cursor-pointer overflow-hidden" onClick={() => setActiveTab('dashboard')}>
+                <img src="/pwa-192x192.png" alt="DESH Logo" className="w-8 h-8 rounded-lg object-contain bg-white/10 p-0.5 shrink-0 shadow-sm" />
+                <div className="flex flex-col min-w-0">
+                  <span className="text-sm font-black text-white tracking-tight leading-none truncate">
+                    DESH Digital Hub
                   </span>
-                  <div className="w-2 h-2 rounded-full bg-cyan-300 animate-pulse"></div>
+                  <span className="text-[10px] text-white/70 font-semibold tracking-wider uppercase mt-0.5 truncate">
+                    Management Portal
+                  </span>
                 </div>
-                <span className="text-[10px] text-white/70 font-semibold tracking-wider uppercase -mt-0.5">
-                  Order Management
-                </span>
               </div>
             ) : (
               <div className="w-full flex justify-center cursor-pointer" onClick={() => setIsSidebarOpen(true)}>
-                <span className="text-lg font-black text-white tracking-tighter">
-                  D<span className="text-cyan-200">m</span>
-                </span>
+                <img src="/pwa-192x192.png" alt="DESH Logo" className="w-8 h-8 rounded-lg object-contain bg-white/10 p-0.5 shadow-sm" />
               </div>
             )}
 
             {/* Hamburger Toggle Icon */}
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0 ml-1"
               title={isSidebarOpen ? "Collapse Menu" : "Expand Menu"}
             >
               {isSidebarOpen ? <ChevronLeft className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -267,12 +265,12 @@ export default function AdminLayout({
 
           </nav>
 
-          {/* Sidebar Bottom Footer matching StoreMate screenshot */}
+          {/* Sidebar Bottom Footer */}
           <div className="p-3 border-t border-white/15 bg-black/10">
             {isSidebarOpen ? (
               <div className="space-y-2">
                 <div className="text-[10px] text-white/70 font-mono flex items-center justify-between">
-                  <span>DESH OMS 1.25.0.1</span>
+                  <span>DESH Hub v1.25.1</span>
                   <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
                 </div>
                 {/* 4 Bottom Quick Icons from screenshot: Headset, Zap, Shield, Settings */}
@@ -397,7 +395,7 @@ export default function AdminLayout({
               <RefreshCw className="w-3.5 h-3.5 group-hover:rotate-180 transition-transform duration-500" />
             </button>
 
-            {/* User Profile Pill matching screenshot: [TO] Test Business / Test owner */}
+            {/* User Profile Pill */}
             {user && (
               <div className="relative" ref={dropdownRef}>
                 <button 
@@ -405,11 +403,11 @@ export default function AdminLayout({
                   className="flex items-center gap-2 pl-1 pr-3 py-1 bg-slate-950/70 border border-slate-800/90 hover:border-slate-700 rounded-full cursor-pointer transition-colors"
                 >
                   <div className="w-8 h-8 rounded-full bg-[#0082cb] text-white font-black text-xs flex items-center justify-center shadow-md">
-                    {isAdmin ? 'DH' : 'TO'}
+                    DH
                   </div>
                   <div className="hidden md:flex flex-col text-left -space-y-0.5">
                     <span className="text-xs font-bold text-slate-200 leading-tight">
-                      {user.email ? user.email.split('@')[0] : 'DESH Hub'}
+                      DESH Hub
                     </span>
                     <span className="text-[10px] text-slate-400 font-semibold">
                       {isAdmin ? 'System Owner' : 'Sales Cashier'}
