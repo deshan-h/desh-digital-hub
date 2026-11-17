@@ -676,5 +676,10 @@ export const settingsService = {
 
     if (error) throw error;
     return true;
+  },
+
+  // Alias for backward compatibility
+  async setSetting(id, data) {
+    return this.saveSetting(id, data);
   }
 };

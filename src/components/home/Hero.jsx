@@ -1,44 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { settingsService } from '../../services/supabaseService';
-import { Megaphone, ChevronRight, ExternalLink } from 'lucide-react';
+import React from 'react';
+import { motion } from 'framer-motion';
+import { ChevronRight, ExternalLink } from 'lucide-react';
+import BannerCarousel from './BannerCarousel';
 import logo from '../../assets/logo.webp';
 import eduHubLogo from '../../assets/edu-hub-logo.jpg';
 
 export default function Hero() {
-  const [news, setNews] = useState([]);
-  const [currentNewsIndex, setCurrentNewsIndex] = useState(0);
-
-  useEffect(() => {
-    const fetchNews = async () => {
-      try {
-        const newsData = await settingsService.getSetting('news');
-        if (newsData && newsData.items?.length > 0) {
-          setNews(newsData.items);
-        } else {
-          setNews(['ඩිජිටල් ලෝකයේ නවතම වෙනස්කම් සමඟින් අපි ඔබ වෙතට...']);
-        }
-      } catch (error) {
-        console.error("Error fetching news:", error);
-        setNews(['ඩිජිටල් ලෝකයේ නවතම වෙනස්කම් සමඟින් අපි ඔබ වෙතට...']);
-      }
-    };
-    fetchNews();
-  }, []);
-
-  useEffect(() => {
-    if (news.length <= 1) return;
-    const interval = setInterval(() => {
-      setCurrentNewsIndex((prev) => (prev + 1) % news.length);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [news]);
-
   return (
     <div className="container mx-auto px-4 relative z-10 flex flex-col lg:flex-row items-center justify-between w-full mt-0 mb-12 md:mb-16 gap-8 lg:gap-8">
       
       {/* Left Column (Hero Content) */}
-      <div className="flex flex-col items-center lg:items-start text-center lg:text-left w-full lg:w-[60%]">
+      <div className="flex flex-col items-center lg:items-start text-center lg:text-left w-full lg:w-[56%]">
         
         <motion.div 
           initial={{ opacity: 0, scale: 0.9, y: -20 }}
@@ -166,54 +138,14 @@ export default function Hero() {
         </motion.a>
       </div>
 
-      {/* Right Column (News Carousel) */}
+      {/* Right Column (Banner / Wallpaper Carousel) */}
       <motion.div 
-        initial={{ opacity: 0, x: 50 }}
+        initial={{ opacity: 0, x: 40 }}
         animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.8, delay: 1.2 }}
-        className="w-full lg:w-[35%] relative group"
+        transition={{ duration: 0.8, delay: 0.4 }}
+        className="w-full lg:w-[42%] relative"
       >
-        <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500 via-purple-500 to-blue-500 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200 animate-gradient-x pointer-events-none"></div>
-        <div className="relative bg-slate-900/80 backdrop-blur-2xl border border-white/10 p-5 md:p-6 rounded-2xl shadow-2xl h-[280px] md:h-[340px] flex flex-col">
-          
-          <div className="flex items-center gap-2.5 mb-5 pb-3 border-b border-slate-700/50">
-            <div className="p-2.5 bg-cyan-500/20 rounded-lg">
-              <Megaphone className="w-5 h-5 text-cyan-400" />
-            </div>
-            <div>
-              <h3 className="text-lg md:text-xl font-bold text-white tracking-wide">Latest News</h3>
-              <p className="text-cyan-400 text-[10px] sm:text-xs font-semibold uppercase tracking-widest mt-0.5">Announcements</p>
-            </div>
-          </div>
-          
-          <div className="flex-1 relative overflow-hidden flex items-center justify-center text-center">
-            <AnimatePresence mode="wait">
-              {news.length > 0 && (
-                <motion.div
-                  key={currentNewsIndex}
-                  initial={{ opacity: 0, y: 20, filter: 'blur(5px)' }}
-                  animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                  exit={{ opacity: 0, y: -20, filter: 'blur(5px)' }}
-                  transition={{ duration: 0.5, ease: "easeOut" }}
-                  className="absolute w-full px-2"
-                >
-                  <p className="text-base md:text-lg text-slate-200 font-medium leading-relaxed drop-shadow-md">
-                    {news[currentNewsIndex]}
-                  </p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          <div className="mt-5 flex justify-center gap-1.5">
-            {news.map((_, idx) => (
-              <div 
-                key={idx} 
-                className={`h-1.5 rounded-full transition-all duration-500 ${idx === currentNewsIndex ? 'w-6 bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.8)]' : 'w-2 bg-slate-700'}`}
-              ></div>
-            ))}
-          </div>
-        </div>
+        <BannerCarousel />
       </motion.div>
 
     </div>
