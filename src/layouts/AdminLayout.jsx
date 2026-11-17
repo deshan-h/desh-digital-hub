@@ -18,8 +18,15 @@ import {
   Calculator,
   Bell,
   HelpCircle,
-  ExternalLink,
-  Plus
+  Menu,
+  ChevronDown,
+  Search,
+  Grid,
+  Headphones,
+  Zap,
+  ShieldCheck,
+  Plus,
+  MessageCircle
 } from 'lucide-react';
 import CalculatorDropdown from '../components/common/CalculatorDropdown';
 
@@ -69,187 +76,308 @@ export default function AdminLayout({
     window.location.reload(true);
   };
 
-  // Nav Items definition matching Enterprise ERP style
-  const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, color: 'text-blue-400', activeBg: 'bg-blue-500/15 text-blue-400 border-blue-500/40' },
-    { id: 'pos', label: 'Orders / POS', icon: ShoppingCart, color: 'text-cyan-400', activeBg: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/40' },
-    { id: 'repairs', label: 'Repairs', icon: Wrench, color: 'text-orange-400', activeBg: 'bg-orange-500/15 text-orange-400 border-orange-500/40' },
-    { id: 'customers', label: 'Customers', icon: Users, color: 'text-purple-400', activeBg: 'bg-purple-500/15 text-purple-400 border-purple-500/40' },
-    { id: 'expenses', label: 'Expenses', icon: Wallet, color: 'text-rose-400', activeBg: 'bg-rose-500/15 text-rose-400 border-rose-500/40' },
-    ...(isAdmin ? [{ id: 'items', label: 'Products', icon: Tags, color: 'text-amber-400', activeBg: 'bg-amber-500/15 text-amber-400 border-amber-500/40' }] : []),
-    { id: 'history', label: 'Sales History', icon: History, color: 'text-emerald-400', activeBg: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40' },
-    { id: 'reports', label: 'Reports', icon: BarChart3, color: 'text-teal-400', activeBg: 'bg-teal-500/15 text-teal-400 border-teal-500/40' },
-    { id: 'settings', label: 'Settings', icon: Settings, color: 'text-slate-300', activeBg: 'bg-slate-500/15 text-slate-300 border-slate-500/40' },
+  // Grouped Navigation Items matching StoreMate layout
+  const mainNavItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, hasDropdown: true },
+    { id: 'pos', label: 'Orders / POS', icon: ShoppingCart, hasDropdown: true },
+    { id: 'history', label: 'Sales History', icon: History, hasDropdown: true },
+    { id: 'reports', label: 'Reports', icon: BarChart3, hasDropdown: false },
   ];
 
-  // Breadcrumbs text helper
+  const optionalNavItems = [
+    ...(isAdmin ? [{ id: 'items', label: 'Products', icon: Tags, hasDropdown: true }] : []),
+    { id: 'repairs', label: 'PC Repairs', icon: Wrench, hasDropdown: false },
+    { id: 'customers', label: 'Customers', icon: Users, hasDropdown: false },
+    { id: 'expenses', label: 'Expenses', icon: Wallet, hasDropdown: false },
+    { id: 'settings', label: 'Settings', icon: Settings, hasDropdown: true },
+  ];
+
+  // Dynamic Breadcrumb text helper
   const getBreadcrumbs = () => {
     switch (activeTab) {
-      case 'pos': return { section: 'Sales Order Management', page: 'Point of Sale (POS) / Add New Sale' };
+      case 'pos': return { section: 'Sales Order Management', page: 'Add New Sale' };
       case 'dashboard': return { section: 'Executive Overview', page: 'Main Dashboard' };
-      case 'repairs': return { section: 'Technical Services', page: 'PC & Hardware Repair Management' };
+      case 'repairs': return { section: 'Services & Support', page: 'PC Repair Management' };
       case 'customers': return { section: 'CRM & Client Records', page: 'Customer Directory' };
-      case 'expenses': return { section: 'Accounting & Finance', page: 'Shop Expenses' };
-      case 'items': return { section: 'Inventory Management', page: 'Products, Stock & Pricing' };
-      case 'history': return { section: 'Sales Invoices', page: 'Sales History & Receipts' };
-      case 'reports': return { section: 'Analytics & Insights', page: 'Performance Reports' };
-      case 'settings': return { section: 'System Configuration', page: 'Wallpaper Banners & Settings' };
-      default: return { section: 'DESH Management', page: 'Administration' };
+      case 'expenses': return { section: 'Accounting', page: 'Shop Expenses' };
+      case 'items': return { section: 'Inventory Management', page: 'Products & Stock' };
+      case 'history': return { section: 'Sales Orders', page: 'Sales Invoices & Receipts' };
+      case 'reports': return { section: 'Business Intelligence', page: 'Analytics & Reports' };
+      case 'settings': return { section: 'System Configuration', page: 'Settings' };
+      default: return { section: 'DESH Management', page: 'Home' };
     }
   };
 
   const breadcrumb = getBreadcrumbs();
 
   return (
-    <div className="flex h-screen bg-slate-950 overflow-hidden text-slate-200 selection:bg-cyan-500/30 selection:text-white print:hidden">
+    // StoreMate Vibrant Ocean Blue Container (Powers the seamless curve background)
+    <div className="flex h-screen bg-[#0082cb] overflow-hidden text-slate-100 selection:bg-cyan-500/30 selection:text-white print:hidden">
 
-      {/* Slim Icon-First ERP Vertical Sidebar */}
+      {/* ======================================================== */}
+      {/* LEFT SIDEBAR (StoreMate Ocean Blue Theme)                */}
+      {/* ======================================================== */}
       <aside 
         className={`${
-          isSidebarOpen ? 'w-52' : 'w-[72px]'
-        } bg-slate-950 border-r border-slate-800/80 flex flex-col justify-between shrink-0 transition-all duration-300 z-40 shadow-2xl relative hidden sm:flex`}
+          isSidebarOpen ? 'w-60' : 'w-[74px]'
+        } bg-[#0082cb] flex flex-col justify-between shrink-0 transition-all duration-300 z-30 select-none relative`}
       >
         <div className="flex flex-col h-full">
-          {/* Sidebar Top: Collapse/Expand Header */}
-          <div className="h-14 flex items-center justify-between px-3 border-b border-slate-800/80">
+          
+          {/* Sidebar Top: Logo Branding + Menu Toggle Button */}
+          <div className="h-16 flex items-center justify-between px-4 border-b border-white/15">
             {isSidebarOpen ? (
-              <div className="flex items-center gap-2 overflow-hidden">
-                <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 font-black text-sm">
-                  DH
+              <div className="flex flex-col">
+                <div className="flex items-center gap-1.5 cursor-pointer" onClick={() => setActiveTab('dashboard')}>
+                  <span className="text-xl font-black text-white tracking-tight">
+                    DESH<span className="text-cyan-200">mate</span>
+                  </span>
+                  <div className="w-2 h-2 rounded-full bg-cyan-300 animate-pulse"></div>
                 </div>
-                <span className="font-extrabold text-xs tracking-wider text-slate-200 uppercase truncate">
-                  DESH Hub
+                <span className="text-[10px] text-white/70 font-semibold tracking-wider uppercase -mt-0.5">
+                  Order Management
                 </span>
               </div>
             ) : (
-              <div className="w-full flex justify-center">
-                <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 font-black text-sm">
-                  DH
-                </div>
+              <div className="w-full flex justify-center cursor-pointer" onClick={() => setIsSidebarOpen(true)}>
+                <span className="text-lg font-black text-white tracking-tighter">
+                  D<span className="text-cyan-200">m</span>
+                </span>
               </div>
             )}
 
+            {/* Hamburger Toggle Icon */}
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white transition-colors border border-slate-800 cursor-pointer"
-              title={isSidebarOpen ? "Collapse Sidebar" : "Expand Sidebar"}
+              className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              title={isSidebarOpen ? "Collapse Menu" : "Expand Menu"}
             >
-              {isSidebarOpen ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+              {isSidebarOpen ? <ChevronLeft className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
 
-          {/* Navigation Items (Stacked Icon + Micro-label) */}
-          <nav className="flex-1 py-3 px-2 space-y-1.5 overflow-y-auto no-scrollbar">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
+          {/* Navigation Links Area */}
+          <nav className="flex-1 py-4 px-3 space-y-4 overflow-y-auto no-scrollbar">
+            
+            {/* Group 1: MAIN */}
+            <div>
+              {isSidebarOpen && (
+                <div className="text-[10px] font-black uppercase tracking-widest text-white/50 px-3 mb-1.5">
+                  Main
+                </div>
+              )}
+              <div className="space-y-1">
+                {mainNavItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeTab === item.id;
 
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveTab(item.id)}
-                  className={`group relative w-full flex rounded-xl transition-all duration-200 cursor-pointer ${
-                    isSidebarOpen 
-                      ? 'items-center px-3 py-2.5 gap-3' 
-                      : 'flex-col items-center justify-center py-2 px-1 gap-1 text-center'
-                  } ${
-                    isActive 
-                      ? `${item.activeBg} border shadow-sm font-bold` 
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-transparent'
-                  }`}
-                >
-                  <Icon className={`w-5 h-5 shrink-0 ${isActive ? item.color : 'text-slate-400 group-hover:text-slate-200'}`} />
-                  
-                  {isSidebarOpen ? (
-                    <span className="text-xs font-semibold whitespace-nowrap truncate">{item.label}</span>
-                  ) : (
-                    <span className="text-[10px] font-medium leading-tight tracking-tight text-slate-400 group-hover:text-slate-200 line-clamp-1 w-full truncate">
-                      {item.label.split('/')[0]}
-                    </span>
-                  )}
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveTab(item.id)}
+                      className={`group relative w-full flex items-center rounded-xl transition-all duration-200 cursor-pointer ${
+                        isSidebarOpen 
+                          ? 'justify-between px-3.5 py-2.5 text-xs' 
+                          : 'flex-col justify-center py-2 px-1 text-center'
+                      } ${
+                        isActive 
+                          ? 'bg-white/20 text-white font-bold backdrop-blur-md shadow-sm border border-white/20' 
+                          : 'text-white/80 hover:text-white hover:bg-white/10 font-medium border border-transparent'
+                      }`}
+                    >
+                      <div className={`flex items-center ${isSidebarOpen ? 'gap-3' : 'flex-col gap-1'}`}>
+                        <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-white/80 group-hover:text-white'}`} />
+                        {isSidebarOpen ? (
+                          <span className="truncate">{item.label}</span>
+                        ) : (
+                          <span className="text-[9px] font-semibold leading-tight text-white/70 group-hover:text-white truncate max-w-[60px]">
+                            {item.label.split('/')[0]}
+                          </span>
+                        )}
+                      </div>
 
-                  {/* Tooltip on hover when collapsed */}
-                  {!isSidebarOpen && (
-                    <div className="absolute left-16 hidden group-hover:block bg-slate-900 text-slate-100 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-700 whitespace-nowrap z-50 shadow-xl pointer-events-none">
-                      {item.label}
-                    </div>
-                  )}
-                </button>
-              );
-            })}
+                      {/* Dropdown chevron on right matching screenshot */}
+                      {isSidebarOpen && item.hasDropdown && (
+                        <ChevronDown className={`w-3.5 h-3.5 text-white/60 transition-transform ${isActive ? 'rotate-180 text-white' : 'group-hover:text-white'}`} />
+                      )}
+
+                      {/* Collapsed Tooltip */}
+                      {!isSidebarOpen && (
+                        <div className="absolute left-16 hidden group-hover:block bg-slate-900 text-white text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-700 whitespace-nowrap z-50 shadow-2xl pointer-events-none">
+                          {item.label}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Group 2: MANAGEMENT / OPTIONAL */}
+            <div>
+              {isSidebarOpen && (
+                <div className="text-[10px] font-black uppercase tracking-widest text-white/50 px-3 mb-1.5">
+                  Optional
+                </div>
+              )}
+              <div className="space-y-1">
+                {optionalNavItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeTab === item.id;
+
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveTab(item.id)}
+                      className={`group relative w-full flex items-center rounded-xl transition-all duration-200 cursor-pointer ${
+                        isSidebarOpen 
+                          ? 'justify-between px-3.5 py-2.5 text-xs' 
+                          : 'flex-col justify-center py-2 px-1 text-center'
+                      } ${
+                        isActive 
+                          ? 'bg-white/20 text-white font-bold backdrop-blur-md shadow-sm border border-white/20' 
+                          : 'text-white/80 hover:text-white hover:bg-white/10 font-medium border border-transparent'
+                      }`}
+                    >
+                      <div className={`flex items-center ${isSidebarOpen ? 'gap-3' : 'flex-col gap-1'}`}>
+                        <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-white/80 group-hover:text-white'}`} />
+                        {isSidebarOpen ? (
+                          <span className="truncate">{item.label}</span>
+                        ) : (
+                          <span className="text-[9px] font-semibold leading-tight text-white/70 group-hover:text-white truncate max-w-[60px]">
+                            {item.label.split('/')[0]}
+                          </span>
+                        )}
+                      </div>
+
+                      {isSidebarOpen && item.hasDropdown && (
+                        <ChevronDown className={`w-3.5 h-3.5 text-white/60 transition-transform ${isActive ? 'rotate-180 text-white' : 'group-hover:text-white'}`} />
+                      )}
+
+                      {!isSidebarOpen && (
+                        <div className="absolute left-16 hidden group-hover:block bg-slate-900 text-white text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-700 whitespace-nowrap z-50 shadow-2xl pointer-events-none">
+                          {item.label}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
           </nav>
 
-          {/* Sidebar Footer: Version & Support */}
-          <div className="p-2.5 border-t border-slate-800/80 bg-slate-950/60">
+          {/* Sidebar Bottom Footer matching StoreMate screenshot */}
+          <div className="p-3 border-t border-white/15 bg-black/10">
             {isSidebarOpen ? (
-              <div className="flex items-center justify-between text-[11px] text-slate-500 px-1">
-                <span className="font-mono">v1.25.1</span>
-                <span className="text-emerald-500 font-bold flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Online
-                </span>
+              <div className="space-y-2">
+                <div className="text-[10px] text-white/70 font-mono flex items-center justify-between">
+                  <span>DESH OMS 1.25.0.1</span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                </div>
+                {/* 4 Bottom Quick Icons from screenshot: Headset, Zap, Shield, Settings */}
+                <div className="flex items-center justify-between text-white/70 pt-1">
+                  <button title="Customer Support" className="hover:text-white cursor-pointer"><Headphones className="w-3.5 h-3.5" /></button>
+                  <button title="System Speed" className="hover:text-white cursor-pointer"><Zap className="w-3.5 h-3.5" /></button>
+                  <button title="Security Verified" className="hover:text-white cursor-pointer"><ShieldCheck className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => setActiveTab('settings')} title="Settings" className="hover:text-white cursor-pointer"><Settings className="w-3.5 h-3.5" /></button>
+                </div>
               </div>
             ) : (
-              <div className="flex flex-col items-center gap-1 text-[9px] text-slate-500">
-                <span className="font-mono">v1.25</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              <div className="flex flex-col items-center gap-1.5 text-white/70">
+                <span className="text-[9px] font-mono">1.25</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
               </div>
             )}
           </div>
+
         </div>
       </aside>
 
-      {/* Main Workspace Area */}
-      <div className="flex-1 overflow-y-auto bg-slate-950 flex flex-col min-w-0">
+      {/* ======================================================== */}
+      {/* MAIN CONTENT CARD WITH THE SIGNATURE TOP-LEFT CURVE      */}
+      {/* (rounded-tl-[32px] revealing the #0082cb blue corner)    */}
+      {/* ======================================================== */}
+      <div className="flex-1 bg-slate-950 rounded-tl-[32px] sm:rounded-tl-[36px] overflow-hidden flex flex-col shadow-[-12px_0_30px_rgba(0,0,0,0.35)] relative min-w-0 border-t border-l border-white/10">
         
-        {/* Top ERP Breadcrumb & Utility Header */}
-        <header className="h-14 px-4 sm:px-6 bg-slate-950/90 backdrop-blur-xl border-b border-slate-800/80 sticky top-0 z-30 flex items-center justify-between gap-4">
+        {/* Top Header Bar (Uda Bar) inside the curved card */}
+        <header className="h-16 px-5 sm:px-8 bg-slate-900/90 backdrop-blur-2xl border-b border-slate-800/80 shrink-0 flex items-center justify-between gap-4 sticky top-0 z-20">
           
-          {/* Left: Breadcrumbs & Page Subtitle */}
+          {/* Left: Breadcrumbs / Title */}
           <div className="flex items-center gap-2 min-w-0">
-            {/* Mobile menu toggle */}
+            {/* Mobile menu button */}
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="sm:hidden p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-white"
+              className="sm:hidden p-2 rounded-xl bg-slate-800 text-white"
             >
-              <ChevronRight className="w-4 h-4" />
+              <Menu className="w-4 h-4" />
             </button>
 
             <div className="flex flex-col">
-              <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-medium truncate">
-                <span className="text-cyan-400 hover:underline cursor-pointer" onClick={() => setActiveTab('dashboard')}>
-                  {breadcrumb.section}
-                </span>
-                <span className="text-slate-600">&gt;</span>
-                <span className="text-slate-300 font-semibold truncate">{breadcrumb.page}</span>
-              </div>
+              <span className="text-xs text-slate-400 font-semibold truncate">
+                {breadcrumb.section} &gt; {breadcrumb.page}
+              </span>
+              <h2 className="text-sm sm:text-base font-black text-slate-100 tracking-tight leading-none mt-0.5">
+                {activeTab === 'pos' ? 'Add New Sale' : breadcrumb.page}
+              </h2>
             </div>
           </div>
 
-          {/* Right: Actions, Calculator, Refresh, Profile */}
-          <div className="flex items-center justify-end gap-2.5 shrink-0">
+          {/* Right: Round Utility Action Buttons matching StoreMate screenshot */}
+          <div className="flex items-center justify-end gap-2 sm:gap-2.5 shrink-0">
             
-            {/* Quick Action Button for POS */}
-            {activeTab === 'pos' && (
-              <button
-                onClick={() => {
+            {/* Primary Action Button (Pill shape with plus icon) */}
+            <button
+              onClick={() => {
+                if (activeTab === 'pos') {
                   window.dispatchEvent(new CustomEvent('pos-reset-sale'));
-                }}
-                className="hidden sm:flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs shadow-sm transition-all cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>New Sale Order</span>
-              </button>
-            )}
+                } else {
+                  setActiveTab('pos');
+                }
+              }}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#0082cb] hover:bg-[#0070b0] text-white font-black text-xs shadow-md hover:shadow-cyan-500/20 transition-all cursor-pointer"
+            >
+              <Plus className="w-4 h-4 stroke-[3]" />
+              <span className="hidden sm:inline">Add Your First Order</span>
+              <span className="sm:hidden">New</span>
+            </button>
 
-            {/* Quick Calculator Dropdown */}
+            {/* Round Search Button */}
+            <button 
+              title="Global Search"
+              className="w-9 h-9 rounded-full bg-slate-950/70 border border-slate-800/90 text-slate-300 hover:text-cyan-400 hover:border-cyan-500/40 flex items-center justify-center transition-colors cursor-pointer"
+            >
+              <Search className="w-4 h-4" />
+            </button>
+
+            {/* Round Notification Bell Button */}
+            <button 
+              title="Notifications"
+              className="relative w-9 h-9 rounded-full bg-slate-950/70 border border-slate-800/90 text-slate-300 hover:text-cyan-400 hover:border-cyan-500/40 flex items-center justify-center transition-colors cursor-pointer"
+            >
+              <Bell className="w-4 h-4" />
+              {pendingOrders.length > 0 && (
+                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-cyan-400"></span>
+              )}
+            </button>
+
+            {/* Round Grid Launcher Button */}
+            <button 
+              title="App Launcher"
+              className="w-9 h-9 rounded-full bg-slate-950/70 border border-slate-800/90 text-slate-300 hover:text-cyan-400 hover:border-cyan-500/40 flex items-center justify-center transition-colors cursor-pointer"
+            >
+              <Grid className="w-4 h-4" />
+            </button>
+
+            {/* Quick Calculator Dropdown (Round button) */}
             <div className="relative" ref={calculatorRef}>
               <button 
                 onClick={() => setIsCalculatorOpen(!isCalculatorOpen)}
                 title="Quick Calculator"
-                className={`flex items-center justify-center p-2 rounded-xl transition-all cursor-pointer border ${
+                className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors cursor-pointer border ${
                   isCalculatorOpen 
                     ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 shadow-sm' 
-                    : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-emerald-400 hover:border-slate-700'
+                    : 'bg-slate-950/70 border-slate-800/90 text-slate-300 hover:text-emerald-400 hover:border-emerald-500/40'
                 }`}
               >
                 <Calculator className="w-4 h-4" />
@@ -260,36 +388,35 @@ export default function AdminLayout({
               )}
             </div>
 
-            {/* Hard Refresh button */}
+            {/* Hard Refresh Button */}
             <button 
               onClick={handleHardRefresh}
               title="Hard Refresh Cache"
-              className="flex items-center justify-center p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700 transition-colors cursor-pointer group"
+              className="w-9 h-9 rounded-full bg-slate-950/70 border border-slate-800/90 text-slate-300 hover:text-white hover:border-slate-700 flex items-center justify-center transition-colors cursor-pointer group"
             >
-              <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
+              <RefreshCw className="w-3.5 h-3.5 group-hover:rotate-180 transition-transform duration-500" />
             </button>
 
-            {/* User Profile Avatar & Role */}
+            {/* User Profile Pill matching screenshot: [TO] Test Business / Test owner */}
             {user && (
               <div className="relative" ref={dropdownRef}>
                 <button 
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="flex items-center gap-2 pl-1.5 pr-3 py-1 bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-xl cursor-pointer transition-colors"
+                  className="flex items-center gap-2 pl-1 pr-3 py-1 bg-slate-950/70 border border-slate-800/90 hover:border-slate-700 rounded-full cursor-pointer transition-colors"
                 >
-                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-cyan-600 to-blue-700 text-white font-black text-xs flex items-center justify-center shadow-sm">
-                    {isAdmin ? 'AD' : 'SA'}
+                  <div className="w-8 h-8 rounded-full bg-[#0082cb] text-white font-black text-xs flex items-center justify-center shadow-md">
+                    {isAdmin ? 'DH' : 'TO'}
                   </div>
                   <div className="hidden md:flex flex-col text-left -space-y-0.5">
                     <span className="text-xs font-bold text-slate-200 leading-tight">
-                      {user.email ? user.email.split('@')[0] : (isAdmin ? 'Admin' : 'Sales')}
+                      {user.email ? user.email.split('@')[0] : 'DESH Hub'}
                     </span>
-                    <span className="text-[10px] text-cyan-400 font-semibold uppercase">
-                      {isAdmin ? 'System Owner' : 'Sales Staff'}
+                    <span className="text-[10px] text-slate-400 font-semibold">
+                      {isAdmin ? 'System Owner' : 'Sales Cashier'}
                     </span>
                   </div>
                 </button>
 
-                {/* Profile Dropdown */}
                 {isDropdownOpen && (
                   <div className="absolute right-0 mt-2 w-52 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl py-2 z-50">
                     <div className="px-4 py-2 border-b border-slate-800">
@@ -314,10 +441,21 @@ export default function AdminLayout({
           </div>
         </header>
 
-        {/* Content Body */}
-        <main className="flex-1 p-4 sm:p-5 lg:p-6 overflow-y-auto">
+        {/* Scrollable Content Body */}
+        <main className="flex-1 p-5 sm:p-7 overflow-y-auto">
           {children}
         </main>
+
+        {/* Floating WhatsApp Action Button in Bottom Right matching StoreMate screenshot */}
+        <a
+          href="https://wa.me/94770000000"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Quick WhatsApp Support"
+          className="fixed bottom-6 right-6 z-40 w-12 h-12 rounded-full bg-[#25D366] hover:bg-[#20bd5a] text-white flex items-center justify-center shadow-[0_4px_20px_rgba(37,211,102,0.4)] hover:scale-110 transition-all duration-300 cursor-pointer"
+        >
+          <MessageCircle className="w-6 h-6 fill-white text-[#25D366]" />
+        </a>
 
       </div>
 
