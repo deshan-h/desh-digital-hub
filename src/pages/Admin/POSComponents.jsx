@@ -18,20 +18,23 @@ export const ICON_MAP = {
 export const POSItem = React.memo(({ item, addToCart, isFavorite, onToggleFavorite }) => (
   <button
     onClick={() => addToCart(item)}
-    className="relative group bg-slate-900 border border-slate-800 flex flex-col text-left transition-colors hover:border-emerald-500/40 rounded-xl h-24 w-full shadow-none overflow-hidden"
+    className="relative group bg-[#090d16] border border-slate-800/80 hover:border-blue-500/50 hover:shadow-lg hover:shadow-blue-500/10 flex flex-col text-left transition-all rounded-xl h-24 w-full shadow-none overflow-hidden cursor-pointer"
   >
     <div 
-      className="absolute top-2 right-2 p-1.5 z-20 hover:bg-slate-800 rounded-full transition-colors"
+      className="absolute top-2 right-2 p-1.5 z-20 hover:bg-white/10 rounded-full transition-colors cursor-pointer"
       onClick={(e) => onToggleFavorite(e, item)}
     >
-      <Star className={`w-[14px] h-[14px] transition-colors ${isFavorite ? 'text-yellow-400 fill-yellow-400' : 'text-slate-600 hover:text-yellow-400'}`} />
+      <Star className={`w-[14px] h-[14px] transition-colors ${isFavorite ? 'text-amber-400 fill-amber-400' : 'text-slate-600 hover:text-amber-400'}`} />
     </div>
-    <div className="flex-1 p-3.5 flex items-start z-10 pr-8">
-      <span className="font-semibold text-slate-200 text-[13px] leading-tight line-clamp-2">{item.name}</span>
+    <div className="flex-1 p-3 flex items-start z-10 pr-8">
+      <span className="font-bold text-slate-200 text-xs leading-snug line-clamp-2 group-hover:text-white transition-colors">{item.name}</span>
     </div>
-    <div className="bg-slate-950 w-full px-3.5 py-2 border-t border-slate-800 mt-auto z-10 transition-colors">
-      <span className="text-emerald-400 font-bold text-[14px] tracking-wide">
+    <div className="bg-slate-900/90 w-full px-3 py-1.5 border-t border-slate-800/80 mt-auto z-10 flex items-center justify-between transition-colors">
+      <span className="text-emerald-400 font-bold font-mono text-xs tracking-wide">
         {item.price === 0 ? 'Custom' : `Rs ${item.price.toFixed(2)}`}
+      </span>
+      <span className="text-[10px] text-slate-400 group-hover:text-sky-400 font-bold transition-colors">
+        + Add
       </span>
     </div>
   </button>
@@ -204,9 +207,9 @@ export const CustomerInput = React.memo(({
               }
             }
           }}
-          className={`w-full text-base bg-slate-950 border ${isCredit && !localVal.trim() ? 'border-red-500/50' : 'border-slate-800'} text-slate-200 rounded-xl pl-5 pr-16 py-4 focus:outline-none focus:border-emerald-500/50 transition-all shadow-inner`}
+          className={`w-full text-xs bg-[#090d16] border ${isCredit && !localVal.trim() ? 'border-rose-500/50' : 'border-slate-800/80'} text-slate-200 rounded-xl pl-3.5 pr-14 py-2.5 focus:outline-none focus:border-blue-500/60 transition-all shadow-inner`}
         />
-        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
           {localVal.trim() && onToggleFavorite && (
             <button
               type="button"
@@ -214,28 +217,28 @@ export const CustomerInput = React.memo(({
                 e.preventDefault();
                 onToggleFavorite(localVal.trim());
               }}
-              className={`p-1.5 rounded-lg border transition-all ${
+              className={`p-1 rounded-lg border transition-all ${
                 isCurrentFav 
-                  ? 'border-yellow-500/40 bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 shadow-[0_0_10px_rgba(234,179,8,0.2)]' 
-                  : 'border-slate-800 bg-slate-900/80 text-slate-500 hover:text-yellow-400 hover:border-yellow-500/30'
+                  ? 'border-amber-500/40 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 shadow-[0_0_10px_rgba(234,179,8,0.2)]' 
+                  : 'border-slate-800 bg-slate-900/80 text-slate-500 hover:text-amber-400 hover:border-amber-500/30'
               }`}
               title={isCurrentFav ? "Favorited (Click to remove)" : "Add to Favorites"}
             >
-              <Star className={`w-4 h-4 ${isCurrentFav ? 'fill-yellow-400 text-yellow-400' : 'text-current'}`} />
+              <Star className={`w-3.5 h-3.5 ${isCurrentFav ? 'fill-amber-400 text-amber-400' : 'text-current'}`} />
             </button>
           )}
           <div 
-            className="text-slate-500 cursor-pointer p-1.5 hover:bg-slate-800 rounded-full transition-colors"
+            className="text-slate-500 cursor-pointer p-1 hover:bg-slate-800 rounded-full transition-colors"
             onClick={() => setShowDropdown(!showDropdown)}
           >
-            <ChevronDown className={`w-5 h-5 transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`w-4 h-4 transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
           </div>
         </div>
       </div>
       
       {showDropdown && filteredCustomers.length > 0 && (
         <div 
-          className="absolute z-[70] mt-1 w-full max-h-52 overflow-y-auto bg-slate-900 border border-slate-700 rounded-lg shadow-2xl custom-scrollbar py-0.5"
+          className="absolute z-[70] mt-1 w-full max-h-52 overflow-y-auto bg-[#0b101d] border border-slate-800/90 rounded-xl shadow-2xl custom-scrollbar py-1"
           style={{ colorScheme: 'dark' }}
         >
           {filteredCustomers.map((c, idx) => {

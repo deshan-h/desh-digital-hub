@@ -111,43 +111,47 @@ export default function AdminLayout({
   const breadcrumb = getBreadcrumbs();
 
   return (
-    // StoreMate Vibrant Ocean Blue Container (Powers the seamless curve background)
-    <div className="flex h-screen bg-[#0082cb] overflow-hidden text-slate-100 selection:bg-cyan-500/30 selection:text-white print:hidden">
+    // Luxury Deep Oceanic Sapphire Container (Powers the seamless curve background)
+    <div className="flex h-screen bg-gradient-to-br from-[#0c2340] via-[#0a1e36] to-[#061424] overflow-hidden text-slate-100 selection:bg-blue-500/30 selection:text-white print:hidden">
 
       {/* ======================================================== */}
-      {/* LEFT SIDEBAR (StoreMate Ocean Blue Theme)                */}
+      {/* LEFT SIDEBAR (Executive Deep Oceanic Sapphire Theme)     */}
       {/* ======================================================== */}
       <aside 
         className={`${
           isSidebarOpen ? 'w-60' : 'w-[74px]'
-        } bg-[#0082cb] flex flex-col justify-between shrink-0 transition-all duration-300 z-30 select-none relative`}
+        } bg-gradient-to-b from-[#0c2340] via-[#0a1e36] to-[#061424] border-r border-sky-500/10 flex flex-col justify-between shrink-0 transition-all duration-300 z-30 select-none relative`}
       >
         <div className="flex flex-col h-full">
           
           {/* Sidebar Top: Logo Branding + Menu Toggle Button */}
-          <div className="h-16 flex items-center justify-between px-3.5 border-b border-white/15">
+          <div className="h-16 flex items-center justify-between px-3.5 border-b border-white/10">
             {isSidebarOpen ? (
               <div className="flex items-center gap-2.5 cursor-pointer overflow-hidden" onClick={() => setActiveTab('dashboard')}>
-                <img src="/pwa-192x192.png" alt="DESH Logo" className="w-8 h-8 rounded-lg object-contain bg-white/10 p-0.5 shrink-0 shadow-sm" />
+                <div className="w-9 h-9 rounded-xl bg-white/10 p-1 border border-white/15 backdrop-blur-md flex items-center justify-center shrink-0 shadow-inner">
+                  <img src="/pwa-192x192.png" alt="DESH Logo" className="w-full h-full object-contain" />
+                </div>
                 <div className="flex flex-col min-w-0">
                   <span className="text-sm font-black text-white tracking-tight leading-none truncate">
                     DESH Digital Hub
                   </span>
-                  <span className="text-[10px] text-white/70 font-semibold tracking-wider uppercase mt-0.5 truncate">
+                  <span className="text-[10px] text-sky-200/80 font-semibold tracking-wider uppercase mt-1 truncate">
                     Management Portal
                   </span>
                 </div>
               </div>
             ) : (
               <div className="w-full flex justify-center cursor-pointer" onClick={() => setIsSidebarOpen(true)}>
-                <img src="/pwa-192x192.png" alt="DESH Logo" className="w-8 h-8 rounded-lg object-contain bg-white/10 p-0.5 shadow-sm" />
+                <div className="w-9 h-9 rounded-xl bg-white/10 p-1 border border-white/15 backdrop-blur-md flex items-center justify-center shadow-inner">
+                  <img src="/pwa-192x192.png" alt="DESH Logo" className="w-full h-full object-contain" />
+                </div>
               </div>
             )}
 
             {/* Hamburger Toggle Icon */}
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0 ml-1"
+              className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0 ml-1"
               title={isSidebarOpen ? "Collapse Menu" : "Expand Menu"}
             >
               {isSidebarOpen ? <ChevronLeft className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -294,12 +298,12 @@ export default function AdminLayout({
 
       {/* ======================================================== */}
       {/* MAIN CONTENT CARD WITH THE SIGNATURE TOP-LEFT CURVE      */}
-      {/* (rounded-tl-[32px] revealing the #0082cb blue corner)    */}
+      {/* (rounded-tl-[34px] revealing the sapphire blue corner)   */}
       {/* ======================================================== */}
-      <div className="flex-1 bg-slate-950 rounded-tl-[32px] sm:rounded-tl-[36px] overflow-hidden flex flex-col shadow-[-12px_0_30px_rgba(0,0,0,0.35)] relative min-w-0 border-t border-l border-white/10">
+      <div className="flex-1 bg-[#090d16] rounded-tl-[34px] sm:rounded-tl-[38px] overflow-hidden flex flex-col shadow-[-18px_0_45px_rgba(0,0,0,0.85)] relative min-w-0 border-t border-l border-sky-400/20">
         
         {/* Top Header Bar (Uda Bar) inside the curved card */}
-        <header className="h-16 px-5 sm:px-8 bg-slate-900/90 backdrop-blur-2xl border-b border-slate-800/80 shrink-0 flex items-center justify-between gap-4 sticky top-0 z-20">
+        <header className="h-16 px-5 sm:px-8 bg-[#0b101d]/90 backdrop-blur-2xl border-b border-slate-800/80 shrink-0 flex items-center justify-between gap-4 sticky top-0 z-20">
           
           {/* Left: Breadcrumbs / Title */}
           <div className="flex items-center gap-2 min-w-0">
@@ -333,9 +337,9 @@ export default function AdminLayout({
                   setActiveTab('pos');
                 }
               }}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#0082cb] hover:bg-[#0070b0] text-white font-black text-xs shadow-md hover:shadow-cyan-500/20 transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-blue-600/30 hover:shadow-blue-500/50 transition-all cursor-pointer"
             >
-              <Plus className="w-4 h-4 stroke-[3]" />
+              <Plus className="w-4 h-4 stroke-[2.5]" />
               <span className="hidden sm:inline">Add Your First Order</span>
               <span className="sm:hidden">New</span>
             </button>
@@ -343,7 +347,7 @@ export default function AdminLayout({
             {/* Round Search Button */}
             <button 
               title="Global Search"
-              className="w-9 h-9 rounded-full bg-slate-950/70 border border-slate-800/90 text-slate-300 hover:text-cyan-400 hover:border-cyan-500/40 flex items-center justify-center transition-colors cursor-pointer"
+              className="w-9 h-9 rounded-full bg-slate-900/80 border border-slate-800 text-slate-300 hover:text-sky-400 hover:border-sky-500/40 flex items-center justify-center transition-all cursor-pointer shadow-sm"
             >
               <Search className="w-4 h-4" />
             </button>
@@ -351,18 +355,19 @@ export default function AdminLayout({
             {/* Round Notification Bell Button */}
             <button 
               title="Notifications"
-              className="relative w-9 h-9 rounded-full bg-slate-950/70 border border-slate-800/90 text-slate-300 hover:text-cyan-400 hover:border-cyan-500/40 flex items-center justify-center transition-colors cursor-pointer"
+              className="relative w-9 h-9 rounded-full bg-slate-900/80 border border-slate-800 text-slate-300 hover:text-sky-400 hover:border-sky-500/40 flex items-center justify-center transition-all cursor-pointer shadow-sm"
             >
               <Bell className="w-4 h-4" />
               {pendingOrders.length > 0 && (
-                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-cyan-400"></span>
+                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-sky-400 animate-pulse"></span>
               )}
             </button>
 
             {/* Round Grid Launcher Button */}
             <button 
               title="App Launcher"
-              className="w-9 h-9 rounded-full bg-slate-950/70 border border-slate-800/90 text-slate-300 hover:text-cyan-400 hover:border-cyan-500/40 flex items-center justify-center transition-colors cursor-pointer"
+              onClick={() => setActiveTab('dashboard')}
+              className="w-9 h-9 rounded-full bg-slate-900/80 border border-slate-800 text-slate-300 hover:text-sky-400 hover:border-sky-500/40 flex items-center justify-center transition-all cursor-pointer shadow-sm"
             >
               <Grid className="w-4 h-4" />
             </button>
@@ -374,8 +379,8 @@ export default function AdminLayout({
                 title="Quick Calculator"
                 className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors cursor-pointer border ${
                   isCalculatorOpen 
-                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 shadow-sm' 
-                    : 'bg-slate-950/70 border-slate-800/90 text-slate-300 hover:text-emerald-400 hover:border-emerald-500/40'
+                    ? 'bg-blue-600 border-blue-500 text-white shadow-blue-500/30' 
+                    : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:text-sky-400 hover:border-sky-500/40'
                 }`}
               >
                 <Calculator className="w-4 h-4" />
@@ -390,7 +395,7 @@ export default function AdminLayout({
             <button 
               onClick={handleHardRefresh}
               title="Hard Refresh Cache"
-              className="w-9 h-9 rounded-full bg-slate-950/70 border border-slate-800/90 text-slate-300 hover:text-white hover:border-slate-700 flex items-center justify-center transition-colors cursor-pointer group"
+              className="w-9 h-9 rounded-full bg-slate-900/80 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 flex items-center justify-center transition-all cursor-pointer group shadow-sm"
             >
               <RefreshCw className="w-3.5 h-3.5 group-hover:rotate-180 transition-transform duration-500" />
             </button>
@@ -400,9 +405,9 @@ export default function AdminLayout({
               <div className="relative" ref={dropdownRef}>
                 <button 
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="flex items-center gap-2 pl-1 pr-3 py-1 bg-slate-950/70 border border-slate-800/90 hover:border-slate-700 rounded-full cursor-pointer transition-colors"
+                  className="flex items-center gap-2 pl-1.5 pr-3 py-1 bg-slate-900/80 border border-slate-800 hover:border-slate-700 rounded-full cursor-pointer transition-colors shadow-sm"
                 >
-                  <div className="w-8 h-8 rounded-full bg-[#0082cb] text-white font-black text-xs flex items-center justify-center shadow-md">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-black text-xs flex items-center justify-center shadow-md">
                     DH
                   </div>
                   <div className="hidden md:flex flex-col text-left -space-y-0.5">

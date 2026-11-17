@@ -281,7 +281,7 @@ export default function POS({
   const cashDiff = cashVal - Math.max(0, finalPayable);
 
   return (
-    <div className="space-y-4 animate-in fade-in duration-300">
+    <div className="p-3 sm:p-5 max-w-[1600px] mx-auto space-y-4">
 
       {/* Main 2-Column Split POS Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
@@ -292,7 +292,7 @@ export default function POS({
         <div className="lg:col-span-7 xl:col-span-8 space-y-4">
           
           {/* Top Bar: Search + Custom Item + Refresh */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-3.5">
+          <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-4 shadow-xl space-y-3.5">
             
             <div className="flex items-center gap-3">
               {/* Search Bar */}
@@ -303,7 +303,7 @@ export default function POS({
                   placeholder="Search products or services..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-9 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500/50"
+                  className="w-full bg-[#090d16] border border-slate-800/80 focus:border-blue-500/60 rounded-xl pl-10 pr-9 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none transition-colors"
                 />
                 {searchQuery && (
                   <button 
@@ -323,7 +323,7 @@ export default function POS({
                   price: 0,
                   qty: 1
                 })}
-                className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-950 hover:bg-slate-800 text-cyan-400 border border-slate-800 hover:border-cyan-500/40 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer"
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-[#090d16] hover:bg-slate-800 text-sky-400 border border-slate-800 hover:border-sky-500/40 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer"
                 title="Add Custom Item with manual price"
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -337,7 +337,7 @@ export default function POS({
                   setSearchQuery('');
                   notify.success("POS Data Refreshed!");
                 }}
-                className="p-2 bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 rounded-xl transition-colors cursor-pointer shrink-0"
+                className="p-2 bg-[#090d16] hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 rounded-xl transition-colors cursor-pointer shrink-0"
                 title="Refresh Items"
               >
                 <RefreshCw className="w-4 h-4" />
@@ -368,8 +368,8 @@ export default function POS({
                       }}
                       className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0 cursor-pointer ${
                         isActive 
-                          ? 'bg-[#0082cb] text-white shadow-md' 
-                          : 'bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800'
+                          ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white shadow-md shadow-blue-600/30 border border-blue-400/30' 
+                          : 'bg-[#090d16] hover:bg-slate-800/80 text-slate-400 hover:text-slate-200 border border-slate-800/70 font-semibold'
                       }`}
                     >
                       {cat.category}
@@ -389,7 +389,7 @@ export default function POS({
           </div>
 
           {/* Services & Products Items Grid */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl min-h-[460px]">
+          <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-4 sm:p-5 shadow-xl min-h-[460px]">
             <POSItemsGrid
               filteredItems={filteredItems}
               handleAddToCart={addToCart}
@@ -408,13 +408,13 @@ export default function POS({
         <div className="lg:col-span-5 xl:col-span-4 space-y-4 lg:sticky lg:top-20">
           
           {/* BOX 1: Customer Details (Right Top) */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-3">
+          <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-4 shadow-xl space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                Customer Details <span className="text-red-400">*</span>
+                Customer Details <span className="text-rose-400">*</span>
               </span>
               {currentCustomerArrears > 0 && (
-                <span className="text-[11px] font-bold text-red-400 bg-red-500/10 border border-red-500/30 px-2 py-0.5 rounded-md">
+                <span className="text-[11px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/30 px-2 py-0.5 rounded-md">
                   Due: Rs {currentCustomerArrears.toFixed(0)}
                 </span>
               )}
@@ -444,7 +444,7 @@ export default function POS({
                         setWhatsappNumber(matched.phone);
                       }
                     }}
-                    className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 hover:text-cyan-400 hover:border-cyan-500/40 transition-colors cursor-pointer"
+                    className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-[#090d16] border border-slate-800/80 text-slate-300 hover:text-sky-400 hover:border-sky-500/40 transition-colors cursor-pointer"
                   >
                     {name}
                   </button>
@@ -454,10 +454,10 @@ export default function POS({
           </div>
 
           {/* BOX 2: Current Order / Cart Box */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+          <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-4 shadow-xl space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
               <div className="flex items-center gap-2">
-                <ShoppingCart className="w-4 h-4 text-cyan-400" />
+                <ShoppingCart className="w-4 h-4 text-sky-400" />
                 <h3 className="font-bold text-slate-200 text-xs uppercase tracking-wider">
                   Current Cart ({cart.length})
                 </h3>
@@ -466,7 +466,7 @@ export default function POS({
                 <button
                   type="button"
                   onClick={() => setCart([])}
-                  className="text-[11px] font-bold text-red-400 hover:text-red-300 flex items-center gap-1 cursor-pointer"
+                  className="text-[11px] font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1 cursor-pointer"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   <span>Clear</span>
@@ -484,7 +484,7 @@ export default function POS({
                 cart.map((item) => (
                   <div 
                     key={item.id} 
-                    className="flex items-center justify-between gap-2 p-2 bg-slate-950 border border-slate-800/80 rounded-xl text-xs"
+                    className="flex items-center justify-between gap-2 p-2.5 bg-[#090d16] border border-slate-800/70 hover:border-slate-700/80 rounded-xl text-xs transition-colors"
                   >
                     <div className="flex-1 min-w-0 pr-1">
                       <span className="font-bold text-slate-200 block truncate">{item.name}</span>
@@ -498,7 +498,7 @@ export default function POS({
                       <button
                         type="button"
                         onClick={() => updateCartItem(item.id, 'qty', Math.max(1, (Number(item.qty) || 1) - 1))}
-                        className="w-5 h-5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold flex items-center justify-center cursor-pointer"
+                        className="w-5 h-5 rounded-md bg-slate-800/90 hover:bg-slate-700 text-slate-200 font-bold flex items-center justify-center cursor-pointer transition-colors"
                       >
                         -
                       </button>
@@ -506,14 +506,14 @@ export default function POS({
                       <button
                         type="button"
                         onClick={() => updateCartItem(item.id, 'qty', (Number(item.qty) || 1) + 1)}
-                        className="w-5 h-5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold flex items-center justify-center cursor-pointer"
+                        className="w-5 h-5 rounded-md bg-slate-800/90 hover:bg-slate-700 text-slate-200 font-bold flex items-center justify-center cursor-pointer transition-colors"
                       >
                         +
                       </button>
                     </div>
 
                     {/* Subtotal */}
-                    <span className="w-16 text-right font-mono font-bold text-cyan-400 shrink-0">
+                    <span className="w-16 text-right font-mono font-bold text-sky-400 shrink-0">
                       Rs {((Number(item.price) || 0) * (Number(item.qty) || 1)).toFixed(0)}
                     </span>
 
@@ -521,7 +521,7 @@ export default function POS({
                     <button
                       type="button"
                       onClick={() => removeFromCart(item.id)}
-                      className="p-1 text-slate-500 hover:text-red-400 transition-colors shrink-0 cursor-pointer"
+                      className="p-1 text-slate-500 hover:text-rose-400 transition-colors shrink-0 cursor-pointer"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -532,35 +532,37 @@ export default function POS({
           </div>
 
           {/* BOX 3: Total & Cash Given / Payment Box */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-3.5 text-xs">
+          <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-4.5 shadow-xl space-y-3.5 text-xs">
             
             {/* Subtotal & Discount */}
             <div className="flex items-center justify-between text-slate-300">
-              <span>Sub Total:</span>
-              <span className="font-mono font-bold text-sm">Rs {rawSubTotal.toFixed(2)}</span>
+              <span className="font-medium">Sub Total:</span>
+              <span className="font-mono font-bold text-sm text-slate-100">Rs {rawSubTotal.toFixed(2)}</span>
             </div>
 
             <div className="flex items-center justify-between gap-2">
-              <span className="text-slate-400">Discount (Rs):</span>
+              <span className="text-slate-400 font-medium">Discount (Rs):</span>
               <input
                 type="number"
                 min="0"
                 placeholder="0.00"
                 value={discount}
                 onChange={(e) => setDiscount(e.target.value)}
-                className="w-24 text-right bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-slate-200 font-mono text-xs focus:outline-none focus:border-cyan-500"
+                className="w-24 text-right bg-[#090d16] border border-slate-800/90 rounded-lg px-2.5 py-1 text-slate-200 font-mono text-xs focus:outline-none focus:border-blue-500 transition-colors"
               />
             </div>
 
             {/* Credit Toggle */}
-            <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
+            <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
               <span className="text-slate-400 font-semibold">Payment Mode:</span>
               <div className="flex gap-1.5">
                 <button
                   type="button"
                   onClick={() => setIsCredit(false)}
                   className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    !isCredit ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-slate-950 text-slate-400'
+                    !isCredit 
+                      ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-sm' 
+                      : 'bg-[#090d16] text-slate-400 border border-slate-800/80 hover:text-slate-300'
                   }`}
                 >
                   Cash
@@ -569,7 +571,9 @@ export default function POS({
                   type="button"
                   onClick={() => setIsCredit(true)}
                   className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    isCredit ? 'bg-red-500/20 text-red-400 border border-red-500/40' : 'bg-slate-950 text-slate-400'
+                    isCredit 
+                      ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30 shadow-sm' 
+                      : 'bg-[#090d16] text-slate-400 border border-slate-800/80 hover:text-slate-300'
                   }`}
                 >
                   Credit (ණයට)
@@ -579,14 +583,14 @@ export default function POS({
 
             {/* Cash Given & Change Due */}
             {!isCredit && (
-              <div className="pt-2 border-t border-slate-800 space-y-2">
+              <div className="pt-2 border-t border-slate-800/80 space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5">
                     <span className="text-slate-300 font-bold">Cash Given:</span>
                     <button
                       type="button"
                       onClick={() => setCashGiven(finalPayable.toFixed(2))}
-                      className="text-[10px] text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/30 hover:bg-cyan-500/20"
+                      className="text-[10px] text-sky-400 bg-sky-500/15 px-2 py-0.5 rounded-md border border-sky-500/30 hover:bg-sky-500/25 font-bold cursor-pointer transition-colors"
                     >
                       Exact
                     </button>
@@ -597,7 +601,7 @@ export default function POS({
                     placeholder="0.00"
                     value={cashGiven}
                     onChange={(e) => setCashGiven(e.target.value)}
-                    className="w-28 text-right bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-emerald-400 font-mono font-bold text-sm focus:outline-none focus:border-emerald-500"
+                    className="w-28 text-right bg-[#090d16] border border-slate-800/90 rounded-lg px-2.5 py-1 text-emerald-400 font-mono font-bold text-sm focus:outline-none focus:border-emerald-500/70 transition-colors shadow-inner"
                   />
                 </div>
 
@@ -606,7 +610,7 @@ export default function POS({
                     <span className="text-slate-400 font-semibold">
                       {cashDiff >= 0 ? 'Change Due:' : 'Short Amount:'}
                     </span>
-                    <span className={`font-mono font-black ${cashDiff >= 0 ? 'text-blue-400' : 'text-red-400'}`}>
+                    <span className={`font-mono font-black ${cashDiff >= 0 ? 'text-sky-400' : 'text-rose-400'}`}>
                       Rs {Math.abs(cashDiff).toFixed(2)}
                     </span>
                   </div>
@@ -615,9 +619,10 @@ export default function POS({
             )}
 
             {/* Total Payable Banner */}
-            <div className="bg-[#0082cb] text-white rounded-xl p-3.5 flex items-center justify-between shadow-lg mt-2">
-              <span className="text-xs font-black uppercase tracking-wider">Total Payable:</span>
-              <span className="text-2xl font-black font-mono">
+            <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-blue-950/80 via-indigo-950/80 to-slate-900 border border-blue-500/30 p-4 shadow-xl shadow-blue-950/40 mt-2 flex items-center justify-between">
+              <div className="absolute -right-6 -bottom-6 w-24 h-24 bg-blue-500/10 rounded-full blur-xl pointer-events-none"></div>
+              <span className="text-xs font-black uppercase tracking-wider text-blue-200">Total Payable:</span>
+              <span className="text-2xl font-black font-mono text-white tracking-tight drop-shadow-[0_2px_10px_rgba(56,189,248,0.3)]">
                 Rs {finalPayable.toFixed(2)}
               </span>
             </div>
@@ -628,9 +633,9 @@ export default function POS({
                 type="button"
                 onClick={handleCompleteOrder}
                 disabled={cart.length === 0 || checkoutLoading}
-                className="w-full py-3.5 rounded-xl font-black text-sm bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 shadow-md disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-3.5 rounded-xl font-black text-sm bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-lg shadow-emerald-500/20 disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
               >
-                <Printer className="w-4 h-4" />
+                <Printer className="w-4 h-4 stroke-[2.5]" />
                 <span>{checkoutLoading ? 'Processing...' : (isCredit ? 'Confirm Credit Sale & Bill' : 'Complete Sale & Print Bill')}</span>
               </button>
 
@@ -638,7 +643,7 @@ export default function POS({
                 type="button"
                 onClick={() => setShowSavePendingModal(true)}
                 disabled={cart.length === 0}
-                className="w-full py-2 rounded-xl font-bold text-xs bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40"
+                className="w-full py-2 rounded-xl font-bold text-xs bg-[#090d16] hover:bg-slate-800 text-slate-300 border border-slate-800 transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40"
               >
                 <Save className="w-3.5 h-3.5" />
                 <span>Save as Pending Order</span>
