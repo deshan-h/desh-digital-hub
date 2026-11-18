@@ -23,7 +23,11 @@ export default function Navbar() {
   ];
 
   return (
-    <header className="sticky top-0 z-40 w-full bg-[#0c2340]/95 backdrop-blur-xl border-b border-white/5 py-3 sm:py-3.5 px-4 sm:px-8 transition-all duration-300">
+    <header className={`sticky top-0 z-40 w-full transition-all duration-300 ${
+      scrolled 
+        ? 'bg-[#0c2340]/95 backdrop-blur-xl border-b border-sky-500/15 shadow-lg py-2.5 sm:py-3 px-4 sm:px-8' 
+        : 'bg-transparent border-b-0 py-3 sm:py-4 px-4 sm:px-8'
+    }`}>
       <nav 
         aria-label="Main Navigation"
         className="max-w-7xl mx-auto"

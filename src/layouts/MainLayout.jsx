@@ -16,7 +16,7 @@ export default function MainLayout({ children }) {
       <Navbar />
 
       {/* Main Content Card (Top 2 corners curved downwards, bottom 2 corners curved upwards) */}
-      <div className="w-full px-0 sm:px-3 lg:px-5 flex-grow flex flex-col pt-1.5 sm:pt-2.5">
+      <div className="w-full px-0 sm:px-3 lg:px-5 flex-grow flex flex-col">
         <main className="flex-grow w-full bg-[#050c18] rounded-t-[30px] sm:rounded-t-[44px] md:rounded-t-[52px] rounded-b-[30px] sm:rounded-b-[44px] md:rounded-b-[52px] shadow-[0_0_50px_rgba(0,0,0,0.85)] relative z-10 pt-8 sm:pt-12 pb-12 sm:pb-16 overflow-hidden">
           {children}
         </main>
