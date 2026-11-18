@@ -238,7 +238,7 @@ export const CustomerInput = React.memo(({
       
       {showDropdown && filteredCustomers.length > 0 && (
         <div 
-          className="absolute z-[70] mt-1 w-full max-h-52 overflow-y-auto bg-[#0b101d] border border-slate-800/90 rounded-xl shadow-2xl custom-scrollbar py-1"
+          className="absolute z-[70] bottom-full mb-1.5 w-full max-h-52 overflow-y-auto bg-[#0b101d] border border-slate-800/90 rounded-xl shadow-2xl custom-scrollbar py-1"
           style={{ colorScheme: 'dark' }}
         >
           {filteredCustomers.map((c, idx) => {

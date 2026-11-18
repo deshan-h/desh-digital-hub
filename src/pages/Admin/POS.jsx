@@ -315,6 +315,17 @@ export default function POS({
                 )}
               </div>
 
+              {/* Today's Sales Mini Widget */}
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-[#090d16] border border-emerald-500/25 rounded-xl shadow-sm shrink-0">
+                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
+                <div className="flex flex-col text-left -space-y-0.5">
+                  <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Today Sales</span>
+                  <span className="text-xs font-black font-mono text-emerald-400">
+                    Rs {Number(todaySalesSum || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+
               {/* Custom Item Button */}
               <button
                 onClick={() => addToCart({
@@ -476,8 +487,8 @@ export default function POS({
               )}
             </div>
 
-            {/* Cart Items List */}
-            <div className="flex-1 overflow-y-auto space-y-2 no-scrollbar pr-0.5 min-h-[140px] max-h-[38vh]">
+            {/* Cart Items List (Compact Single Line) */}
+            <div className="flex-1 overflow-y-auto space-y-1.5 no-scrollbar pr-0.5 min-h-[140px] max-h-[38vh]">
               {cart.length === 0 ? (
                 <div className="text-center text-slate-500 py-8 text-xs font-medium italic">
                   Cart is empty. Tap items on the left to add.
@@ -486,44 +497,46 @@ export default function POS({
                 cart.map((item) => (
                   <div 
                     key={item.id} 
-                    className="flex items-center justify-between gap-2 p-2.5 bg-[#090d16] border border-slate-800/70 hover:border-slate-700/80 rounded-xl text-xs transition-colors"
+                    className="flex items-center justify-between gap-2 py-1.5 px-2.5 bg-[#090d16] border border-slate-800/70 hover:border-slate-700/80 rounded-xl text-xs transition-colors"
                   >
-                    <div className="flex-1 min-w-0 pr-1">
-                      <span className="font-bold text-slate-200 block truncate">{item.name}</span>
-                      <span className="text-[10px] text-slate-400 font-mono">
-                        Rs {Number(item.price || 0).toFixed(2)}
+                    {/* Item Name & Unit Price on Single Line */}
+                    <div className="flex-1 min-w-0 flex items-center gap-1.5 pr-1">
+                      <span className="font-bold text-slate-200 truncate text-[11px]">{item.name}</span>
+                      <span className="text-[10px] text-slate-500 font-mono shrink-0">
+                        @{Number(item.price || 0).toFixed(0)}
                       </span>
                     </div>
 
-                    {/* Quantity Stepper */}
+                    {/* Quantity Stepper (Compact) */}
                     <div className="flex items-center gap-1 shrink-0">
                       <button
                         type="button"
                         onClick={() => updateCartItem(item.id, 'qty', Math.max(1, (Number(item.qty) || 1) - 1))}
-                        className="w-5 h-5 rounded-md bg-slate-800/90 hover:bg-slate-700 text-slate-200 font-bold flex items-center justify-center cursor-pointer transition-colors"
+                        className="w-4 h-4 rounded bg-slate-800/90 hover:bg-slate-700 text-slate-200 font-bold text-[10px] flex items-center justify-center cursor-pointer transition-colors"
                       >
                         -
                       </button>
-                      <span className="w-6 text-center font-bold text-slate-200">{item.qty}</span>
+                      <span className="w-5 text-center font-bold text-slate-200 text-xs font-mono">{item.qty}</span>
                       <button
                         type="button"
                         onClick={() => updateCartItem(item.id, 'qty', (Number(item.qty) || 1) + 1)}
-                        className="w-5 h-5 rounded-md bg-slate-800/90 hover:bg-slate-700 text-slate-200 font-bold flex items-center justify-center cursor-pointer transition-colors"
+                        className="w-4 h-4 rounded bg-slate-800/90 hover:bg-slate-700 text-slate-200 font-bold text-[10px] flex items-center justify-center cursor-pointer transition-colors"
                       >
                         +
                       </button>
                     </div>
 
                     {/* Subtotal */}
-                    <span className="w-16 text-right font-mono font-bold text-sky-400 shrink-0">
+                    <span className="w-14 text-right font-mono font-bold text-sky-400 text-xs shrink-0">
                       Rs {((Number(item.price) || 0) * (Number(item.qty) || 1)).toFixed(0)}
                     </span>
 
-                    {/* Delete */}
+                    {/* Delete Button */}
                     <button
                       type="button"
                       onClick={() => removeFromCart(item.id)}
-                      className="p-1 text-slate-500 hover:text-rose-400 transition-colors shrink-0 cursor-pointer"
+                      className="p-0.5 text-slate-500 hover:text-rose-400 transition-colors shrink-0 cursor-pointer"
+                      title="Remove Item"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>

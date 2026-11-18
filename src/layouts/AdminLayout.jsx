@@ -315,11 +315,8 @@ export default function AdminLayout({
               <Menu className="w-4 h-4" />
             </button>
 
-            <div className="flex flex-col">
-              <span className="text-xs text-slate-400 font-semibold truncate">
-                {breadcrumb.section} &gt; {breadcrumb.page}
-              </span>
-              <h2 className="text-sm sm:text-base font-black text-slate-100 tracking-tight leading-none mt-0.5">
+            <div className="flex items-center">
+              <h2 className="text-sm sm:text-base font-black text-slate-100 tracking-tight leading-none">
                 {activeTab === 'pos' ? 'Add New Sale' : breadcrumb.page}
               </h2>
             </div>
