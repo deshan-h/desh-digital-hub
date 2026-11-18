@@ -2,7 +2,6 @@ import React from 'react';
 import MainLayout from '../layouts/MainLayout';
 import Hero from '../components/home/Hero';
 import Services from '../components/home/Services';
-import EduHubSection from '../components/home/EduHubSection';
 import SocialChannels from '../components/home/SocialChannels';
 import WorkingHoursAndLocation from '../components/home/WorkingHoursAndLocation';
 import QuickInquiry from '../components/home/QuickInquiry';
@@ -39,19 +38,16 @@ export default function Home() {
         {/* 1. Services Showcase (No Prices) */}
         <Services />
 
-        {/* 2. DESH Edu Hub Educational Portal */}
-        <EduHubSection />
-
-        {/* 3. YouTube & TikTok Digital Channels */}
+        {/* 2. Digital Community & EduHub Showcase (YouTube, TikTok, EduHub) */}
         <SocialChannels />
 
-        {/* 4. Store Working Hours & Google Map Location */}
+        {/* 3. Store Working Hours & Google Map Location */}
         <WorkingHoursAndLocation />
 
-        {/* 5. Direct Message / WhatsApp Inquiry */}
+        {/* 4. Direct Message / WhatsApp Inquiry */}
         <QuickInquiry />
 
-        {/* 6. About & Quality Standards */}
+        {/* 5. About & Quality Standards */}
         <About />
 
       </div>

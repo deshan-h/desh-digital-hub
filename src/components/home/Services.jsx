@@ -6,12 +6,11 @@ import {
   CheckCircle2, 
   X, 
   MessageCircle, 
-  ArrowRight,
-  ExternalLink
+  ArrowRight
 } from 'lucide-react';
 
 // ========================================================
-// THE 7 CORE SERVICES DEFINED BY USER WITH AI 3D ISOMETRIC ART
+// THE 12 CORE SERVICES (SPLIT & ENRICHED WITH 3D ISOMETRIC ART)
 // ========================================================
 const DEFAULT_SERVICES = [
   {
@@ -24,7 +23,7 @@ const DEFAULT_SERVICES = [
       { name: 'Hardware Diagnostics & Fault Checking' },
       { name: 'Windows OS Formatting & Essential Setup' },
       { name: 'High-Speed SSD & RAM Installation' },
-      { name: 'Thermal Paste Servicing & Deep Fan Cleaning' },
+      { name: 'Thermal Paste Servicing & Fan Cleaning' },
       { name: 'Motherboard & Power Circuit Troubleshooting' }
     ]
   },
@@ -39,48 +38,91 @@ const DEFAULT_SERVICES = [
       { name: 'Fast Photocopy [A4, Legal, A3]' },
       { name: 'Bulk Printing & Exam Document Duplication' },
       { name: 'High-DPI Photo & Certificate Printing' },
-      { name: 'Both Side (Duplex) Double-Sided Printing' }
+      { name: 'Double-Sided (Duplex) Duplication' }
     ]
   },
   {
-    id: 'laminating-binding',
-    title: 'Laminating & Book Binding',
-    sinhala: 'ලැමිනේට්, පොත් බයින්ඩින්',
-    image: '/images/services/laminating_binding.jpg',
-    description: 'NIC, A4, Legal, A3 Thermal Laminating සහ Spiral, Tape, Hardcover කල්පවත්නා පොත් බයින්ඩින්.',
+    id: 'laminating',
+    title: 'Document Laminating',
+    sinhala: 'ලැමිනේටින් සේවා',
+    image: '/images/services/laminating.jpg',
+    description: 'ජාතික හැඳුනුම්පත් (NIC), A4, Legal, A3 ප්‍රමාණයේ වැදගත් සහතික සහ ලේඛන කල්පවත්නා ලෙස Thermal Laminating කිරීම.',
     items: [
-      { name: 'Thermal Laminating [NIC, A4, Legal, A3]' },
-      { name: 'Plastic Spiral & Comb Coil Binding' },
-      { name: 'Tape Binding & Report Protection Covers' },
-      { name: 'Hardcover Thesis, Project & Book Binding' }
+      { name: 'NIC & Driving License Thermal Lamination' },
+      { name: 'A4 & Legal Document Heavy Protection' },
+      { name: 'A3 Certificate & Chart Lamination' },
+      { name: 'High Gloss Crystal-Clear Pouch Sealing' },
+      { name: 'Moisture, Dust & UV Fade Proof Coating' }
     ]
   },
   {
-    id: 'scan-online-apps',
-    title: 'Scan, Email & Online Apps',
-    sinhala: 'ස්කෑන්, ඊ-මේල්, ඔන්ලයින් අයදුම් පත්‍ර',
-    image: '/images/services/scan_online_apps.jpg',
-    description: 'උසස් තත්ත්වයේ ලේඛන ස්කෑන් කිරීම, ඊ-මේල් සේවා, විශ්වවිද්‍යාල සහ රජයේ සියලුම මාර්ගගත අයදුම්පත් පිරවීම.',
+    id: 'book-binding',
+    title: 'Book Binding',
+    sinhala: 'පොත් බයින්ඩින් සේවා',
+    image: '/images/services/book_binding.jpg',
+    description: 'පාසල් හා විශ්වවිද්‍යාල නිබන්ධන, ව්‍යාපෘති වාර්තා සහ පොත් සඳහා Plastic Spiral, Comb, Tape සහ Hardcover බයින්ඩින්.',
     items: [
-      { name: 'High-DPI Document & Signature Scanning' },
-      { name: 'Email & Secure Online Document Dispatch' },
-      { name: 'University & Exam Online Applications' },
-      { name: 'Vehicle Revenue License Renewals' },
-      { name: 'Passport & Driving License Appointment Forms' }
+      { name: 'Plastic Spiral & Wire-O Metal Binding' },
+      { name: 'Executive Comb & Tape Binding' },
+      { name: 'Project Reports & Thesis Hardcover Binding' },
+      { name: 'Transparent Frosted/Gloss Cover Sheets' },
+      { name: 'Gold & Silver Foil Title Embossing' }
+    ]
+  },
+  {
+    id: 'document-scanning',
+    title: 'Document Scanning',
+    sinhala: 'ලේඛන ස්කෑන් කිරීම',
+    image: '/images/services/document_scanning.jpg',
+    description: 'ඔබගේ සහතික, අත්සන්, ඡායාරූප සහ වැදගත් ලේඛන 600+ DPI උසස් පැහැදිලි බවකින් යුතුව PDF හෝ JPG ලෙස ඩිජිටල්කරණය කිරීම.',
+    items: [
+      { name: 'High-Resolution Optical Scanning (600+ DPI)' },
+      { name: 'Multi-Page Merged PDF Document Creation' },
+      { name: 'Biometric Photos & Signature Digitalization' },
+      { name: 'OCR Searchable PDF File Generation' },
+      { name: 'Immediate Cloud & USB Storage Loading' }
+    ]
+  },
+  {
+    id: 'email-services',
+    title: 'Email & Internet Services',
+    sinhala: 'ඊ-මේල් සේවා',
+    image: '/images/services/email_services.jpg',
+    description: 'විශ්වාසදායී ලෙස ඊ-මේල් පණිවිඩ යැවීම, ලේඛන ඇමුණුම් පරීක්ෂාව සහ ආරක්ෂිත ඩිජිටල් සන්නිවේදන විසඳුම්.',
+    items: [
+      { name: 'Official Email Composition & Fast Dispatch' },
+      { name: 'Secure Document Dispatch & Cloud Links' },
+      { name: 'Incoming Mail Checking & Quick Printouts' },
+      { name: 'Job Application & Resume Direct HR Sending' },
+      { name: 'Digital File Verification & Compressing' }
+    ]
+  },
+  {
+    id: 'online-applications',
+    title: 'Online Applications',
+    sinhala: 'මාර්ගගත අයදුම් පත්‍ර',
+    image: '/images/services/online_applications.jpg',
+    description: 'විශ්වවිද්‍යාල, විභාග, රියදුරු බලපත්‍ර, ආදායම් බලපත්‍ර සහ රජයේ සියලුම මාර්ගගත අයදුම්පත් නිවැරදිව පිරවීම.',
+    items: [
+      { name: 'University & Examination Registrations' },
+      { name: 'Vehicle Revenue License Online Renewal' },
+      { name: 'Passport & Driving License Appointment Forms' },
+      { name: 'Government Vacancy & Gazette Submissions' },
+      { name: 'State Portal & Digital Identity Setup' }
     ]
   },
   {
     id: 'media-downloads',
     title: 'Entertainment & Downloads',
-    sinhala: 'චිත්‍රපට, ගීත, වීඩියෝ, සොෆ්ට්වෙයාර්, ගේම්ස් ඩවුන්ලෝඩ්',
+    sinhala: 'චිත්‍රපට, ගීත, වීඩියෝ, මෘදුකාංග ඩවුන්ලෝඩ්',
     image: '/images/services/media_downloads.jpg',
     description: 'චිත්‍රපට, ගීත ඇල්බම්, වීඩියෝ, අත්‍යවශ්‍ය පරිගණක මෘදුකාංග සහ ක්‍රීඩා අධිවේගී ඩවුන්ලෝඩ්.',
     items: [
-      { name: 'Sinhala, Tamil & English MP3 Songs & Tracks' },
-      { name: 'HD Movies & High-Quality Video Collections' },
-      { name: 'Essential Windows PC & Office Software' },
+      { name: 'Sinhala, English & Tamil MP3 Song Collections' },
+      { name: 'Full HD Movies & High Quality Series' },
+      { name: 'Essential Windows Utility Software Packages' },
       { name: 'Offline PC Games & High-Speed Media Loading' },
-      { name: 'Past Examination Papers & Study Worksheets' }
+      { name: 'Educational Documentaries & Revision Media' }
     ]
   },
   {
@@ -91,24 +133,52 @@ const DEFAULT_SERVICES = [
     description: 'වෘත්තීය මට්ටමේ CV නිර්මාණය, ව්‍යාපාරික කාඩ්පත්, පෝස්ටර්, බැනර් සහ සමාජ මාධ්‍ය ප්‍රවර්ධන දැන්වීම්.',
     items: [
       { name: 'Professional CV & Modern ATS Resumes' },
-      { name: 'Business Cards & Identity Tags (ID Cards)' },
+      { name: 'Business Cards & Office Identity Tags' },
       { name: 'Flyers, Posters & Leaflet Graphic Design' },
-      { name: 'Social Media Post & Banner Graphics' },
-      { name: 'Book Covers, Labels & Package Stickers' }
+      { name: 'Social Media Facebook & Instagram Graphics' },
+      { name: 'Product Labels, Covers & Custom Stickers' }
     ]
   },
   {
     id: 'bill-payments',
-    title: 'Bill Payments & Reloads',
-    sinhala: 'බිල්පත් ගෙවීම්, පැකේජ සක්‍රිය කිරීම්',
+    title: 'Utility Bill Payments',
+    sinhala: 'බිල්පත් ගෙවීම්',
     image: '/images/services/bill_payments.jpg',
-    description: 'විදුලි, ජල, දුරකථන බිල්පත් ගෙවීම්, සියලුම ජංගම දුරකථන Reloads, Data පැකේජ සහ DTV සක්‍රිය කිරීම්.',
+    description: 'විදුලි, ජල, ස්ථාවර දුරකථන සහ රක්ෂණ බිල්පත් කඩිනමින් සහ විශ්වාසදායී රිසිට්පත් සහිතව ක්ෂණිකව ගෙවීම.',
     items: [
-      { name: 'CEB Electricity & Water Board Bill Payments' },
-      { name: 'SLT, Mobitel, Dialog, Airtel, Hutch Postpaid Bills' },
-      { name: 'Instant Mobile Reloads & Card Top-ups' },
-      { name: 'Broadband Data & Router Package Activations' },
-      { name: 'Dialog Television & DTV Channel Activations' }
+      { name: 'CEB & LECO Electricity Bill Settlement' },
+      { name: 'National Water Supply & Drainage Board Bills' },
+      { name: 'SLT Megaline & Fibre Broadband Postpaid Bills' },
+      { name: 'Dialog, Mobitel, Airtel, Hutch Postpaid Bills' },
+      { name: 'Instant Electronic Verified Payment Receipts' }
+    ]
+  },
+  {
+    id: 'reloads-packages',
+    title: 'Mobile Reloads & Packages',
+    sinhala: 'පැකේජ සක්‍රිය කිරීම් සහ Reload',
+    image: '/images/services/mobile_reloads.jpg',
+    description: 'සියලුම දුරකථන ජාල සඳහා Reloads, 4G/5G Data Plans, Unlimited Voice Plans සහ DTV නාලිකා සක්‍රිය කිරීම්.',
+    items: [
+      { name: 'Instant Mobile Reloads for All Networks' },
+      { name: 'Monthly & Weekly High-Speed Data Packs' },
+      { name: 'Unlimited YouTube & Social Media Bundles' },
+      { name: 'Dialog Television & DTV Channel Top-ups' },
+      { name: 'International Calling Cards & Roaming Reloads' }
+    ]
+  },
+  {
+    id: 'web-development',
+    title: 'Web Application Development',
+    sinhala: 'වෙබ් අඩවි සහ මෘදුකාංග නිර්මාණය',
+    image: '/images/services/web_development.jpg',
+    description: 'නවීන තාක්ෂණයෙන් යුත් Responsive වෙබ් අඩවි, Cloud Management Systems සහ E-Commerce විසඳුම් සැලසුම් කිරීම.',
+    items: [
+      { name: 'Custom Business & Portfolio Websites' },
+      { name: 'Modern React & Node.js Cloud Web Apps' },
+      { name: 'E-Commerce Online Stores & Payment Gateways' },
+      { name: 'Cloud Inventory & Database Management Portals' },
+      { name: 'Search Engine Optimization (SEO) & Fast Hosting' }
     ]
   }
 ];
@@ -117,7 +187,10 @@ export default function Services() {
   const [services, setServices] = useState(DEFAULT_SERVICES);
   const [loading, setLoading] = useState(true);
   const [selectedServiceModal, setSelectedServiceModal] = useState(null);
+  const [hoveredId, setHoveredId] = useState(null);
+  const [cycleIndex, setCycleIndex] = useState(0);
 
+  // Load hidden/visible state from Supabase if configured in Admin
   useEffect(() => {
     async function loadVisibility() {
       try {
@@ -138,6 +211,18 @@ export default function Services() {
     }
     loadVisibility();
   }, []);
+
+  // Idle cycle: Automatically alternate hover description overlay among tiles every 3 seconds
+  useEffect(() => {
+    if (hoveredId !== null) return; // Pause cycling while user is hovering manually
+    if (!services || services.length === 0) return;
+
+    const interval = setInterval(() => {
+      setCycleIndex((prev) => (prev + 1) % services.length);
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [hoveredId, services.length]);
 
   const handleWhatsAppInquiry = (serviceName) => {
     const text = encodeURIComponent(`Hi DESH Digital Hub! I would like to inquire about your ${serviceName} service.`);
@@ -170,66 +255,82 @@ export default function Services() {
         </div>
 
         {/* ======================================================== */}
-        {/* MAIN CATEGORIES: 1:1 SQUARE TILES (HATHARES TILES)       */}
-        {/* Powered by AI-generated 3D Isometric Renders             */}
+        {/* 1:1 SQUARE TILES (FULL IMAGE BOX + DARK GRADIENT FADE)    */}
+        {/* Hover description overlay + idle rotating auto-cycle     */}
         {/* ======================================================== */}
         {loading ? (
           <div className="py-20 text-center text-sky-400 font-semibold text-sm">
             සේවා තොරතුරු පූරණය වෙමින් පවතී...
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
-            {services.map((service, idx) => (
-              <motion.div
-                key={service.id}
-                initial={{ opacity: 0, y: 24 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: '-40px' }}
-                transition={{ duration: 0.45, delay: idx * 0.05 }}
-                onClick={() => setSelectedServiceModal(service)}
-                className="group relative aspect-square rounded-[26px] sm:rounded-[34px] p-3.5 sm:p-5 bg-gradient-to-b from-[#0a52a3] via-[#043372] to-[#011a40] border border-sky-400/35 hover:border-sky-300 shadow-[0_14px_35px_rgba(2,24,56,0.7),inset_0_1px_1.5px_rgba(255,255,255,0.4)] hover:shadow-[0_20px_50px_rgba(14,165,233,0.35),inset_0_1px_2px_rgba(255,255,255,0.6)] hover:-translate-y-2 hover:scale-[1.02] transition-all duration-300 cursor-pointer overflow-hidden flex flex-col justify-between select-none"
-              >
-                {/* Subtle Cyber Circuit Grid Background Pattern */}
-                <div className="absolute inset-0 opacity-15 group-hover:opacity-25 transition-opacity pointer-events-none">
-                  <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-                    <defs>
-                      <pattern id={`circuit-${service.id}`} width="50" height="50" patternUnits="userSpaceOnUse">
-                        <path d="M 50 0 L 35 15 L 15 15 L 0 0" fill="none" stroke="#38bdf8" strokeWidth="0.8" opacity="0.6" />
-                        <circle cx="35" cy="15" r="1.5" fill="#38bdf8" />
-                        <path d="M 0 50 L 20 30 L 40 30" fill="none" stroke="#38bdf8" strokeWidth="0.8" opacity="0.6" />
-                        <circle cx="20" cy="30" r="1.5" fill="#38bdf8" />
-                      </pattern>
-                    </defs>
-                    <rect width="100%" height="100%" fill={`url(#circuit-${service.id})`} />
-                  </svg>
-                </div>
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-7">
+            {services.map((service, idx) => {
+              // Active overlay is either explicitly hovered by the user or chosen by the idle rotation
+              const isOverlayActive = hoveredId !== null 
+                ? hoveredId === service.id 
+                : cycleIndex === idx;
 
-                {/* Top Glowing Ambient Highlight */}
-                <div className="absolute top-0 left-1/4 right-1/4 h-[2px] bg-gradient-to-r from-transparent via-sky-300 to-transparent opacity-80 group-hover:opacity-100 transition-opacity"></div>
+              return (
+                <motion.div
+                  key={service.id}
+                  initial={{ opacity: 0, y: 24 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: '-40px' }}
+                  transition={{ duration: 0.45, delay: idx * 0.04 }}
+                  onMouseEnter={() => setHoveredId(service.id)}
+                  onMouseLeave={() => setHoveredId(null)}
+                  onClick={() => setSelectedServiceModal(service)}
+                  className="group relative aspect-square rounded-[24px] sm:rounded-[30px] overflow-hidden border border-white/10 hover:border-sky-400/60 shadow-[0_12px_35px_rgba(0,0,0,0.6)] hover:shadow-[0_20px_50px_rgba(14,165,233,0.3)] hover:-translate-y-2 hover:scale-[1.02] transition-all duration-300 cursor-pointer select-none bg-slate-950"
+                >
+                  {/* Full Box Edge-to-Edge Image */}
+                  <img 
+                    src={service.image} 
+                    alt={service.title} 
+                    className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-108"
+                    loading="lazy"
+                  />
 
-                {/* 3D Isometric Artwork (Takes 65% of Tile Height) */}
-                <div className="relative z-10 flex-1 flex items-center justify-center pt-1 group-hover:scale-105 transition-transform duration-300">
-                  <div className="w-[84%] sm:w-[88%] aspect-square flex items-center justify-center">
-                    <img 
-                      src={service.image} 
-                      alt={service.title} 
-                      className="w-full h-full object-contain rounded-2xl drop-shadow-[0_12px_24px_rgba(0,0,0,0.65)]"
-                      loading="lazy"
-                    />
+                  {/* Bottom Dark Gradient Fade for Text */}
+                  <div className={`absolute inset-x-0 bottom-0 pt-16 pb-3.5 sm:pb-4 px-3 sm:px-4 bg-gradient-to-t from-black/95 via-black/80 to-transparent text-center z-10 pointer-events-none transition-opacity duration-300 ${isOverlayActive ? 'opacity-0' : 'opacity-100'}`}>
+                    <h3 className="text-xs sm:text-sm md:text-base font-black text-white tracking-tight leading-snug drop-shadow-md">
+                      {service.title}
+                    </h3>
+                    <p className="text-[10px] sm:text-xs font-semibold text-sky-300/90 mt-0.5 truncate drop-shadow-sm">
+                      {service.sinhala}
+                    </p>
                   </div>
-                </div>
 
-                {/* Bottom Text Area (English Title + Sinhala Subtitle) */}
-                <div className="relative z-10 pt-2 pb-0.5 text-center">
-                  <h3 className="text-xs sm:text-sm md:text-base font-black text-white tracking-tight leading-snug drop-shadow-md group-hover:text-sky-200 transition-colors">
-                    {service.title}
-                  </h3>
-                  <p className="text-[10px] sm:text-xs font-semibold text-sky-200/90 mt-0.5 sm:mt-1 truncate drop-shadow-sm">
-                    {service.sinhala}
-                  </p>
-                </div>
-              </motion.div>
-            ))}
+                  {/* Hover / Auto-Cycling Description Overlay Covering the Tile */}
+                  <div 
+                    className={`absolute inset-0 bg-[#061224]/92 backdrop-blur-md p-4 sm:p-5 flex flex-col justify-between z-20 text-left transition-all duration-300 ${
+                      isOverlayActive 
+                        ? 'opacity-100 translate-y-0 pointer-events-auto' 
+                        : 'opacity-0 translate-y-2 pointer-events-none'
+                    }`}
+                  >
+                    <div>
+                      <span className="text-[10px] sm:text-[11px] font-bold text-sky-400 uppercase tracking-wider block mb-1 truncate">
+                        {service.sinhala}
+                      </span>
+                      <h4 className="text-xs sm:text-sm md:text-base font-black text-white leading-snug tracking-tight">
+                        {service.title}
+                      </h4>
+                      <p className="text-[11px] sm:text-xs text-slate-300 mt-2 line-clamp-3 sm:line-clamp-4 leading-relaxed font-medium">
+                        {service.description}
+                      </p>
+                    </div>
+
+                    <div className="pt-2 border-t border-white/10 flex items-center justify-between text-sky-300 text-[11px] sm:text-xs font-bold">
+                      <span>විස්තර බලන්න</span>
+                      <ArrowRight className="w-3.5 h-3.5 text-sky-400 group-hover:translate-x-1 transition-transform" />
+                    </div>
+                  </div>
+
+                  {/* Subtle Top Glow Border */}
+                  <div className="absolute top-0 left-1/4 right-1/4 h-[2px] bg-gradient-to-r from-transparent via-sky-300 to-transparent opacity-0 group-hover:opacity-100 transition-opacity z-30" />
+                </motion.div>
+              );
+            })}
           </div>
         )}
 
@@ -249,11 +350,11 @@ export default function Services() {
               <div>
                 <div className="flex items-start justify-between pb-4 border-b border-slate-700/80">
                   <div className="flex items-center gap-3">
-                    <div className="w-14 h-14 rounded-2xl bg-sky-500/10 border border-sky-400/30 p-1 flex items-center justify-center shrink-0 shadow-inner overflow-hidden">
+                    <div className="w-14 h-14 rounded-2xl bg-sky-500/10 border border-sky-400/30 overflow-hidden shrink-0 shadow-inner">
                       <img 
                         src={selectedServiceModal.image} 
                         alt={selectedServiceModal.title} 
-                        className="w-full h-full object-contain rounded-xl"
+                        className="w-full h-full object-cover"
                       />
                     </div>
                     <div>
