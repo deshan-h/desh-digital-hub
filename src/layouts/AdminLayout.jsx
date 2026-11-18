@@ -445,20 +445,9 @@ export default function AdminLayout({
         </header>
 
         {/* Scrollable Content Body */}
-        <main className="flex-1 p-5 sm:p-7 overflow-y-auto">
+        <main className="flex-1 p-2 sm:p-3 overflow-y-auto">
           {children}
         </main>
-
-        {/* Floating WhatsApp Action Button in Bottom Right matching StoreMate screenshot */}
-        <a
-          href="https://wa.me/94770000000"
-          target="_blank"
-          rel="noopener noreferrer"
-          title="Quick WhatsApp Support"
-          className="fixed bottom-6 right-6 z-40 w-12 h-12 rounded-full bg-[#25D366] hover:bg-[#20bd5a] text-white flex items-center justify-center shadow-[0_4px_20px_rgba(37,211,102,0.4)] hover:scale-110 transition-all duration-300 cursor-pointer"
-        >
-          <MessageCircle className="w-6 h-6 fill-white text-[#25D366]" />
-        </a>
 
       </div>
 

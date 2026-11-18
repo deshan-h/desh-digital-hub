@@ -281,20 +281,20 @@ export default function POS({
   const cashDiff = cashVal - Math.max(0, finalPayable);
 
   return (
-    <div className="p-3 sm:p-5 max-w-[1600px] mx-auto space-y-4">
+    <div className="w-full space-y-2.5">
 
       {/* Main 2-Column Split POS Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
         
         {/* ======================================================== */}
-        {/* LEFT SIDE (65% Width): Categories at Top + Services Box */}
+        {/* LEFT SIDE (65% Width): Categories + POS Items + Customer */}
         {/* ======================================================== */}
-        <div className="lg:col-span-7 xl:col-span-8 space-y-4">
+        <div className="lg:col-span-7 xl:col-span-8 space-y-3">
           
           {/* Top Bar: Search + Custom Item + Refresh */}
-          <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-4 shadow-xl space-y-3.5">
+          <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-3 sm:p-3.5 shadow-xl space-y-3">
             
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5">
               {/* Search Bar */}
               <div className="relative flex-1">
                 <Search className="absolute left-3.5 top-2.5 w-4 h-4 text-slate-500" />
@@ -391,7 +391,7 @@ export default function POS({
           </div>
 
           {/* Services & Products Items Grid */}
-          <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-4 sm:p-5 shadow-xl min-h-[460px]">
+          <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-3.5 sm:p-4 shadow-xl min-h-[420px]">
             <POSItemsGrid
               filteredItems={filteredItems}
               handleAddToCart={addToCart}
@@ -402,15 +402,61 @@ export default function POS({
             />
           </div>
 
+          {/* Customer Details Box (Placed Under POS Items Box) */}
+          <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-3.5 sm:p-4 shadow-xl space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                Customer Details <span className="text-rose-400">*</span>
+              </span>
+              {currentCustomerArrears > 0 && (
+                <span className="text-[11px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/30 px-2 py-0.5 rounded-md">
+                  Due: Rs {currentCustomerArrears.toFixed(0)}
+                </span>
+              )}
+            </div>
+
+            <CustomerInput
+              customerName={customerName}
+              setCustomerName={setCustomerName}
+              customersList={customersList}
+              whatsappNumber={whatsappNumber}
+              setWhatsappNumber={setWhatsappNumber}
+              isCredit={isCredit}
+              favoriteCustomers={favoriteCustomerNames}
+            />
+
+            {/* Favorite Customers Quick-Pill Selection */}
+            {favoriteCustomerNames.length > 0 && !customerName && (
+              <div className="flex flex-wrap gap-1.5 pt-0.5">
+                {favoriteCustomerNames.slice(0, 6).map((name, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => {
+                      setCustomerName(name);
+                      const matched = customersList.find(c => c.name?.toLowerCase() === name.toLowerCase());
+                      if (matched && matched.phone && !whatsappNumber) {
+                        setWhatsappNumber(matched.phone);
+                      }
+                    }}
+                    className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-[#090d16] border border-slate-800/80 text-slate-300 hover:text-sky-400 hover:border-sky-500/40 transition-colors cursor-pointer"
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
         </div>
 
         {/* ======================================================== */}
-        {/* RIGHT SIDE (35% Width): Customer -> Cart -> Total & Pay  */}
+        {/* RIGHT SIDE (35% Width): Current Cart -> Total & Pay      */}
         {/* ======================================================== */}
-        <div className="lg:col-span-5 xl:col-span-4 space-y-4 lg:sticky lg:top-20">
+        <div className="lg:col-span-5 xl:col-span-4 space-y-3 lg:sticky lg:top-14">
           
           {/* BOX 1: Current Order / Cart Box (Top Right) */}
-          <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-4 shadow-xl space-y-3">
+          <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-3.5 sm:p-4 shadow-xl space-y-3">
             <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
               <div className="flex items-center gap-2">
                 <ShoppingCart className="w-4 h-4 text-sky-400" />
@@ -431,7 +477,7 @@ export default function POS({
             </div>
 
             {/* Cart Items List */}
-            <div className="max-h-56 overflow-y-auto space-y-2 no-scrollbar pr-0.5">
+            <div className="max-h-60 overflow-y-auto space-y-2 no-scrollbar pr-0.5">
               {cart.length === 0 ? (
                 <div className="text-center text-slate-500 py-8 text-xs font-medium italic">
                   Cart is empty. Tap items on the left to add.
@@ -487,54 +533,8 @@ export default function POS({
             </div>
           </div>
 
-          {/* BOX 2: Customer Details (Under Items / Cart Box) */}
-          <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-4 shadow-xl space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                Customer Details <span className="text-rose-400">*</span>
-              </span>
-              {currentCustomerArrears > 0 && (
-                <span className="text-[11px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/30 px-2 py-0.5 rounded-md">
-                  Due: Rs {currentCustomerArrears.toFixed(0)}
-                </span>
-              )}
-            </div>
-
-            <CustomerInput
-              customerName={customerName}
-              setCustomerName={setCustomerName}
-              customersList={customersList}
-              whatsappNumber={whatsappNumber}
-              setWhatsappNumber={setWhatsappNumber}
-              isCredit={isCredit}
-              favoriteCustomers={favoriteCustomerNames}
-            />
-
-            {/* Favorite Customers Quick-Pill Selection */}
-            {favoriteCustomerNames.length > 0 && !customerName && (
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {favoriteCustomerNames.slice(0, 5).map((name, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => {
-                      setCustomerName(name);
-                      const matched = customersList.find(c => c.name?.toLowerCase() === name.toLowerCase());
-                      if (matched && matched.phone && !whatsappNumber) {
-                        setWhatsappNumber(matched.phone);
-                      }
-                    }}
-                    className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-[#090d16] border border-slate-800/80 text-slate-300 hover:text-sky-400 hover:border-sky-500/40 transition-colors cursor-pointer"
-                  >
-                    {name}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* BOX 3: Total & Cash Given / Payment Box */}
-          <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-4.5 shadow-xl space-y-3.5 text-xs">
+          {/* BOX 2: Total & Cash Given / Payment Box */}
+          <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-3.5 sm:p-4 shadow-xl space-y-3 text-xs">
             
             {/* Subtotal & Discount */}
             <div className="flex items-center justify-between text-slate-300">
@@ -621,7 +621,7 @@ export default function POS({
             )}
 
             {/* Total Payable Banner */}
-            <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-blue-950/80 via-indigo-950/80 to-slate-900 border border-blue-500/30 p-4 shadow-xl shadow-blue-950/40 mt-2 flex items-center justify-between">
+            <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-blue-950/80 via-indigo-950/80 to-slate-900 border border-blue-500/30 p-3.5 sm:p-4 shadow-xl shadow-blue-950/40 mt-1 flex items-center justify-between">
               <div className="absolute -right-6 -bottom-6 w-24 h-24 bg-blue-500/10 rounded-full blur-xl pointer-events-none"></div>
               <span className="text-xs font-black uppercase tracking-wider text-blue-200">Total Payable:</span>
               <span className="text-2xl font-black font-mono text-white tracking-tight drop-shadow-[0_2px_10px_rgba(56,189,248,0.3)]">
@@ -629,26 +629,26 @@ export default function POS({
               </span>
             </div>
 
-            {/* Primary Action Buttons */}
-            <div className="space-y-2 pt-1">
+            {/* Primary Action Buttons (In the same single row) */}
+            <div className="grid grid-cols-2 gap-2 pt-1">
               <button
                 type="button"
                 onClick={handleCompleteOrder}
                 disabled={cart.length === 0 || checkoutLoading}
-                className="w-full py-3.5 rounded-xl font-black text-sm bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-lg shadow-emerald-500/20 disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
+                className="w-full py-3 px-2 rounded-xl font-black text-xs sm:text-sm bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-lg shadow-emerald-500/20 disabled:opacity-50 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.99] text-center"
               >
-                <Printer className="w-4 h-4 stroke-[2.5]" />
-                <span>{checkoutLoading ? 'Processing...' : (isCredit ? 'Confirm Credit Sale & Bill' : 'Complete Sale & Print Bill')}</span>
+                <Printer className="w-4 h-4 stroke-[2.5] shrink-0" />
+                <span className="truncate">{checkoutLoading ? 'Processing...' : (isCredit ? 'Confirm Bill' : 'Complete & Print')}</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setShowSavePendingModal(true)}
                 disabled={cart.length === 0}
-                className="w-full py-2 rounded-xl font-bold text-xs bg-[#090d16] hover:bg-slate-800 text-slate-300 border border-slate-800 transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40"
+                className="w-full py-3 px-2 rounded-xl font-bold text-xs bg-[#090d16] hover:bg-slate-800 text-slate-300 border border-slate-800 transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40 text-center"
               >
-                <Save className="w-3.5 h-3.5" />
-                <span>Save as Pending Order</span>
+                <Save className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">Save Pending</span>
               </button>
             </div>
 
