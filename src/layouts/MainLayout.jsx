@@ -6,7 +6,7 @@ import Footer from '../components/common/Footer';
 export default function MainLayout({ children }) {
   return (
     <div 
-      className="min-h-screen bg-[#050c18] text-slate-100 font-sans selection:bg-blue-500/30 selection:text-white flex flex-col relative overflow-x-clip"
+      className="min-h-screen bg-[#050c18] text-slate-100 font-sans selection:bg-blue-500/30 selection:text-white flex flex-col relative overflow-hidden"
       style={{ fontFamily: "'Inter', 'Noto Sans Sinhala', sans-serif" }}
     >
       {/* Background ambient lighting */}
@@ -16,7 +16,7 @@ export default function MainLayout({ children }) {
       <NoticeBar />
       <Navbar />
 
-      <main className="flex-grow">
+      <main className="flex-grow pt-24 md:pt-28">
         {children}
       </main>
 

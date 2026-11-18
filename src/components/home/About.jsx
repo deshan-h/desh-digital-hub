@@ -6,9 +6,9 @@ export default function About() {
   const capabilities = [
     {
       icon: Printer,
-      title: 'High-DPI Laser & Color Production',
+      title: 'High-DPI Document & Color Printing',
       sub: 'වෘත්තීය මට්ටමේ මුද්‍රණ තාක්ෂණය',
-      desc: 'නවීන Laser සහ Color මුද්‍රණ යන්ත්‍ර මගින් පැහැදිලි ලේඛන සහ දීප්තිමත් ඡායාරූප මුද්‍රණය.',
+      desc: 'නවීන මුද්‍රණ යන්ත්‍ර මගින් පැහැදිලි ලේඛන, ෆොටෝකොපි සහ උසස් තත්ත්වයේ ඡායාරූප මුද්‍රණය.',
       badge: 'Industrial Grade'
     },
     {

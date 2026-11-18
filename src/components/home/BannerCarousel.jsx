@@ -152,10 +152,10 @@ export default function BannerCarousel() {
       onTouchEnd={() => setIsPaused(false)}
     >
       {/* Ambient Neon Glow behind the Carousel */}
-      <div className="absolute -inset-1.5 bg-gradient-to-r from-blue-600/30 via-sky-500/20 to-indigo-600/30 rounded-3xl blur-2xl opacity-40 group-hover:opacity-75 transition-opacity duration-700 pointer-events-none"></div>
+      <div className="absolute -inset-1.5 bg-gradient-to-r from-cyan-500 via-blue-500 to-emerald-500 rounded-3xl blur-xl opacity-30 group-hover:opacity-60 transition duration-700 pointer-events-none animate-gradient-x"></div>
 
       {/* Main Carousel Container - Fixed 1:1 Aspect Ratio (Square) */}
-      <div className="relative w-full max-w-[340px] sm:max-w-[390px] lg:max-w-[430px] aspect-square mx-auto rounded-3xl overflow-hidden bg-black/95 border border-slate-800/90 shadow-[0_25px_60px_rgba(0,0,0,0.95)] backdrop-blur-2xl">
+      <div className="relative w-full max-w-[380px] sm:max-w-[430px] lg:max-w-[460px] aspect-square mx-auto rounded-3xl overflow-hidden bg-slate-950 border border-white/10 shadow-2xl">
         <AnimatePresence initial={false} custom={direction} mode="wait">
           <motion.div
             key={currentBanner.id || currentIndex}
