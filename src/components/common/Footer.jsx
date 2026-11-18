@@ -13,49 +13,50 @@ import {
 
 export default function Footer() {
   return (
-    <footer id="contact" className="bg-[#040812] text-slate-400 pt-16 pb-10 border-t border-sky-500/15 relative overflow-hidden">
-      
-      {/* Background Lighting */}
-      <div className="absolute bottom-0 right-0 w-96 h-96 bg-sky-600/5 rounded-full blur-[140px] pointer-events-none -z-10"></div>
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-indigo-600/5 rounded-full blur-[140px] pointer-events-none -z-10"></div>
-
-      <div className="container mx-auto px-4 md:px-6 max-w-7xl relative z-10">
+    <footer id="contact" className="w-full px-3 sm:px-6 md:px-8 pb-6 md:pb-10 max-w-[1440px] mx-auto text-slate-400 relative">
+      <div className="rounded-[28px] sm:rounded-[36px] md:rounded-[42px] bg-[#040814]/95 border border-sky-500/20 pt-12 pb-8 px-6 sm:px-10 shadow-[0_20px_50px_rgba(0,0,0,0.8)] relative overflow-hidden">
         
-        {/* Main 4-Column Footer Content */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 lg:gap-12 pb-14 border-b border-slate-800/80">
+        {/* Background Lighting */}
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-sky-600/5 rounded-full blur-[140px] pointer-events-none -z-10"></div>
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-indigo-600/5 rounded-full blur-[140px] pointer-events-none -z-10"></div>
+
+        <div className="relative z-10">
           
-          {/* Column 1: Brand & Operational Hours */}
-          <div className="space-y-4">
-            <Link to="/" className="flex items-center gap-3 group">
-              <div className="w-10 h-10 rounded-xl bg-white/10 p-1 border border-white/15 flex items-center justify-center shadow-inner">
-                <img src="/pwa-192x192.png" alt="DESH Logo" className="w-full h-full object-contain" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-lg font-black text-white tracking-tight leading-tight">
-                  DESH Digital Hub
-                </span>
-                <span className="text-[10px] text-sky-400 font-bold uppercase tracking-wider">
-                  Printing & IT Solutions
-                </span>
-              </div>
-            </Link>
+          {/* Main 4-Column Footer Content */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 lg:gap-12 pb-12 border-b border-slate-800/80">
+            
+            {/* Column 1: Brand & Operational Hours */}
+            <div className="space-y-4">
+              <Link to="/" className="flex items-center gap-3 group">
+                <div className="w-10 h-10 rounded-xl bg-white/10 p-1 border border-white/15 flex items-center justify-center shadow-inner">
+                  <img src="/pwa-192x192.png" alt="DESH Logo" className="w-full h-full object-contain" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-lg font-black text-white tracking-tight leading-tight">
+                    DESH Digital Hub
+                  </span>
+                  <span className="text-[10px] text-sky-400 font-bold uppercase tracking-wider">
+                    Your One Step Digital Solution
+                  </span>
+                </div>
+              </Link>
 
-            <p className="text-xs text-slate-400 leading-relaxed font-medium">
-              පරිගණක අලුත්වැඩියාව, අධිවේගී ලේසර් මුද්‍රණ, ලැමිනේටින්, බයින්ඩින් සහ සියලුම මාර්ගගත (Online) සේවා එකම වහලක් යටින් ලබාගන්න.
-            </p>
-
-            {/* Operating Hours Badge */}
-            <div className="p-3 rounded-2xl bg-[#09172c]/80 border border-sky-500/20 space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span className="text-xs font-bold text-white">සතියේ දින 7 ම විවෘතයි</span>
-              </div>
-              <p className="text-[11px] text-slate-400 flex items-center gap-1.5 pl-4">
-                <Clock className="w-3.5 h-3.5 text-sky-400" />
-                <span>Open: 8:00 AM – 8:30 PM</span>
+              <p className="text-xs text-slate-400 leading-relaxed font-medium">
+                පරිගණක අලුත්වැඩියාව, අධිවේගී මුද්‍රණ, ලැමිනේටින්, බයින්ඩින් සහ සියලුම මාර්ගගත (Online) සේවා එකම වහලක් යටින් ලබාගන්න.
               </p>
+
+              {/* Operating Hours Badge */}
+              <div className="p-3 rounded-2xl bg-[#09172c]/80 border border-sky-500/20 space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span className="text-xs font-bold text-white">සතියේ දින 7 ම විවෘතයි</span>
+                </div>
+                <p className="text-[11px] text-slate-400 flex items-center gap-1.5 pl-4">
+                  <Clock className="w-3.5 h-3.5 text-sky-400" />
+                  <span>Monday – Sunday Open (Daily from 7:00 AM)</span>
+                </p>
+              </div>
             </div>
-          </div>
 
           {/* Column 2: Contact Information */}
           <div className="space-y-4">
@@ -212,6 +213,7 @@ export default function Footer() {
         </div>
 
       </div>
-    </footer>
+    </div>
+  </footer>
   );
 }

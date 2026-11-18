@@ -23,11 +23,11 @@ export default function Navbar() {
   ];
 
   return (
-    <header className="fixed w-full z-40 top-0 left-0 right-0 px-2 sm:px-6 pt-0 sm:pt-1.5 pointer-events-none">
+    <header className="fixed w-full z-40 top-0 left-0 right-0 px-3 sm:px-6 md:px-8 pt-2 sm:pt-3 pointer-events-none transition-all duration-300">
       <nav 
         aria-label="Main Navigation"
-        className={`max-w-7xl mx-auto pointer-events-auto rounded-b-[24px] sm:rounded-b-[30px] border-b border-l border-r border-sky-400/20 bg-gradient-to-b from-[#0c2340]/95 via-[#0a1e36]/95 to-[#061424]/95 backdrop-blur-2xl shadow-[0_18px_45px_rgba(0,0,0,0.75)] transition-all duration-300 ${
-          scrolled ? 'py-2 sm:py-2.5' : 'py-2.5 sm:py-3.5'
+        className={`max-w-[1440px] mx-auto pointer-events-auto rounded-2xl sm:rounded-[28px] border border-sky-400/25 bg-gradient-to-r from-[#0c2340]/95 via-[#091a32]/95 to-[#061424]/95 backdrop-blur-2xl shadow-[0_16px_45px_rgba(0,0,0,0.75)] transition-all duration-300 ${
+          scrolled ? 'py-2 sm:py-2.5 bg-[#07152b]/98 border-sky-400/35 shadow-[0_18px_50px_rgba(0,0,0,0.85)]' : 'py-2.5 sm:py-3.5'
         }`}
       >
         <div className="px-4 sm:px-6">
@@ -117,8 +117,8 @@ export default function Navbar() {
 
         {/* Mobile Dropdown Drawer */}
         <div 
-          className={`lg:hidden transition-all duration-300 ease-in-out overflow-hidden bg-[#071322]/95 backdrop-blur-3xl border-b border-sky-500/20 ${
-            isMobileMenuOpen ? 'max-h-[420px] py-4' : 'max-h-0 py-0 border-transparent'
+          className={`lg:hidden transition-all duration-300 ease-in-out overflow-hidden rounded-b-2xl sm:rounded-b-[28px] bg-[#071322]/98 backdrop-blur-3xl ${
+            isMobileMenuOpen ? 'max-h-[420px] py-4 border-t border-sky-500/20' : 'max-h-0 py-0 border-transparent'
           }`}
         >
           <div className="flex flex-col px-6 space-y-3">
