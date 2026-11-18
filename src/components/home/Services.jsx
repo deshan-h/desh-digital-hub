@@ -1,123 +1,78 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { categoryService } from '../../services/supabaseService';
-import { FcPackage, FcPrint, FcTemplate, FcDocument, FcRules, FcImageFile, FcDataBackup, FcCommandLine, FcSettings, FcGlobe } from 'react-icons/fc';
+import { 
+  Printer, 
+  Layers, 
+  FileText, 
+  Image as ImageIcon, 
+  Download, 
+  Code, 
+  Settings, 
+  Globe, 
+  Package, 
+  Wrench, 
+  Search, 
+  ExternalLink, 
+  CheckCircle2, 
+  X, 
+  MessageCircle,
+  Tag,
+  ArrowRight,
+  Sparkles
+} from 'lucide-react';
 
 const ICON_MAP = {
-  'Package': FcPackage,
-  'Printer': FcPrint,
-  'Layers': FcTemplate,
-  'FileText': FcDocument,
-  'Type': FcRules,
-  'Image': FcImageFile,
-  'Download': FcDataBackup,
-  'Code': FcCommandLine,
-  'Settings': FcSettings,
-  'Globe': FcGlobe
-};
-
-const CATEGORY_META = {
-  'Printing & Scanning': {
-    name: 'මුද්‍රණ සහ ස්කෑන් සේවා',
-    description: 'උසස් තත්ත්වයේ මුද්‍රණ (Printing) සහ ලිපිලේඛන ස්කෑන් කිරීමේ සේවාවන්.',
-    colorClass: 'text-blue-400'
-  },
-  'Document Laminating': {
-    name: 'ලැමිනේටින් සේවා',
-    description: 'ඔබේ වටිනා සහතිකපත් සහ හැඳුනුම්පත් ආරක්ෂා කරගැනීමට උසස් ලැමිනේටින් සේවාව.',
-    colorClass: 'text-emerald-400'
-  },
-  'Book Binding': {
-    name: 'පොත් බඳින සේවා (Book Binding)',
-    description: 'වාර්තා, පැවරුම් (Assignments) සහ පොත් සඳහා වෘත්තීය මට්ටමේ බයින්ඩිං සේවාවන්.',
-    colorClass: 'text-orange-400'
-  },
-  'Type Setting': {
-    name: 'ග්‍රැෆික් නිර්මාණ (Graphic Design)',
-    description: 'ඔබගේ ව්‍යාපාරයට, උත්සව වලට සහ පුද්ගලික අවශ්‍යතා සඳහා නිර්මාණාත්මක ග්‍රැෆික් නිර්මාණ.',
-    colorClass: 'text-pink-400'
-  },
-  'Online Services': {
-    name: 'මාර්ගගත සේවා (Online Services)',
-    description: 'රජයේ අයදුම්පත්, වීසා පෝරම සහ විභාග අයදුම්පත් මාර්ගගතව (Online) යැවීම සඳහා විශ්වාසදායී සේවාව.',
-    colorClass: 'text-purple-400'
-  },
-  'Downloads & Media': {
-    name: 'ඩවුන්ලෝඩ් සේවා',
-    description: 'නවීන චිත්‍රපට, පරිගණක ක්‍රීඩා සහ මෘදුකාංග (Software) ඉක්මනින් ඩවුන්ලෝඩ් කරගැනීමේ පහසුකම.',
-    colorClass: 'text-yellow-400'
-  },
-  'Custom & Utilities': {
-    name: 'පරිගණක අලුත්වැඩියාව',
-    description: 'පරිගණක සහ ලැප්ටොප් දෝෂ පරික්ෂා කිරීම සහ අලුත්වැඩියාව.',
-    colorClass: 'text-red-400'
-  }
+  'Package': Package,
+  'Printer': Printer,
+  'Layers': Layers,
+  'FileText': FileText,
+  'Type': FileText,
+  'Image': ImageIcon,
+  'Download': Download,
+  'Code': Code,
+  'Settings': Settings,
+  'Globe': Globe,
+  'Wrench': Wrench
 };
 
 export default function Services() {
-  const [activeService, setActiveService] = useState(null);
-  const [services, setServices] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeCategory, setActiveCategory] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedServiceModal, setSelectedServiceModal] = useState(null);
 
   useEffect(() => {
     async function fetchServices() {
       try {
         let data = await categoryService.getCategories();
-
-        // Hide "Custom & Utilities" from the public frontend
         data = data.filter(cat => cat.category !== 'Custom & Utilities');
+        data.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
-        data.sort((a, b) => {
-          if (a.order !== undefined && b.order !== undefined) {
-            return a.order - b.order;
-          }
-          return 0;
-        });
-
-        const mappedServices = data.map(cat => {
-          const meta = CATEGORY_META[cat.category] || {
-            description: 'Specialized services from DESH Digital Hub.',
-            colorClass: cat.color || 'text-cyan-400'
-          };
-          
-          return {
-            ...cat,
-            displayName: cat.category, // ALWAYS use the name from Firestore
-            description: meta.description,
-            colorClass: meta.colorClass,
-            iconName: cat.category === 'Online Services' ? 'Globe' : (cat.icon || 'Package')
-          };
-        });
-
-        const hardcodedServices = [
+        // Add PC Repairs as a dedicated service category
+        const allServices = [
+          ...data,
           {
-            id: 'hc-repair',
+            id: 'pc-repairs',
             category: 'Computer Repairing',
-            displayName: 'Computer Repairing',
-            description: 'Professional computer and laptop repair services, troubleshooting, and hardware upgrades.',
-            colorClass: 'text-orange-400',
-            iconName: 'Wrench',
-            items: []
-          },
-          {
-            id: 'hc-software',
-            category: 'Software Development',
-            displayName: 'Software Development',
-            description: 'Custom software solutions, web applications, and mobile apps tailored to your business needs.',
-            colorClass: 'text-blue-400',
-            iconName: 'Code',
-            items: []
+            displayName: 'Computer & Laptop Repairing',
+            icon: 'Wrench',
+            color: 'text-amber-400',
+            description: 'Professional hardware diagnostics, laptop servicing, motherboard repairs, OS formatting and SSD upgrades.',
+            items: [
+              { name: 'Hardware Diagnostics & Checking', price: 500 },
+              { name: 'Windows OS Formatting & Setup', price: 1500 },
+              { name: 'Virus Removal & Deep Cleaning', price: 1000 },
+              { name: 'RAM & SSD Speed Upgrade Installation', price: 800 },
+              { name: 'Thermal Paste Re-application & Servicing', price: 1200 }
+            ]
           }
         ];
 
-        const allServices = [...mappedServices, ...hardcodedServices];
-        setServices(allServices);
-        
-        if (allServices.length > 0) {
-          setActiveService(0);
-        }
+        setCategories(allServices);
       } catch (error) {
-        console.error("Error fetching services: ", error);
+        console.error('Error fetching services:', error);
       } finally {
         setLoading(false);
       }
@@ -125,195 +80,300 @@ export default function Services() {
     fetchServices();
   }, []);
 
-  const [activeServiceId, setActiveServiceId] = useState(null);
+  // Filter categories and search query
+  const filteredCategories = useMemo(() => {
+    return categories.filter(cat => {
+      const matchesCategory = activeCategory === 'all' || cat.id === activeCategory || cat.category === activeCategory;
+      if (!searchQuery.trim()) return matchesCategory;
 
-  useEffect(() => {
-    if (services.length > 0 && !activeServiceId) {
-      setActiveServiceId(services[0].id);
-    }
-  }, [services, activeServiceId]);
+      const q = searchQuery.toLowerCase();
+      const inCatTitle = cat.category.toLowerCase().includes(q) || (cat.displayName && cat.displayName.toLowerCase().includes(q));
+      const inItems = cat.items && cat.items.some(it => it.name.toLowerCase().includes(q));
 
-  const scrollContainerRef = React.useRef(null);
-  const scroll = (direction) => {
-    if (scrollContainerRef.current) {
-      const { current } = scrollContainerRef;
-      const scrollAmount = current.clientWidth >= 768 ? current.clientWidth * 0.5 : current.clientWidth * 0.9;
-      current.scrollBy({ left: direction === 'left' ? -scrollAmount : scrollAmount, behavior: 'smooth' });
-    }
+      return matchesCategory && (inCatTitle || inItems);
+    });
+  }, [categories, activeCategory, searchQuery]);
+
+  // Compute minimum starting price
+  const getStartingPrice = (items) => {
+    if (!items || items.length === 0) return null;
+    const prices = items.map(i => Number(i.price)).filter(p => !isNaN(p) && p > 0);
+    if (prices.length === 0) return null;
+    return Math.min(...prices);
   };
 
-  if (loading) {
-    return (
-      <div id="services" className="w-full max-w-6xl mt-4 pt-8 border-t border-white/5 container mx-auto px-4 text-center text-cyan-400">
-        Loading Services...
-      </div>
-    );
-  }
-
   return (
-    <div id="services" className="w-full max-w-[1400px] mt-12 pt-16 border-t border-white/5 container mx-auto px-4 z-10 relative">
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: "-100px" }}
-        transition={{ duration: 0.6 }}
-        className="text-center mb-10 md:mb-16"
-      >
-        <h2 className="text-3xl md:text-5xl font-black text-white mb-4 tracking-tight drop-shadow-lg">
-          අපගේ <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">ප්‍රධාන සේවාවන්</span>
-        </h2>
-        <div className="h-1.5 w-24 bg-gradient-to-r from-cyan-500 to-blue-600 mx-auto rounded-full mb-6 shadow-[0_0_15px_rgba(34,211,238,0.5)]"></div>
-        <p className="text-slate-400 text-sm md:text-base max-w-2xl mx-auto font-medium">
-          වැඩි විස්තර සහ මිල ගණන් දැනගැනීමට අදාළ සේවාව තෝරන්න
-        </p>
-      </motion.div>
+    <section id="services" className="py-20 relative z-10 w-full border-t border-sky-500/10">
+      
+      {/* Background Ambient Glow */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[60rem] h-[30rem] bg-sky-500/5 rounded-full blur-[150px] pointer-events-none -z-10"></div>
 
-      {/* Quick Navigation Slider */}
-      <div className="flex flex-wrap gap-3 mb-8 justify-center px-4 w-full max-w-4xl mx-auto">
-        {services.map((service) => {
-          const IconCmp = ICON_MAP[service.iconName] || FcPackage;
-          const isActive = activeServiceId === service.id;
-          
-          return (
-            <button
-              key={`nav-${service.id}`}
-              onClick={() => {
-                setActiveServiceId(service.id);
-                const el = document.getElementById(`card-${service.id}`);
-                if (el && scrollContainerRef.current) {
-                  const container = scrollContainerRef.current;
-                  const scrollLeft = el.offsetLeft - container.offsetLeft - (container.clientWidth / 2) + (el.clientWidth / 2);
-                  container.scrollTo({ left: scrollLeft, behavior: 'smooth' });
-                }
-              }}
-              className={`flex items-center justify-center gap-2 whitespace-nowrap p-3 md:px-5 md:py-2.5 rounded-full border transition-all duration-300 shadow-md aspect-square md:aspect-auto ${
-                isActive
-                  ? 'bg-cyan-500/20 text-cyan-400 border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.3)]'
-                  : 'bg-slate-900 border-slate-700/50 text-slate-300 hover:bg-slate-800 hover:text-cyan-400 hover:border-cyan-500/50'
-              }`}
-            >
-              <IconCmp className="w-6 h-6 md:w-5 md:h-5" />
-              <span className="hidden md:inline">{service.displayName}</span>
-            </button>
-          );
-        })}
-      </div>
-      
-      <style>{`
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(34, 211, 238, 0.2); border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(34, 211, 238, 0.5); }
-      `}</style>
-      
-      <div className="relative w-full group">
+      <div className="container mx-auto px-4 md:px-6 max-w-7xl">
         
-        {/* Navigation Arrows */}
-        <button 
-          onClick={() => scroll('left')} 
-          className="absolute -left-2 md:-left-6 top-1/2 -translate-y-1/2 z-50 w-10 h-10 md:w-12 md:h-12 flex items-center justify-center rounded-full bg-slate-900 border border-slate-700 text-slate-300 hover:text-cyan-400 hover:border-cyan-500/50 hover:bg-slate-800 transition-all shadow-xl opacity-0 group-hover:opacity-100"
-        >
-          <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg>
-        </button>
+        {/* Section Header */}
+        <div className="text-center max-w-3xl mx-auto mb-12">
+          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-sky-500/10 border border-sky-500/25 text-sky-300 text-xs font-bold uppercase tracking-wider mb-3">
+            <Sparkles className="w-3.5 h-3.5 text-sky-400" />
+            <span>Digital Services & Price Catalog</span>
+          </div>
 
-        <button 
-          onClick={() => scroll('right')} 
-          className="absolute -right-2 md:-right-6 top-1/2 -translate-y-1/2 z-50 w-10 h-10 md:w-12 md:h-12 flex items-center justify-center rounded-full bg-slate-900 border border-slate-700 text-slate-300 hover:text-cyan-400 hover:border-cyan-500/50 hover:bg-slate-800 transition-all shadow-xl opacity-0 group-hover:opacity-100"
-        >
-          <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>
-        </button>
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight leading-tight">
+            අපගේ සියලුම{' '}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-400">
+              සේවාවන් සහ මිල ගණන්
+            </span>
+          </h2>
 
-        {/* Carousel Container */}
-        <div ref={scrollContainerRef} className="flex overflow-x-auto gap-6 md:gap-8 snap-x snap-mandatory scroll-smooth hide-scrollbar px-2 md:px-6 pb-10 pt-4">
-          
-          {services.map((service, idx) => {
-            const IconCmp = ICON_MAP[service.iconName] || FcPackage;
-            const isCardActive = activeServiceId === service.id;
-            
+          <p className="text-sm sm:text-base text-slate-400 mt-2 font-medium">
+            ඔබට අවශ්‍ය සේවාව සහ පැකේජ පහසුවෙන්ම තෝරාගෙන ක්ෂණිකව මිල ගණන් පරීක්ෂා කරන්න.
+          </p>
+
+          {/* Search Input Bar */}
+          <div className="relative max-w-md mx-auto mt-6">
+            <Search className="w-4 h-4 text-slate-400 absolute left-4 top-3.5" />
+            <input
+              type="text"
+              placeholder="සේවාවක් සොයන්න (Search: NIC, CV, Printing, A4, Format...)"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-[#081528]/80 border border-sky-500/20 rounded-2xl pl-11 pr-4 py-3 text-slate-200 placeholder-slate-500 text-xs sm:text-sm focus:outline-none focus:border-sky-400/60 shadow-lg"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3.5 top-3.5 text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Category Pills Filter Tabs */}
+        <div className="flex items-center justify-start sm:justify-center gap-2 overflow-x-auto no-scrollbar pb-3 mb-10 px-2">
+          <button
+            onClick={() => setActiveCategory('all')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeCategory === 'all'
+                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-600/30'
+                : 'bg-[#09172c]/80 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800/80'
+            }`}
+          >
+            සියලුම සේවා (All)
+          </button>
+
+          {categories.map((cat) => {
+            const Icon = ICON_MAP[cat.icon] || Package;
+            const isActive = activeCategory === cat.id || activeCategory === cat.category;
             return (
-              <motion.div 
-                id={`card-${service.id}`}
-                key={service.id}
-                initial={{ opacity: 0, scale: 0.95 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true, margin: "-50px" }}
-                transition={{ duration: 0.5, delay: idx * 0.1 }}
-                className={`snap-center shrink-0 w-[95%] sm:w-[80%] md:w-[600px] bg-[#0f172a] rounded-[2rem] p-6 md:p-10 flex flex-col h-[550px] md:h-[650px] hover:border-cyan-500/40 transition-all duration-500 group/card relative overflow-hidden ${
-                  isCardActive 
-                    ? 'border-2 border-cyan-400 shadow-[0_0_40px_-10px_rgba(34,211,238,0.4)]' 
-                    : 'border border-slate-800/80 hover:shadow-[0_20px_60px_-15px_rgba(8,145,178,0.2)]'
+              <button
+                key={cat.id}
+                onClick={() => setActiveCategory(cat.id || cat.category)}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                  isActive
+                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-md shadow-blue-600/30'
+                    : 'bg-[#09172c]/80 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800/80'
                 }`}
               >
-                {/* Background Glow */}
-                <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/5 rounded-full blur-[80px] pointer-events-none group-hover/card:bg-cyan-500/10 transition-colors duration-500"></div>
-                
-                {/* Header Section */}
-                <div className="flex justify-between items-start mb-6 relative z-10">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] md:text-xs text-slate-300 border border-slate-700/60 px-4 py-1.5 rounded-full font-semibold tracking-wide bg-slate-900/50 backdrop-blur-md">
-                      {service.id?.startsWith('hc-') ? 'Featured Service' : 'Standard Service'}
-                    </span>
-                  </div>
-                  <div className="text-slate-600 group-hover/card:text-cyan-500/40 transition-colors">
-                    <IconCmp className="w-8 h-8 opacity-50 grayscale group-hover/card:grayscale-0 transition-all" />
-                  </div>
-                </div>
-                
-                <h3 className="text-2xl md:text-3xl font-black text-white mb-4 leading-tight tracking-tight drop-shadow-sm relative z-10">{service.displayName}</h3>
-                
-                <p className="text-slate-400 text-sm md:text-base mb-8 leading-relaxed font-medium relative z-10 flex-shrink-0">
-                  {service.description}
-                </p>
-                
-                {/* Items Section Header */}
-                <div className="flex items-center gap-2 text-[11px] md:text-xs font-bold text-slate-300 uppercase tracking-[0.2em] mb-6 relative z-10">
-                  <span className="text-cyan-400 text-base leading-none">&lt;/&gt;</span> SERVICES & PRICES
-                </div>
-                
-                {/* Scrollable Items List (Grid Layout) */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar relative z-10 pr-2">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
-                    {service.items && service.items.map((item, i) => (
-                      <div 
-                        key={i} 
-                        className="flex flex-col justify-between bg-slate-800/40 backdrop-blur-md p-4 rounded-2xl border border-white/5 hover:border-cyan-400/50 hover:bg-slate-800/80 transition-all duration-300 shadow-lg hover:shadow-[0_0_15px_rgba(34,211,238,0.2)] group/item"
-                      >
-                        <span className="text-slate-200 text-sm font-semibold group-hover/item:text-white transition-colors mb-3 leading-tight">{item.name}</span>
-                        <span className="text-cyan-400 text-xs font-black self-start bg-slate-900/80 px-3 py-1.5 rounded-lg border border-cyan-500/30 shadow-inner">
-                          {item.price !== undefined ? `${Number(item.price).toFixed(2)} LKR` : 'Custom Price'}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {(!service.items || service.items.length === 0) && (
-                    <div className="text-slate-500 italic text-sm py-4 text-center bg-slate-800/20 rounded-2xl border border-dashed border-slate-700/50">
-                      No specific packages listed. Please contact us for custom requirements.
-                    </div>
-                  )}
-                </div>
-
-                {/* Conditional WhatsApp Button at bottom */}
-                {(service.displayName === 'පරිගණක අලුත්වැඩියාව' || service.id?.startsWith('hc-')) && (
-                  <div className="pt-6 mt-4 border-t border-slate-800/50 relative z-10 shrink-0">
-                    <a 
-                      href={`https://wa.me/94719989000?text=Hello%20DESH%20Digital%20Hub,%20I%20need%20details%20about%20${encodeURIComponent(service.displayName)}`}
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-center gap-2 w-full bg-slate-800/80 hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-400 border border-slate-700 hover:border-emerald-500/50 font-bold py-3.5 rounded-xl transition-all duration-300 text-sm"
-                    >
-                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
-                      Contact via WhatsApp
-                    </a>
-                  </div>
-                )}
-              </motion.div>
+                <Icon className="w-3.5 h-3.5" />
+                <span>{cat.displayName || cat.category}</span>
+              </button>
             );
           })}
         </div>
+
+        {/* Services Bento Grid */}
+        {loading ? (
+          <div className="py-20 text-center text-sky-400 font-semibold text-sm">
+            සේවා තොරතුරු පූරණය වෙමින් පවතී...
+          </div>
+        ) : filteredCategories.length === 0 ? (
+          <div className="py-16 text-center text-slate-400 text-sm border border-dashed border-slate-800 rounded-3xl bg-[#081528]/40">
+            සොයන ලද සේවාව හමු නොවීය. කරුණාකර වෙනත් නමකින් සොයන්න.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredCategories.map((service, idx) => {
+              const Icon = ICON_MAP[service.icon] || Package;
+              const startPrice = getStartingPrice(service.items);
+              const previewItems = (service.items || []).slice(0, 3);
+
+              return (
+                <motion.div
+                  key={service.id || idx}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: '-50px' }}
+                  transition={{ duration: 0.4, delay: idx * 0.05 }}
+                  className="bg-[#081528]/85 hover:bg-[#0b1c36] backdrop-blur-xl border border-sky-500/15 hover:border-sky-500/40 rounded-3xl p-6 transition-all duration-300 shadow-xl hover:shadow-2xl hover:shadow-sky-500/5 hover:-translate-y-1 flex flex-col justify-between group relative overflow-hidden"
+                >
+                  <div className="space-y-4">
+                    
+                    {/* Top Row: Icon badge + Starting Price Tag */}
+                    <div className="flex items-center justify-between">
+                      <div className="w-12 h-12 rounded-2xl bg-sky-500/10 border border-sky-500/25 text-sky-400 flex items-center justify-center shadow-inner group-hover:scale-105 transition-transform">
+                        <Icon className="w-6 h-6 stroke-[2]" />
+                      </div>
+
+                      {startPrice !== null ? (
+                        <div className="text-right">
+                          <span className="text-[10px] text-slate-400 font-medium block">Starting from</span>
+                          <span className="text-xs font-black text-emerald-400 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/25">
+                            Rs. {startPrice.toFixed(2)}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-sky-300 font-bold px-2 py-0.5 rounded bg-sky-500/10 border border-sky-500/20">
+                          Custom Rates
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Category Title & Description */}
+                    <div>
+                      <h3 className="text-lg font-black text-white group-hover:text-sky-300 transition-colors">
+                        {service.displayName || service.category}
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-1 leading-relaxed line-clamp-2">
+                        {service.description || 'Specialized digital and computer services from DESH Digital Hub.'}
+                      </p>
+                    </div>
+
+                    {/* Top 3 Popular Items Preview */}
+                    <div className="space-y-1.5 pt-2 border-t border-slate-800/80">
+                      {previewItems.map((item, itemIdx) => (
+                        <div
+                          key={itemIdx}
+                          className="flex items-center justify-between py-1 px-2.5 rounded-xl bg-slate-900/60 border border-white/5 text-xs"
+                        >
+                          <span className="text-slate-300 truncate font-medium max-w-[70%]">
+                            {item.name}
+                          </span>
+                          <span className="text-slate-200 font-bold font-mono">
+                            {item.price ? `Rs. ${Number(item.price).toFixed(0)}` : 'Inquire'}
+                          </span>
+                        </div>
+                      ))}
+
+                      {(service.items || []).length > 3 && (
+                        <p className="text-[11px] text-sky-400/80 font-semibold text-center pt-1">
+                          + {(service.items || []).length - 3} more options available
+                        </p>
+                      )}
+                    </div>
+
+                  </div>
+
+                  {/* Card Action Button */}
+                  <div className="pt-5 mt-4 border-t border-slate-800/80 flex items-center justify-between">
+                    <button
+                      onClick={() => setSelectedServiceModal(service)}
+                      className="text-xs font-bold text-sky-400 hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <span>සම්පූර්ණ මිල ලැයිස්තුව (View All)</span>
+                      <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                    </button>
+
+                    <a
+                      href={`https://wa.me/94719989000?text=Hi%20DESH%20Hub,%20I%20would%20like%20to%20order%20from%20${encodeURIComponent(service.displayName || service.category)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="p-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-slate-950 transition-colors"
+                      title="Direct WhatsApp Order"
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                    </a>
+                  </div>
+
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
+
       </div>
-    </div>
+
+      {/* ======================================================== */}
+      {/* SERVICE DETAIL PRICING MODAL                             */}
+      {/* ======================================================== */}
+      <AnimatePresence>
+        {selectedServiceModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-[#081528] border border-sky-500/25 rounded-3xl max-w-lg w-full p-6 shadow-2xl relative overflow-hidden flex flex-col max-h-[85vh]"
+            >
+              {/* Modal Header */}
+              <div className="flex items-start justify-between pb-4 border-b border-slate-800">
+                <div>
+                  <span className="text-[10px] font-mono font-bold text-sky-400 uppercase tracking-widest">
+                    SERVICE PRICING CATALOG
+                  </span>
+                  <h3 className="text-xl font-black text-white mt-1">
+                    {selectedServiceModal.displayName || selectedServiceModal.category}
+                  </h3>
+                </div>
+
+                <button
+                  onClick={() => setSelectedServiceModal(null)}
+                  className="p-1.5 rounded-xl bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Modal Items List */}
+              <div className="flex-1 overflow-y-auto py-4 space-y-2 pr-1 no-scrollbar">
+                {(selectedServiceModal.items || []).map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between p-3 rounded-2xl bg-slate-950/70 border border-slate-800/80 hover:border-sky-500/30 transition-colors"
+                  >
+                    <div>
+                      <span className="text-xs sm:text-sm font-bold text-slate-200 block">
+                        {item.name}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs sm:text-sm font-black text-sky-400 font-mono">
+                        {item.price ? `Rs. ${Number(item.price).toFixed(2)}` : 'Inquire'}
+                      </span>
+                      <a
+                        href={`https://wa.me/94719989000?text=Hello%20DESH%20Hub,%20I%20would%20like%20to%20order%20${encodeURIComponent(item.name)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500 text-emerald-400 hover:text-slate-950 text-[11px] font-bold transition-colors"
+                      >
+                        Order
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="pt-4 border-t border-slate-800 flex items-center justify-between gap-3">
+                <span className="text-xs text-slate-400">
+                  Bulk order discounts available
+                </span>
+                <a
+                  href={`https://wa.me/94719989000?text=Hi%20DESH%20Hub,%20I%20need%20custom%20work%20for%20${encodeURIComponent(selectedServiceModal.displayName || selectedServiceModal.category)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-colors"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  <span>Chat on WhatsApp</span>
+                </a>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+    </section>
   );
 }

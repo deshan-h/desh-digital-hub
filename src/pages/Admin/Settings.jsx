@@ -3,6 +3,7 @@ import { settingsService } from '../../services/supabaseService';
 import { supabase } from '../../config/supabase';
 import { uploadToCloudflare } from '../../services/cloudflareStorage';
 import { notify } from '../../utils/toast';
+import ItemsManager from './ItemsManager';
 import { 
   Save, 
   Plus, 
@@ -15,22 +16,18 @@ import {
   ArrowUp, 
   ArrowDown, 
   ExternalLink,
-  Store,
   Printer,
-  ShoppingCart,
-  ShieldCheck,
   Database,
-  Bell,
   Sliders,
-  ChevronRight,
-  ChevronLeft,
-  Search,
   CheckCircle2,
   RefreshCw,
-  FileText,
+  Palette,
+  Package,
+  Layers,
   Sparkles,
   Clock,
-  Laptop
+  ShieldCheck,
+  Check
 } from 'lucide-react';
 import Loader from '../../components/Loader';
 
@@ -57,12 +54,13 @@ const DEFAULT_BANNERS = [
   }
 ];
 
-export default function Settings({ isAdmin }) {
+export default function Settings({ isAdmin, posCategories, fetchCategories }) {
   const [loading, setLoading] = useState(true);
-  const [activeCategory, setActiveCategory] = useState('all'); // 'all' | 'general' | 'banners' | 'invoice' | 'pos' | 'security' | 'storage'
-  const [searchFilter, setSearchFilter] = useState('');
+  const [activeTab, setActiveTab] = useState('ad-posts'); // 'ad-posts' | 'items' | 'appearance' | 'storage'
 
-  // 1. Banners state
+  // ==========================================
+  // 1. AD POST / BANNERS STATE
+  // ==========================================
   const [savingBanners, setSavingBanners] = useState(false);
   const [banners, setBanners] = useState([]);
   const [uploading, setUploading] = useState(false);
@@ -77,55 +75,38 @@ export default function Settings({ isAdmin }) {
     active: true
   });
 
-  // 2. Business Profile state
-  const [savingProfile, setSavingProfile] = useState(false);
-  const [profile, setProfile] = useState({
-    businessName: 'DESH Digital Hub',
-    tagline: 'Next-Generation POS Systems, Web Development & IT Solutions',
-    phone: '+94 77 123 4567',
-    email: 'contact@deshdigital.com',
-    address: 'No 45, Commercial Complex, Sri Lanka',
-    currency: 'Rs.',
-    timezone: 'Asia/Colombo (GMT+5:30)'
-  });
-
-  // 3. Invoice & Print state
-  const [savingInvoice, setSavingInvoice] = useState(false);
-  const [invoiceSettings, setInvoiceSettings] = useState({
-    headerTitle: 'DESH DIGITAL HUB',
-    subtitle: 'Official Sales & Service Receipt',
-    paperSize: '80mm',
+  // ==========================================
+  // 2. APPEARANCE SETTINGS STATE
+  // ==========================================
+  const [savingAppearance, setSavingAppearance] = useState(false);
+  const [appearance, setAppearance] = useState({
+    theme: 'sapphire-obsidian',
+    compactMode: true,
+    accentColor: '#38bdf8',
+    receiptTitle: 'DESH DIGITAL HUB',
+    receiptSubtitle: 'Computer Systems, Printing & IT Solutions',
+    paperSize: '80mm', // '80mm' | '58mm' | 'a4'
     footerNote: 'Thank you for your business! Please visit us again.',
     showCashier: true,
     showCustomerDetails: true,
     autoPrintOnSale: false
   });
 
-  // 4. POS Rules state
-  const [savingPOS, setSavingPOS] = useState(false);
-  const [posSettings, setPosSettings] = useState({
-    defaultPaymentMode: 'cash',
-    quickCashPresets: '100, 500, 1000, 5000',
-    soundEffects: true,
-    autoFocusSearch: true,
-    defaultCustomerName: 'Walk-in Customer'
-  });
-
-  // 5. Diagnostics state
+  // ==========================================
+  // 3. STORAGE & DIAGNOSTICS STATE
+  // ==========================================
   const [pingLatency, setPingLatency] = useState(null);
   const [testingPing, setTestingPing] = useState(false);
 
   useEffect(() => {
-    fetchSettings();
+    fetchInitialSettings();
   }, []);
 
-  const fetchSettings = async () => {
+  const fetchInitialSettings = async () => {
     try {
-      const [bannersData, profileData, invoiceData, posData] = await Promise.all([
+      const [bannersData, appearanceData] = await Promise.all([
         settingsService.getSetting('banners').catch(() => null),
-        settingsService.getSetting('business_profile').catch(() => null),
-        settingsService.getSetting('invoice_settings').catch(() => null),
-        settingsService.getSetting('pos_settings').catch(() => null)
+        settingsService.getSetting('appearance_settings').catch(() => null)
       ]);
 
       if (bannersData && Array.isArray(bannersData.items) && bannersData.items.length > 0) {
@@ -134,18 +115,12 @@ export default function Settings({ isAdmin }) {
         setBanners(DEFAULT_BANNERS);
       }
 
-      if (profileData && typeof profileData === 'object') {
-        setProfile((prev) => ({ ...prev, ...profileData }));
-      }
-      if (invoiceData && typeof invoiceData === 'object') {
-        setInvoiceSettings((prev) => ({ ...prev, ...invoiceData }));
-      }
-      if (posData && typeof posData === 'object') {
-        setPosSettings((prev) => ({ ...prev, ...posData }));
+      if (appearanceData && typeof appearanceData === 'object') {
+        setAppearance((prev) => ({ ...prev, ...appearanceData }));
       }
     } catch (error) {
       console.error(error);
-      notify.error('Failed to load settings');
+      notify.error('Failed to load settings data');
     } finally {
       setLoading(false);
     }
@@ -160,7 +135,7 @@ export default function Settings({ isAdmin }) {
     try {
       const result = await uploadToCloudflare(file);
       setNewBanner((prev) => ({ ...prev, imageUrl: result.url }));
-      notify.success('Image uploaded to Cloudflare R2 successfully!');
+      notify.success('Flyer image uploaded to Cloudflare R2 successfully!');
     } catch (err) {
       console.error(err);
       notify.error(err.message || 'Image upload failed. You can paste an image URL directly.');
@@ -198,7 +173,7 @@ export default function Settings({ isAdmin }) {
       linkText: 'View Details',
       active: true
     });
-    notify.success('Banner added. Click "Save Banners" to publish!');
+    notify.success('Banner added. Click "Save Changes" to publish to carousel!');
   };
 
   const handleRemoveBanner = (index) => {
@@ -224,7 +199,7 @@ export default function Settings({ isAdmin }) {
     setSavingBanners(true);
     try {
       await settingsService.saveSetting('banners', { items: banners });
-      notify.success('Public wallpaper carousel updated successfully!');
+      notify.success('Public wallpaper & ad carousel updated successfully!');
     } catch (error) {
       console.error(error);
       notify.error('Failed to save banners');
@@ -233,49 +208,21 @@ export default function Settings({ isAdmin }) {
     }
   };
 
-  // --- Profile Handler ---
-  const handleSaveProfile = async () => {
-    setSavingProfile(true);
+  // --- Appearance Handler ---
+  const handleSaveAppearance = async () => {
+    setSavingAppearance(true);
     try {
-      await settingsService.saveSetting('business_profile', profile);
-      notify.success('Business profile updated successfully!');
+      await settingsService.saveSetting('appearance_settings', appearance);
+      notify.success('Appearance & print layout settings saved successfully!');
     } catch (error) {
       console.error(error);
-      notify.error('Failed to save profile');
+      notify.error('Failed to save appearance settings');
     } finally {
-      setSavingProfile(false);
+      setSavingAppearance(false);
     }
   };
 
-  // --- Invoice Handler ---
-  const handleSaveInvoiceSettings = async () => {
-    setSavingInvoice(true);
-    try {
-      await settingsService.saveSetting('invoice_settings', invoiceSettings);
-      notify.success('Invoice & print settings saved successfully!');
-    } catch (error) {
-      console.error(error);
-      notify.error('Failed to save invoice settings');
-    } finally {
-      setSavingInvoice(false);
-    }
-  };
-
-  // --- POS Handler ---
-  const handleSavePosSettings = async () => {
-    setSavingPOS(true);
-    try {
-      await settingsService.saveSetting('pos_settings', posSettings);
-      notify.success('POS preferences updated successfully!');
-    } catch (error) {
-      console.error(error);
-      notify.error('Failed to save POS preferences');
-    } finally {
-      setSavingPOS(false);
-    }
-  };
-
-  // --- System Diagnostic Ping ---
+  // --- Storage Diagnostic Ping ---
   const handleRunDiagnostic = async () => {
     setTestingPing(true);
     const start = performance.now();
@@ -284,10 +231,10 @@ export default function Settings({ isAdmin }) {
       const end = performance.now();
       const latency = Math.round(end - start);
       setPingLatency(latency);
-      notify.success(`Database response verified in ${latency}ms`);
+      notify.success(`Database connection verified in ${latency}ms`);
     } catch (err) {
       console.error(err);
-      notify.error('Database connection test failed');
+      notify.error('Database ping failed');
     } finally {
       setTestingPing(false);
     }
@@ -295,387 +242,127 @@ export default function Settings({ isAdmin }) {
 
   if (loading) return <Loader />;
 
-  // Category Cards Configuration matching StoreMate screenshot
-  const categoryCards = [
+  // 4 Primary Setting Sections
+  const navTabs = [
     {
-      id: 'general',
-      title: 'Business Profile',
-      subtitle: 'Store identity, address, phone, currency and branding information.',
-      icon: Store,
-      badgeColor: 'bg-sky-500/15 text-sky-400 border border-sky-500/30 shadow-[0_0_15px_rgba(14,165,233,0.15)]',
-      openText: 'Configure Profile'
-    },
-    {
-      id: 'banners',
-      title: 'Wallpaper & Banners',
-      subtitle: 'Upload and manage 1:1 graphic posters for the public home carousel.',
+      id: 'ad-posts',
+      label: 'Ad Post Settings',
+      shortLabel: 'Ad Posts',
       icon: ImageIcon,
-      badgeColor: 'bg-amber-500/15 text-amber-400 border border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.15)]',
-      openText: 'Manage Banners',
-      count: banners.length
+      count: banners.length,
+      badgeColor: 'text-amber-400'
     },
     {
-      id: 'invoice',
-      title: 'Layout & Printing',
-      subtitle: 'Thermal receipt 80mm/58mm, A4 invoice design, and footer notes.',
-      icon: Printer,
-      badgeColor: 'bg-purple-500/15 text-purple-400 border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.15)]',
-      openText: 'Customize Layout'
+      id: 'items',
+      label: 'Product & Items',
+      shortLabel: 'Products',
+      icon: Package,
+      badgeColor: 'text-emerald-400'
     },
     {
-      id: 'pos',
-      title: 'POS & Ordering',
-      subtitle: 'Default payment methods, quick cash presets, and checkout preferences.',
-      icon: ShoppingCart,
-      badgeColor: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.15)]',
-      openText: 'Edit POS Rules'
-    },
-    {
-      id: 'security',
-      title: 'Security & Policy',
-      subtitle: 'System authentication, role-based protection, and session timeouts.',
-      icon: ShieldCheck,
-      badgeColor: 'bg-rose-500/15 text-rose-400 border border-rose-500/30 shadow-[0_0_15px_rgba(244,63,94,0.15)]',
-      openText: 'Review Security'
+      id: 'appearance',
+      label: 'Appearance Settings',
+      shortLabel: 'Appearance',
+      icon: Palette,
+      badgeColor: 'text-purple-400'
     },
     {
       id: 'storage',
-      title: 'Storage & Diagnostics',
-      subtitle: 'Cloudflare R2 bucket connection, Supabase database latency and cache.',
+      label: 'Storage Settings',
+      shortLabel: 'Storage',
       icon: Database,
-      badgeColor: 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.15)]',
-      openText: 'View Diagnostics'
+      badgeColor: 'text-sky-400'
     }
   ];
-
-  const filteredCards = categoryCards.filter(c => 
-    c.title.toLowerCase().includes(searchFilter.toLowerCase()) ||
-    c.subtitle.toLowerCase().includes(searchFilter.toLowerCase())
-  );
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300 pb-12">
       
       {/* ======================================================== */}
-      {/* TOP SUB-HEADER BAR                                      */}
+      {/* HEADER & 4-TAB NAVIGATION                                */}
       {/* ======================================================== */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-5">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800/80 pb-5">
         <div>
-          <div className="flex items-center gap-3">
-            {activeCategory !== 'all' ? (
-              <button
-                onClick={() => setActiveCategory('all')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-sky-500/40 text-slate-300 hover:text-white text-xs font-semibold transition-all cursor-pointer shadow-sm group"
-              >
-                <ChevronLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
-                <span>All Settings</span>
-              </button>
-            ) : (
-              <div className="w-9 h-9 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center shadow-inner">
-                <Sliders className="w-5 h-5" />
-              </div>
-            )}
-            
-            <h1 className="text-xl sm:text-2xl font-black text-slate-100 tracking-tight">
-              {activeCategory === 'all' && 'System Configuration & Settings'}
-              {activeCategory === 'general' && 'Business Profile Settings'}
-              {activeCategory === 'banners' && 'Wallpaper & Poster Banners'}
-              {activeCategory === 'invoice' && 'Invoice & Receipt Layout'}
-              {activeCategory === 'pos' && 'POS & Checkout Preferences'}
-              {activeCategory === 'security' && 'Security & Access Policy'}
-              {activeCategory === 'storage' && 'Cloud Storage & Diagnostics'}
-            </h1>
-          </div>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1 pl-0.5">
-            {activeCategory === 'all' && 'Manage your store profile, wallpapers, printing layout, POS preferences, and cloud connectivity.'}
-            {activeCategory === 'general' && 'Configure store name, contact numbers, address, and default currency symbols.'}
-            {activeCategory === 'banners' && 'Upload and organize 1:1 promotional flyers and graphic banners for the home carousel.'}
-            {activeCategory === 'invoice' && 'Configure thermal receipt header, 80mm/58mm paper sizes, and customer notes.'}
-            {activeCategory === 'pos' && 'Set default payment modes, quick cash preset values, and ordering behaviors.'}
-            {activeCategory === 'security' && 'Manage system authentication policies, session timeouts, and audit preferences.'}
-            {activeCategory === 'storage' && 'Verify Cloudflare R2 bucket connection, Supabase database health, and client cache.'}
+          <h1 className="text-xl sm:text-2xl font-black text-slate-100 tracking-tight flex items-center gap-2.5">
+            <Sliders className="w-6 h-6 text-sky-400" />
+            <span>Settings & Control Panel</span>
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-400 mt-1">
+            Manage promotional ad posts, product inventory, receipt appearance, and cloud storage.
           </p>
         </div>
 
-        {/* Global Save or Action Button based on category */}
-        {activeCategory === 'banners' && (
+        {/* Action Button based on active tab */}
+        {activeTab === 'ad-posts' && (
           <button
             onClick={handleSaveBanners}
             disabled={savingBanners}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-500 text-white transition-all shadow-lg shadow-blue-600/30 disabled:opacity-50 self-start sm:self-auto cursor-pointer"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-500 text-white transition-all shadow-lg shadow-blue-600/30 disabled:opacity-50 self-start md:self-auto cursor-pointer"
           >
             <Save className="w-4 h-4" />
-            <span>{savingBanners ? 'Saving...' : 'Save Banners'}</span>
+            <span>{savingBanners ? 'Saving Changes...' : 'Save Ad Banners'}</span>
           </button>
         )}
 
-        {activeCategory === 'general' && (
+        {activeTab === 'appearance' && (
           <button
-            onClick={handleSaveProfile}
-            disabled={savingProfile}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-500 text-white transition-all shadow-lg shadow-blue-600/30 disabled:opacity-50 self-start sm:self-auto cursor-pointer"
+            onClick={handleSaveAppearance}
+            disabled={savingAppearance}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-500 text-white transition-all shadow-lg shadow-blue-600/30 disabled:opacity-50 self-start md:self-auto cursor-pointer"
           >
             <Save className="w-4 h-4" />
-            <span>{savingProfile ? 'Saving...' : 'Save Profile'}</span>
-          </button>
-        )}
-
-        {activeCategory === 'invoice' && (
-          <button
-            onClick={handleSaveInvoiceSettings}
-            disabled={savingInvoice}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-500 text-white transition-all shadow-lg shadow-blue-600/30 disabled:opacity-50 self-start sm:self-auto cursor-pointer"
-          >
-            <Save className="w-4 h-4" />
-            <span>{savingInvoice ? 'Saving...' : 'Save Layout'}</span>
-          </button>
-        )}
-
-        {activeCategory === 'pos' && (
-          <button
-            onClick={handleSavePosSettings}
-            disabled={savingPOS}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-500 text-white transition-all shadow-lg shadow-blue-600/30 disabled:opacity-50 self-start sm:self-auto cursor-pointer"
-          >
-            <Save className="w-4 h-4" />
-            <span>{savingPOS ? 'Saving...' : 'Save POS Rules'}</span>
+            <span>{savingAppearance ? 'Saving Layout...' : 'Save Appearance'}</span>
           </button>
         )}
       </div>
 
       {/* ======================================================== */}
-      {/* QUICK CATEGORY PILL TABS                                */}
+      {/* 4 PRIMARY SETTINGS TABS (Sleek Segment Switch)           */}
       {/* ======================================================== */}
-      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
-        <button
-          onClick={() => setActiveCategory('all')}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-            activeCategory === 'all'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
-              : 'bg-slate-900/80 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800'
-          }`}
-        >
-          All Categories
-        </button>
-        {categoryCards.map(cat => (
-          <button
-            key={cat.id}
-            onClick={() => setActiveCategory(cat.id)}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-              activeCategory === cat.id
-                ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-600/20'
-                : 'bg-slate-900/80 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800'
-            }`}
-          >
-            <span>{cat.title}</span>
-            {cat.count !== undefined && (
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300">
-                {cat.count}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* ======================================================== */}
-      {/* VIEW 1: MASTER SETTINGS HUB (StoreMate Card Grid)        */}
-      {/* ======================================================== */}
-      {activeCategory === 'all' && (
-        <div className="space-y-6">
-          {/* Search bar */}
-          <div className="relative max-w-md">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-            <input
-              type="text"
-              placeholder="Search setting modules..."
-              value={searchFilter}
-              onChange={(e) => setSearchFilter(e.target.value)}
-              className="w-full bg-[#0b101d] border border-slate-800/80 rounded-xl pl-10 pr-4 py-2 text-slate-200 placeholder-slate-500 text-xs focus:outline-none focus:border-sky-500/50"
-            />
-          </div>
-
-          {/* 4-Column Grid matching StoreMate layout */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-5">
-            {filteredCards.map((card) => {
-              const Icon = card.icon;
-              return (
-                <div
-                  key={card.id}
-                  onClick={() => setActiveCategory(card.id)}
-                  className="bg-[#0b101d]/90 hover:bg-[#0e1526] border border-slate-800/80 hover:border-sky-500/40 rounded-2xl p-6 transition-all duration-300 shadow-xl hover:shadow-2xl hover:shadow-sky-500/5 hover:-translate-y-1 flex flex-col justify-between group cursor-pointer relative overflow-hidden"
-                >
-                  {/* Subtle ambient corner glow */}
-                  <div className="absolute -top-12 -right-12 w-28 h-28 bg-blue-500/5 rounded-full blur-2xl group-hover:bg-sky-500/10 transition-all pointer-events-none" />
-
-                  {/* Card Content Top */}
-                  <div className="space-y-4">
-                    {/* Centered Squircle Icon matching StoreMate */}
-                    <div className="flex justify-center">
-                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110 ${card.badgeColor}`}>
-                        <Icon className="w-6 h-6 stroke-[2]" />
-                      </div>
-                    </div>
-
-                    {/* Title & Description */}
-                    <div className="text-center space-y-1.5">
-                      <h3 className="text-base font-bold text-slate-100 group-hover:text-sky-300 transition-colors">
-                        {card.title}
-                      </h3>
-                      <p className="text-xs text-slate-400 leading-relaxed min-h-[36px]">
-                        {card.subtitle}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Card Footer: Open link matching StoreMate */}
-                  <div className="pt-5 mt-4 border-t border-slate-800/60 flex items-center justify-between">
-                    <span className="text-xs font-bold text-sky-400 group-hover:text-sky-300 flex items-center gap-1 transition-colors">
-                      <span>Open</span>
-                      <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-                    </span>
-
-                    {card.count !== undefined && (
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800/80 text-slate-400 border border-slate-700/50">
-                        {card.count} items
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* ======================================================== */}
-      {/* VIEW 2: BUSINESS PROFILE                                */}
-      {/* ======================================================== */}
-      {activeCategory === 'general' && (
-        <div className="bg-[#0b101d]/90 border border-slate-800/80 rounded-2xl p-6 sm:p-8 shadow-xl space-y-6">
-          <div className="border-b border-slate-800/80 pb-4">
-            <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
-              <Store className="w-5 h-5 text-sky-400" />
-              Store Identity & Contact Details
-            </h2>
-            <p className="text-xs text-slate-400 mt-1">
-              These details appear on your printed customer invoices, receipts, and headers.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-300 block mb-1.5">
-                Business / Store Name *
-              </label>
-              <input
-                type="text"
-                value={profile.businessName}
-                onChange={(e) => setProfile({ ...profile, businessName: e.target.value })}
-                className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-200 text-sm focus:outline-none focus:border-sky-500/50"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-300 block mb-1.5">
-                Business Slogan / Tagline
-              </label>
-              <input
-                type="text"
-                value={profile.tagline}
-                onChange={(e) => setProfile({ ...profile, tagline: e.target.value })}
-                className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-200 text-sm focus:outline-none focus:border-sky-500/50"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-300 block mb-1.5">
-                Official Contact Number
-              </label>
-              <input
-                type="text"
-                value={profile.phone}
-                onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-                className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-200 text-sm focus:outline-none focus:border-sky-500/50"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-300 block mb-1.5">
-                Support Email Address
-              </label>
-              <input
-                type="email"
-                value={profile.email}
-                onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-                className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-200 text-sm focus:outline-none focus:border-sky-500/50"
-              />
-            </div>
-
-            <div className="sm:col-span-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-300 block mb-1.5">
-                Physical Shop / Outlet Address
-              </label>
-              <input
-                type="text"
-                value={profile.address}
-                onChange={(e) => setProfile({ ...profile, address: e.target.value })}
-                className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-200 text-sm focus:outline-none focus:border-sky-500/50"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-300 block mb-1.5">
-                Currency Symbol
-              </label>
-              <input
-                type="text"
-                value={profile.currency}
-                onChange={(e) => setProfile({ ...profile, currency: e.target.value })}
-                className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-200 text-sm focus:outline-none focus:border-sky-500/50"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-300 block mb-1.5">
-                System Timezone
-              </label>
-              <input
-                type="text"
-                value={profile.timezone}
-                disabled
-                className="w-full bg-slate-950/50 border border-slate-800/80 rounded-xl px-4 py-2.5 text-slate-400 text-sm cursor-not-allowed"
-              />
-            </div>
-          </div>
-
-          <div className="pt-4 border-t border-slate-800/80 flex justify-end">
+      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar p-1.5 bg-[#0b101d]/90 border border-slate-800/80 rounded-2xl shadow-inner">
+        {navTabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
             <button
-              onClick={handleSaveProfile}
-              disabled={savingProfile}
-              className="px-6 py-2.5 rounded-xl font-bold text-xs bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white flex items-center gap-2 shadow-lg shadow-blue-600/30 cursor-pointer"
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex-1 min-w-[150px] py-2.5 px-4 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 ${
+                isActive
+                  ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white shadow-md shadow-blue-600/30'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
             >
-              <Save className="w-4 h-4" />
-              <span>{savingProfile ? 'Saving Changes...' : 'Save Profile Details'}</span>
+              <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : tab.badgeColor}`} />
+              <span className="truncate">{tab.label}</span>
+              {tab.count !== undefined && (
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${
+                  isActive ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-300'
+                }`}>
+                  {tab.count}
+                </span>
+              )}
             </button>
-          </div>
-        </div>
-      )}
+          );
+        })}
+      </div>
 
       {/* ======================================================== */}
-      {/* VIEW 3: WALLPAPER & BANNERS (Existing Full Feature Set)  */}
+      {/* TAB 1: AD POST SETTINGS (Promotional Wallpapers/Posters)  */}
       {/* ======================================================== */}
-      {activeCategory === 'banners' && (
-        <div className="space-y-6">
-          {/* Add New Banner Form Card */}
+      {activeTab === 'ad-posts' && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          
+          {/* Add New Flyer Card */}
           <div className="bg-[#0b101d]/90 border border-slate-800/80 rounded-2xl p-6 sm:p-7 shadow-xl space-y-6">
             <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
               <div>
                 <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
                   <Plus className="w-4 h-4 text-amber-400" />
-                  Add New Wallpaper / Carousel Poster
+                  Add New Promotional Ad Post / Wallpaper
                 </h2>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Upload a 1:1 graphic poster or enter an image URL to feature on the public home carousel.
+                  Upload a 1:1 square graphic flyer or enter an image URL to display on the public customer carousel.
                 </p>
               </div>
             </div>
@@ -683,11 +370,11 @@ export default function Settings({ isAdmin }) {
             {/* Input Controls */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               
-              {/* Left Column: Image Selector */}
+              {/* Left Column: Image Uploader */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                    Banner Graphic Image *
+                    Graphic Flyer Image *
                   </label>
                   <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs">
                     <button
@@ -733,7 +420,7 @@ export default function Settings({ isAdmin }) {
                         )}
                       </div>
                       <p className="text-sm font-semibold text-slate-200">
-                        {uploading ? 'Uploading to Cloudflare R2...' : 'Click or drop banner image here'}
+                        {uploading ? 'Uploading to Cloudflare R2...' : 'Click or drop flyer image here'}
                       </p>
                       <p className="text-xs text-slate-500">
                         PNG, JPG, WebP (Square 1:1 ratio / 1080x1080 px recommended)
@@ -752,7 +439,7 @@ export default function Settings({ isAdmin }) {
                   </div>
                 )}
 
-                {/* 1:1 Square Image Live Preview */}
+                {/* 1:1 Live Square Preview */}
                 {newBanner.imageUrl && (
                   <div className="relative rounded-2xl overflow-hidden border border-slate-700 aspect-square max-w-[220px] mx-auto bg-slate-950 group shadow-lg">
                     <img
@@ -773,7 +460,7 @@ export default function Settings({ isAdmin }) {
                 )}
               </div>
 
-              {/* Right Column: Banner Metadata */}
+              {/* Right Column: Metadata */}
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -804,11 +491,11 @@ export default function Settings({ isAdmin }) {
 
                 <div>
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-300 block mb-1.5">
-                    Banner Title (Optional)
+                    Ad Title (Optional)
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Next-Gen POS Software (Leave blank if poster has text)"
+                    placeholder="e.g. Special PC Repair Offer (Leave blank if poster has text)"
                     value={newBanner.title}
                     onChange={(e) => setNewBanner({ ...newBanner, title: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-slate-200 placeholder-slate-500 text-sm focus:outline-none focus:border-amber-500/50"
@@ -821,7 +508,7 @@ export default function Settings({ isAdmin }) {
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Special discounts for retail shops and educational portals."
+                    placeholder="e.g. Free software diagnostics for students."
                     value={newBanner.subtitle}
                     onChange={(e) => setNewBanner({ ...newBanner, subtitle: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-slate-200 placeholder-slate-500 text-sm focus:outline-none focus:border-amber-500/50"
@@ -851,7 +538,7 @@ export default function Settings({ isAdmin }) {
                     className="w-full py-2.5 rounded-xl font-bold text-xs bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer"
                   >
                     <Plus className="w-4 h-4" />
-                    <span>Add Banner to Carousel</span>
+                    <span>Add to Active Carousel</span>
                   </button>
                 </div>
               </div>
@@ -859,16 +546,16 @@ export default function Settings({ isAdmin }) {
             </div>
           </div>
 
-          {/* Active Banners List */}
+          {/* Active Carousel Banners List */}
           <div className="bg-[#0b101d]/90 border border-slate-800/80 rounded-2xl p-6 shadow-xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
               <div>
                 <h3 className="font-bold text-slate-100 text-sm sm:text-base flex items-center gap-2">
                   <ImageIcon className="w-4 h-4 text-amber-400" />
-                  Active Carousel Banners ({banners.length})
+                  Active Carousel Posters ({banners.length})
                 </h3>
                 <p className="text-xs text-slate-400">
-                  Slide order goes from top to bottom. Use the arrow buttons to reorder.
+                  Slide order goes top to bottom. Click the save button after reordering.
                 </p>
               </div>
 
@@ -885,7 +572,7 @@ export default function Settings({ isAdmin }) {
             <div className="space-y-3">
               {banners.length === 0 ? (
                 <div className="py-12 text-center text-slate-500 text-sm italic border border-dashed border-slate-800 rounded-xl bg-slate-950/40">
-                  No banners added yet. Default banners will be displayed on the home page.
+                  No ad banners added yet. Default banners will be shown on the home carousel.
                 </div>
               ) : (
                 banners.map((item, idx) => (
@@ -986,61 +673,118 @@ export default function Settings({ isAdmin }) {
                 ))
               )}
             </div>
-
-            <div className="pt-2 text-xs text-slate-500 flex justify-end">
-              * Click &apos;Save Banners&apos; after adding or reordering to publish changes to the public site.
-            </div>
           </div>
+
         </div>
       )}
 
       {/* ======================================================== */}
-      {/* VIEW 4: INVOICE & PRINTING LAYOUT                        */}
+      {/* TAB 2: PRODUCT AND ITEMS (Embedded ItemsManager)         */}
       {/* ======================================================== */}
-      {activeCategory === 'invoice' && (
-        <div className="bg-[#0b101d]/90 border border-slate-800/80 rounded-2xl p-6 sm:p-8 shadow-xl space-y-6">
+      {activeTab === 'items' && (
+        <div className="space-y-4 animate-in fade-in duration-200">
+          <div className="bg-[#0b101d]/90 border border-slate-800/80 rounded-2xl p-5 shadow-sm flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                <Package className="w-5 h-5 text-emerald-400" />
+                Product & Services Catalog Management
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Manage your product prices, service categories, adding/editing items, and PDF price sheet exports.
+              </p>
+            </div>
+          </div>
+
+          {/* Embedded Complete ItemsManager */}
+          <ItemsManager 
+            posCategories={posCategories} 
+            fetchCategories={fetchCategories} 
+          />
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* TAB 3: APPEARANCE SETTINGS (Theme & Receipt Layout)      */}
+      {/* ======================================================== */}
+      {activeTab === 'appearance' && (
+        <div className="bg-[#0b101d]/90 border border-slate-800/80 rounded-2xl p-6 sm:p-8 shadow-xl space-y-6 animate-in fade-in duration-200">
           <div className="border-b border-slate-800/80 pb-4">
             <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
-              <Printer className="w-5 h-5 text-purple-400" />
-              Receipt & Invoice Layout Configuration
+              <Palette className="w-5 h-5 text-purple-400" />
+              Theme Appearance & Print Layout Configuration
             </h2>
             <p className="text-xs text-slate-400 mt-1">
-              Customize paper sizing, thank you notes, and header branding for sales slips.
+              Customize the sapphire dark interface, thermal POS receipt styling, and invoice print formats.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            
+            {/* Theme Card */}
+            <div className="sm:col-span-2 p-5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-sky-400" />
+                Active Interface Theme
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div className="p-3.5 rounded-xl border border-sky-500/40 bg-sky-500/10 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#0c2340] to-sky-500 border border-sky-400/50 shadow-inner"></div>
+                    <div>
+                      <span className="text-xs font-bold text-white block">Oceanic Sapphire Dark</span>
+                      <span className="text-[10px] text-sky-300">Executive Deep Navy with Glass Accents</span>
+                    </div>
+                  </div>
+                  <Check className="w-4 h-4 text-sky-400" />
+                </div>
+
+                <div className="p-3.5 rounded-xl border border-slate-800/80 bg-slate-900/40 flex items-center justify-between opacity-60">
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-slate-900 to-slate-700 border border-slate-600"></div>
+                    <div>
+                      <span className="text-xs font-bold text-slate-300 block">Pure Obsidian Black</span>
+                      <span className="text-[10px] text-slate-500">Ultra-Minimal Monochrome</span>
+                    </div>
+                  </div>
+                  <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400">Default</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Receipt Header Title */}
             <div>
               <label className="text-xs font-bold uppercase tracking-wider text-slate-300 block mb-1.5">
                 Receipt Header Title
               </label>
               <input
                 type="text"
-                value={invoiceSettings.headerTitle}
-                onChange={(e) => setInvoiceSettings({ ...invoiceSettings, headerTitle: e.target.value })}
+                value={appearance.receiptTitle}
+                onChange={(e) => setAppearance({ ...appearance, receiptTitle: e.target.value })}
                 className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-200 text-sm focus:outline-none focus:border-purple-500/50"
               />
             </div>
 
+            {/* Receipt Subtitle */}
             <div>
               <label className="text-xs font-bold uppercase tracking-wider text-slate-300 block mb-1.5">
-                Receipt Subtitle
+                Receipt Subtitle / Tagline
               </label>
               <input
                 type="text"
-                value={invoiceSettings.subtitle}
-                onChange={(e) => setInvoiceSettings({ ...invoiceSettings, subtitle: e.target.value })}
+                value={appearance.receiptSubtitle}
+                onChange={(e) => setAppearance({ ...appearance, receiptSubtitle: e.target.value })}
                 className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-200 text-sm focus:outline-none focus:border-purple-500/50"
               />
             </div>
 
+            {/* Default Paper Format */}
             <div>
               <label className="text-xs font-bold uppercase tracking-wider text-slate-300 block mb-1.5">
-                Default Paper Format
+                Default Receipt Format
               </label>
               <select
-                value={invoiceSettings.paperSize}
-                onChange={(e) => setInvoiceSettings({ ...invoiceSettings, paperSize: e.target.value })}
+                value={appearance.paperSize}
+                onChange={(e) => setAppearance({ ...appearance, paperSize: e.target.value })}
                 className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-200 text-sm focus:outline-none focus:border-purple-500/50 cursor-pointer"
               >
                 <option value="80mm">80mm Thermal POS Roll (Standard)</option>
@@ -1049,14 +793,15 @@ export default function Settings({ isAdmin }) {
               </select>
             </div>
 
-            <div className="sm:col-span-2">
+            {/* Thank You Note */}
+            <div>
               <label className="text-xs font-bold uppercase tracking-wider text-slate-300 block mb-1.5">
-                Footer Thank You Note / Terms
+                Footer Thank You Note
               </label>
-              <textarea
-                rows={2}
-                value={invoiceSettings.footerNote}
-                onChange={(e) => setInvoiceSettings({ ...invoiceSettings, footerNote: e.target.value })}
+              <input
+                type="text"
+                value={appearance.footerNote}
+                onChange={(e) => setAppearance({ ...appearance, footerNote: e.target.value })}
                 className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-200 text-sm focus:outline-none focus:border-purple-500/50"
               />
             </div>
@@ -1066,36 +811,36 @@ export default function Settings({ isAdmin }) {
               <label className="flex items-center gap-3 cursor-pointer group">
                 <input
                   type="checkbox"
-                  checked={invoiceSettings.showCashier}
-                  onChange={(e) => setInvoiceSettings({ ...invoiceSettings, showCashier: e.target.checked })}
+                  checked={appearance.showCashier}
+                  onChange={(e) => setAppearance({ ...appearance, showCashier: e.target.checked })}
                   className="w-4 h-4 rounded text-blue-600 focus:ring-0 bg-slate-900 border-slate-700 cursor-pointer"
                 />
                 <span className="text-xs text-slate-300 group-hover:text-white">
-                  Show Cashier & Operator name on receipt
+                  Show Cashier name & Station ID on printed receipts
                 </span>
               </label>
 
               <label className="flex items-center gap-3 cursor-pointer group">
                 <input
                   type="checkbox"
-                  checked={invoiceSettings.showCustomerDetails}
-                  onChange={(e) => setInvoiceSettings({ ...invoiceSettings, showCustomerDetails: e.target.checked })}
+                  checked={appearance.showCustomerDetails}
+                  onChange={(e) => setAppearance({ ...appearance, showCustomerDetails: e.target.checked })}
                   className="w-4 h-4 rounded text-blue-600 focus:ring-0 bg-slate-900 border-slate-700 cursor-pointer"
                 />
                 <span className="text-xs text-slate-300 group-hover:text-white">
-                  Print Customer Name & Phone number when selected
+                  Print Customer Name & Contact details when attached to sales order
                 </span>
               </label>
 
               <label className="flex items-center gap-3 cursor-pointer group">
                 <input
                   type="checkbox"
-                  checked={invoiceSettings.autoPrintOnSale}
-                  onChange={(e) => setInvoiceSettings({ ...invoiceSettings, autoPrintOnSale: e.target.checked })}
+                  checked={appearance.autoPrintOnSale}
+                  onChange={(e) => setAppearance({ ...appearance, autoPrintOnSale: e.target.checked })}
                   className="w-4 h-4 rounded text-blue-600 focus:ring-0 bg-slate-900 border-slate-700 cursor-pointer"
                 />
                 <span className="text-xs text-slate-300 group-hover:text-white">
-                  Auto-trigger browser print dialog immediately when completing a sale
+                  Auto-trigger browser print dialog immediately after confirming order
                 </span>
               </label>
             </div>
@@ -1103,215 +848,46 @@ export default function Settings({ isAdmin }) {
 
           <div className="pt-4 border-t border-slate-800/80 flex justify-end">
             <button
-              onClick={handleSaveInvoiceSettings}
-              disabled={savingInvoice}
+              onClick={handleSaveAppearance}
+              disabled={savingAppearance}
               className="px-6 py-2.5 rounded-xl font-bold text-xs bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white flex items-center gap-2 shadow-lg shadow-blue-600/30 cursor-pointer"
             >
               <Save className="w-4 h-4" />
-              <span>{savingInvoice ? 'Saving Changes...' : 'Save Print Layout'}</span>
+              <span>{savingAppearance ? 'Saving Changes...' : 'Save Appearance Settings'}</span>
             </button>
           </div>
         </div>
       )}
 
       {/* ======================================================== */}
-      {/* VIEW 5: POS & ORDER PREFERENCES                          */}
+      {/* TAB 4: STORAGE SETTINGS (Cloudflare R2, Supabase, Cache) */}
       {/* ======================================================== */}
-      {activeCategory === 'pos' && (
-        <div className="bg-[#0b101d]/90 border border-slate-800/80 rounded-2xl p-6 sm:p-8 shadow-xl space-y-6">
+      {activeTab === 'storage' && (
+        <div className="bg-[#0b101d]/90 border border-slate-800/80 rounded-2xl p-6 sm:p-8 shadow-xl space-y-6 animate-in fade-in duration-200">
           <div className="border-b border-slate-800/80 pb-4">
             <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
-              <ShoppingCart className="w-5 h-5 text-emerald-400" />
-              Point of Sale Preferences & Defaults
+              <Database className="w-5 h-5 text-sky-400" />
+              Cloud Storage & Database Infrastructure
             </h2>
             <p className="text-xs text-slate-400 mt-1">
-              Configure checkout speeds, quick cash buttons, and search behavior.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-300 block mb-1.5">
-                Default Payment Method
-              </label>
-              <select
-                value={posSettings.defaultPaymentMode}
-                onChange={(e) => setPosSettings({ ...posSettings, defaultPaymentMode: e.target.value })}
-                className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-200 text-sm focus:outline-none focus:border-emerald-500/50 cursor-pointer"
-              >
-                <option value="cash">Cash (Default)</option>
-                <option value="credit">Credit / Account</option>
-                <option value="bank">Bank Transfer</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-300 block mb-1.5">
-                Default Customer Fallback
-              </label>
-              <input
-                type="text"
-                value={posSettings.defaultCustomerName}
-                onChange={(e) => setPosSettings({ ...posSettings, defaultCustomerName: e.target.value })}
-                className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-200 text-sm focus:outline-none focus:border-emerald-500/50"
-              />
-            </div>
-
-            <div className="sm:col-span-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-300 block mb-1.5">
-                Quick Cash Preset Denominations (Comma separated)
-              </label>
-              <input
-                type="text"
-                value={posSettings.quickCashPresets}
-                onChange={(e) => setPosSettings({ ...posSettings, quickCashPresets: e.target.value })}
-                className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-200 text-sm focus:outline-none focus:border-emerald-500/50"
-                placeholder="100, 500, 1000, 5000"
-              />
-            </div>
-
-            {/* Feature Toggles */}
-            <div className="sm:col-span-2 space-y-3 pt-2">
-              <label className="flex items-center gap-3 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={posSettings.soundEffects}
-                  onChange={(e) => setPosSettings({ ...posSettings, soundEffects: e.target.checked })}
-                  className="w-4 h-4 rounded text-blue-600 focus:ring-0 bg-slate-900 border-slate-700 cursor-pointer"
-                />
-                <span className="text-xs text-slate-300 group-hover:text-white">
-                  Play subtle audio feedback when items are added to cart or sales completed
-                </span>
-              </label>
-
-              <label className="flex items-center gap-3 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={posSettings.autoFocusSearch}
-                  onChange={(e) => setPosSettings({ ...posSettings, autoFocusSearch: e.target.checked })}
-                  className="w-4 h-4 rounded text-blue-600 focus:ring-0 bg-slate-900 border-slate-700 cursor-pointer"
-                />
-                <span className="text-xs text-slate-300 group-hover:text-white">
-                  Automatically refocus the item search bar after completing each order
-                </span>
-              </label>
-            </div>
-          </div>
-
-          <div className="pt-4 border-t border-slate-800/80 flex justify-end">
-            <button
-              onClick={handleSavePosSettings}
-              disabled={savingPOS}
-              className="px-6 py-2.5 rounded-xl font-bold text-xs bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white flex items-center gap-2 shadow-lg shadow-blue-600/30 cursor-pointer"
-            >
-              <Save className="w-4 h-4" />
-              <span>{savingPOS ? 'Saving Changes...' : 'Save POS Rules'}</span>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ======================================================== */}
-      {/* VIEW 6: SECURITY & ACCESS POLICY                         */}
-      {/* ======================================================== */}
-      {activeCategory === 'security' && (
-        <div className="bg-[#0b101d]/90 border border-slate-800/80 rounded-2xl p-6 sm:p-8 shadow-xl space-y-6">
-          <div className="border-b border-slate-800/80 pb-4">
-            <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-rose-400" />
-              Security & Access Policy
-            </h2>
-            <p className="text-xs text-slate-400 mt-1">
-              Role permissions, session controls, and data protection policies.
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 flex items-start gap-3">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-              <div>
-                <h4 className="text-xs font-bold text-slate-200">Admin Role Privilege Active</h4>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  You are currently authenticated with Full Administrator Privileges. You have permission to modify settings, manage products, view financial analytics, and process sales.
-                </p>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 flex items-start gap-3">
-              <Clock className="w-5 h-5 text-sky-400 shrink-0 mt-0.5" />
-              <div>
-                <h4 className="text-xs font-bold text-slate-200">Session Inactivity Timeout</h4>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Admin session tokens automatically refresh with Supabase JWT security. Sessions remain active for 24 hours on this browser.
-                </p>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 flex items-start gap-3">
-              <Laptop className="w-5 h-5 text-purple-400 shrink-0 mt-0.5" />
-              <div>
-                <h4 className="text-xs font-bold text-slate-200">Device Hardware Verification</h4>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Hardware accelerated graphic rendering and offline Progressive Web App (PWA) caching are enabled for high POS performance.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ======================================================== */}
-      {/* VIEW 7: STORAGE & DIAGNOSTICS                            */}
-      {/* ======================================================== */}
-      {activeCategory === 'storage' && (
-        <div className="bg-[#0b101d]/90 border border-slate-800/80 rounded-2xl p-6 sm:p-8 shadow-xl space-y-6">
-          <div className="border-b border-slate-800/80 pb-4">
-            <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
-              <Database className="w-5 h-5 text-indigo-400" />
-              Cloud Infrastructure & System Diagnostics
-            </h2>
-            <p className="text-xs text-slate-400 mt-1">
-              Verify database connectivity, storage bucket health, and cache status.
+              Verify Cloudflare R2 object storage, test database response latency, and clear client PWA cache.
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             
-            {/* Supabase Card */}
+            {/* Cloudflare R2 Storage Card */}
             <div className="p-5 rounded-2xl bg-slate-950/70 border border-slate-800 flex flex-col justify-between space-y-4">
               <div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-300">Supabase Cloud Database</span>
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                </div>
-                <p className="text-xs text-slate-400 mt-1">
-                  PostgreSQL database powering sales orders, items, repairs, and customer records.
-                </p>
-              </div>
-
-              <div className="flex items-center justify-between pt-2 border-t border-slate-800">
-                <span className="text-xs text-slate-400">
-                  {pingLatency !== null ? `Latency: ${pingLatency}ms` : 'Status: Ready'}
-                </span>
-                <button
-                  onClick={handleRunDiagnostic}
-                  disabled={testingPing}
-                  className="px-3 py-1 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer disabled:opacity-50"
-                >
-                  {testingPing ? 'Testing...' : 'Test Ping'}
-                </button>
-              </div>
-            </div>
-
-            {/* Cloudflare R2 Card */}
-            <div className="p-5 rounded-2xl bg-slate-950/70 border border-slate-800 flex flex-col justify-between space-y-4">
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-300">Cloudflare R2 Storage</span>
+                  <span className="text-xs font-bold text-slate-200 flex items-center gap-2">
+                    <UploadCloud className="w-4 h-4 text-sky-400" />
+                    Cloudflare R2 Object Storage
+                  </span>
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
                 </div>
-                <p className="text-xs text-slate-400 mt-1">
-                  High-speed global CDN object storage for product images and wallpaper carousel flyers.
+                <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
+                  High-speed global S3-compatible bucket storing product catalog images and promotional carousel flyers.
                 </p>
               </div>
 
@@ -1323,25 +899,63 @@ export default function Settings({ isAdmin }) {
               </div>
             </div>
 
-            {/* Client Cache Card */}
+            {/* Supabase Cloud Database Card */}
+            <div className="p-5 rounded-2xl bg-slate-950/70 border border-slate-800 flex flex-col justify-between space-y-4">
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-200 flex items-center gap-2">
+                    <Database className="w-4 h-4 text-emerald-400" />
+                    Supabase PostgreSQL Database
+                  </span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                </div>
+                <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
+                  Real-time database powering inventory items, repair jobs, sales records, customers, and configuration.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+                <span className="text-xs text-slate-400">
+                  {pingLatency !== null ? `Latency: ${pingLatency}ms` : 'Status: Ready'}
+                </span>
+                <button
+                  onClick={handleRunDiagnostic}
+                  disabled={testingPing}
+                  className="px-3 py-1 rounded-lg text-xs font-bold bg-sky-600 hover:bg-sky-500 text-white cursor-pointer disabled:opacity-50"
+                >
+                  {testingPing ? 'Testing...' : 'Test Ping'}
+                </button>
+              </div>
+            </div>
+
+            {/* Client Cache Management Card */}
             <div className="p-5 rounded-2xl bg-slate-950/70 border border-slate-800 flex flex-col justify-between space-y-4 sm:col-span-2">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <h4 className="text-xs font-bold text-slate-200">Application PWA Cache & Local Storage</h4>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Clear local browser cache and reload the latest PWA service worker build (v1.25.1).
+                  <h4 className="text-xs font-bold text-slate-200 flex items-center gap-2">
+                    <RefreshCw className="w-4 h-4 text-purple-400" />
+                    Browser Cache & Progressive Web App (PWA) Storage
+                  </h4>
+                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                    Unregister old Service Worker versions, flush temporary storage, and reload fresh application state (v1.25.1).
                   </p>
                 </div>
                 <button
-                  onClick={() => {
+                  onClick={async () => {
+                    if ('serviceWorker' in navigator) {
+                      const registrations = await navigator.serviceWorker.getRegistrations();
+                      for (let reg of registrations) {
+                        await reg.unregister();
+                      }
+                    }
                     localStorage.clear();
                     sessionStorage.clear();
-                    notify.success('Local cache cleared! Reloading...');
-                    setTimeout(() => window.location.reload(), 800);
+                    notify.success('Cache cleared! Reloading application...');
+                    setTimeout(() => window.location.reload(true), 600);
                   }}
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white border border-rose-500/30 transition-all cursor-pointer"
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white border border-rose-500/30 transition-all cursor-pointer whitespace-nowrap self-start sm:self-auto"
                 >
-                  Clear Cache & Reload
+                  Clear Cache & Hard Reload
                 </button>
               </div>
             </div>

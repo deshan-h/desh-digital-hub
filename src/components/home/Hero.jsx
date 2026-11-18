@@ -1,152 +1,148 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ChevronRight, ExternalLink } from 'lucide-react';
-import BannerCarousel from './BannerCarousel';
-import logo from '../../assets/logo.webp';
+import { ChevronRight, ExternalLink, Zap, ShieldCheck, Printer, Wrench, MessageCircle } from 'lucide-react';
 import eduHubLogo from '../../assets/edu-hub-logo.jpg';
 
 export default function Hero() {
+  const valueBadges = [
+    { icon: Zap, label: 'ක්ෂණික මුද්‍රණ', sub: 'Ultra-Fast Printing', color: 'text-amber-400 bg-amber-500/10 border-amber-500/20' },
+    { icon: Printer, label: 'උසස් තත්ත්වය', sub: 'High DPI Quality', color: 'text-sky-400 bg-sky-500/10 border-sky-500/20' },
+    { icon: ShieldCheck, label: 'විශ්වාසදායී සේවය', sub: '100% Guaranteed', color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' },
+    { icon: Wrench, label: 'පරිගණක Lab', sub: 'Expert Diagnostics', color: 'text-purple-400 bg-purple-500/10 border-purple-500/20' }
+  ];
+
   return (
-    <div className="container mx-auto px-4 relative z-10 flex flex-col lg:flex-row items-center justify-between w-full mt-0 mb-12 md:mb-16 gap-8 lg:gap-8">
+    <div className="container mx-auto px-4 md:px-6 relative z-10 w-full pt-2 pb-10 text-center flex flex-col items-center">
       
-      {/* Left Column (Hero Content) */}
-      <div className="flex flex-col items-center lg:items-start text-center lg:text-left w-full lg:w-[56%]">
+      {/* Top Tagline Pill */}
+      <motion.div
+        initial={{ opacity: 0, y: -15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-sky-500/10 border border-sky-400/25 backdrop-blur-md mb-6 shadow-sm"
+      >
+        <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse"></span>
+        <span className="text-xs font-bold text-sky-200 tracking-wide">
+          Next-Gen Digital Printing, Online Services & IT Solutions
+        </span>
+      </motion.div>
+
+      {/* Main Hero Headline */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.7, delay: 0.1 }}
+        className="max-w-4xl mx-auto mb-5 relative"
+      >
+        <h1 className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-black text-white tracking-tight leading-none drop-shadow-2xl">
+          <span>DESH</span>{' '}
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-400 inline-block">
+            Digital Hub
+          </span>
+        </h1>
         
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.9, y: -20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-          className="mb-6 relative"
-        >
-          <div className="absolute -inset-4 bg-gradient-to-r from-cyan-400 via-blue-500 to-emerald-400 blur-[60px] opacity-20 -z-10 rounded-full transform scale-110"></div>
-          <h1 className="font-black tracking-tighter text-white drop-shadow-2xl flex flex-col items-center lg:items-start leading-[1.0]">
-            <motion.span 
-              initial={{ opacity: 0, x: -50 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8, delay: 0.1, type: "spring", stiffness: 100 }}
-              className="inline-block text-5xl sm:text-6xl md:text-7xl lg:text-8xl"
+        <p className="text-base sm:text-xl md:text-2xl text-slate-300 font-medium tracking-wide mt-4 max-w-2xl mx-auto leading-relaxed">
+          ඔබේ සියලුම ඩිජිටල්, මුද්‍රණ සහ පරිගණක සේවා{' '}
+          <span className="text-sky-400 font-bold underline decoration-sky-500/40 underline-offset-4">
+            එකම වහලක් යටින්
+          </span>
+        </p>
+      </motion.div>
+
+      {/* 4 Value Proposition Badges */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.7, delay: 0.3 }}
+        className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3.5 max-w-3xl w-full my-6"
+      >
+        {valueBadges.map((badge, idx) => {
+          const Icon = badge.icon;
+          return (
+            <div
+              key={idx}
+              className="p-3 rounded-2xl bg-[#09172c]/70 backdrop-blur-xl border border-sky-500/10 hover:border-sky-500/30 transition-all duration-300 flex items-center gap-3 shadow-lg group hover:-translate-y-0.5"
             >
-              DESH
-            </motion.span>
-            <motion.span 
-              initial={{ opacity: 0, x: 50 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8, delay: 0.3, type: "spring", stiffness: 100 }}
-              className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-emerald-400 animate-gradient-x inline-block mt-1 relative text-2xl sm:text-3xl md:text-4xl lg:text-5xl tracking-tight pb-2"
-            >
-              Digital Hub
-            </motion.span>
-          </h1>
-        </motion.div>
-        
-        <motion.p 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1, delay: 0.3 }}
-          className="text-base sm:text-lg md:text-xl text-slate-300 font-medium tracking-wide mb-6 drop-shadow-lg max-w-xl"
-        >
-          ඔබේ සියලුම ඩිජිටල් අවශ්‍යතා <span className="text-cyan-400 font-bold">එකම තැනකින්</span>
-        </motion.p>
-
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.7 }}
-          className="flex flex-wrap justify-center lg:justify-start gap-2 sm:gap-2.5 mb-8 max-w-xl"
-        >
-          {[
-            { icon: '⚡', text: 'වේගවත්', color: 'text-yellow-400', border: 'hover:border-yellow-500/50', shadow: 'hover:shadow-yellow-500/20' },
-            { icon: '💎', text: 'උසස් තත්ත්වය', color: 'text-emerald-400', border: 'hover:border-emerald-500/50', shadow: 'hover:shadow-emerald-500/20' },
-            { icon: '🛡️', text: 'විශ්වාසදායී', color: 'text-blue-400', border: 'hover:border-blue-500/50', shadow: 'hover:shadow-blue-500/20' },
-            { icon: '✨', text: 'නවීන සේවා', color: 'text-purple-400', border: 'hover:border-purple-500/50', shadow: 'hover:shadow-purple-500/20' },
-          ].map((badge, idx) => (
-            <div 
-              key={idx} 
-              className={`px-3.5 py-1.5 bg-slate-900/40 backdrop-blur-xl border border-white/5 rounded-xl text-slate-200 text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-default ${badge.border} ${badge.shadow}`}
-            >
-              <span className={`${badge.color} text-sm drop-shadow-md`}>{badge.icon}</span> 
-              <span className="tracking-wide">{badge.text}</span>
-            </div>
-          ))}
-        </motion.div>
-
-        {/* Action Buttons */}
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, delay: 1 }}
-          className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start w-full sm:w-auto"
-        >
-          {/* Button 1: Services */}
-          <a href="#services" className="group relative w-full sm:w-auto px-6 md:px-8 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold text-base transition-all shadow-[0_0_20px_rgba(8,145,178,0.3)] hover:shadow-[0_0_35px_rgba(8,145,178,0.5)] hover:-translate-y-0.5 overflow-hidden text-center flex items-center justify-center gap-2">
-            <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out rounded-xl"></div>
-            <span className="relative z-10 flex items-center justify-center gap-2">
-              සේවාවන් බලන්න
-              <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </span>
-          </a>
-
-          {/* Button 2: Contact */}
-          <a href="#contact" className="w-full sm:w-auto px-6 md:px-8 py-3 rounded-xl bg-slate-800/50 backdrop-blur-lg border border-slate-700/50 text-slate-200 font-bold text-base hover:bg-slate-800 hover:text-white transition-all shadow-md hover:shadow-xl hover:border-slate-600 hover:-translate-y-0.5 text-center flex items-center justify-center">
-            අපව අමතන්න
-          </a>
-        </motion.div>
-
-        {/* DESH Edu Hub Button Card */}
-        <motion.a
-          href="https://desh.s.gy/edu-hub"
-          target="_blank"
-          rel="noopener noreferrer"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 1.1 }}
-          className="group relative mt-5 w-full max-w-lg p-3 sm:p-3.5 rounded-xl bg-slate-900/80 hover:bg-slate-900/95 backdrop-blur-xl border border-cyan-500/30 hover:border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.1)] hover:shadow-[0_0_25px_rgba(6,182,212,0.25)] transition-all duration-300 hover:-translate-y-0.5 flex items-center justify-between gap-3 overflow-hidden"
-        >
-          {/* Subtle Ambient Glow */}
-          <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 via-blue-500/5 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
-
-          <div className="flex items-center gap-3 relative z-10 min-w-0">
-            {/* Logo */}
-            <div className="relative w-10 h-10 sm:w-11 sm:h-11 rounded-lg overflow-hidden p-0.5 bg-gradient-to-br from-cyan-400/40 via-blue-500/20 to-purple-500/40 border border-cyan-400/30 flex-shrink-0 group-hover:scale-105 transition-transform duration-300 shadow-md">
-              <img 
-                src={eduHubLogo} 
-                alt="DESH Edu Hub Logo" 
-                className="w-full h-full object-cover rounded-md" 
-              />
-            </div>
-
-            {/* Content */}
-            <div className="text-left min-w-0">
-              <div className="flex items-center gap-2">
-                <h4 className="text-sm sm:text-base font-bold text-white group-hover:text-cyan-300 transition-colors tracking-tight truncate">
-                  DESH Edu Hub
-                </h4>
-                <span className="px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 rounded-full flex-shrink-0">
-                  Portal
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${badge.color}`}>
+                <Icon className="w-4 h-4" />
+              </div>
+              <div className="text-left min-w-0">
+                <span className="text-xs font-bold text-slate-100 block truncate group-hover:text-sky-300 transition-colors">
+                  {badge.label}
+                </span>
+                <span className="text-[10px] text-slate-400 block truncate">
+                  {badge.sub}
                 </span>
               </div>
-              <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 font-medium leading-snug">
-                Educational resources download කරගැනීමට පිවිසෙන්න
-              </p>
             </div>
-          </div>
-
-          {/* Icon */}
-          <div className="relative z-10 flex items-center justify-center w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 group-hover:bg-cyan-500 group-hover:text-slate-950 transition-all duration-300 flex-shrink-0 group-hover:translate-x-0.5 shadow-md">
-            <ExternalLink className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-          </div>
-        </motion.a>
-      </div>
-
-      {/* Right Column (Banner / Wallpaper Carousel - 1:1 Square) */}
-      <motion.div 
-        initial={{ opacity: 0, x: 40 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.8, delay: 0.4 }}
-        className="w-full lg:w-[44%] flex justify-center lg:justify-end relative"
-      >
-        <BannerCarousel />
+          );
+        })}
       </motion.div>
+
+      {/* Call to Action Buttons */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.5 }}
+        className="flex flex-col sm:flex-row items-center justify-center gap-3.5 w-full max-w-md mt-2"
+      >
+        <a
+          href="#services"
+          className="w-full sm:w-auto px-7 py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-sm transition-all shadow-[0_0_25px_rgba(37,99,235,0.35)] hover:shadow-[0_0_35px_rgba(37,99,235,0.6)] hover:-translate-y-0.5 flex items-center justify-center gap-2 group cursor-pointer"
+        >
+          <span>සේවාවන් බලන්න (Explore Services)</span>
+          <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+        </a>
+
+        <a
+          href="https://wa.me/94719989000?text=Hello%20DESH%20Digital%20Hub,%20I%20would%20like%20to%20place%20an%20order."
+          target="_blank"
+          rel="noreferrer"
+          className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-[#091a32]/80 hover:bg-[#0c2242] text-slate-200 hover:text-white border border-sky-500/20 hover:border-sky-400/40 font-bold text-sm transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+        >
+          <MessageCircle className="w-4 h-4 text-emerald-400" />
+          <span>WhatsApp ඇණවුම්</span>
+        </a>
+      </motion.div>
+
+      {/* DESH Edu Hub Gateway Card */}
+      <motion.a
+        href="https://desh.s.gy/edu-hub"
+        target="_blank"
+        rel="noopener noreferrer"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.7 }}
+        className="group relative mt-8 w-full max-w-xl p-3.5 rounded-2xl bg-[#081528]/80 hover:bg-[#0b1c36] backdrop-blur-xl border border-sky-500/20 hover:border-sky-400/50 shadow-xl transition-all duration-300 hover:-translate-y-0.5 flex items-center justify-between gap-4 overflow-hidden"
+      >
+        <div className="flex items-center gap-3.5 min-w-0">
+          <div className="w-11 h-11 rounded-xl overflow-hidden p-0.5 bg-gradient-to-br from-sky-400/40 via-blue-500/20 to-indigo-500/40 border border-sky-400/30 shrink-0 group-hover:scale-105 transition-transform shadow-md">
+            <img 
+              src={eduHubLogo} 
+              alt="DESH Edu Hub Logo" 
+              className="w-full h-full object-cover rounded-lg" 
+            />
+          </div>
+
+          <div className="text-left min-w-0">
+            <div className="flex items-center gap-2">
+              <h4 className="text-sm font-bold text-white group-hover:text-sky-300 transition-colors truncate">
+                DESH Edu Hub Educational Portal
+              </h4>
+              <span className="px-2 py-0.5 text-[9px] font-black uppercase tracking-wider bg-sky-500/20 text-sky-300 border border-sky-500/30 rounded-full shrink-0">
+                Study Free
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 mt-0.5 truncate">
+              Exam papers, past papers, notes & study guides නොමිලේ ලබාගන්න
+            </p>
+          </div>
+        </div>
+
+        <div className="w-8 h-8 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400 group-hover:bg-sky-500 group-hover:text-slate-950 transition-all flex items-center justify-center shrink-0">
+          <ExternalLink className="w-4 h-4" />
+        </div>
+      </motion.a>
 
     </div>
   );
