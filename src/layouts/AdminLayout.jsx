@@ -112,20 +112,21 @@ export default function AdminLayout({
 
   return (
     // Luxury Deep Oceanic Sapphire Container (Powers the seamless curve background)
-    <div className="flex h-screen bg-gradient-to-br from-[#0c2340] via-[#0a1e36] to-[#061424] overflow-hidden text-slate-100 selection:bg-blue-500/30 selection:text-white print:hidden">
+    <div className="flex h-screen bg-gradient-to-b from-[#0c2340] via-[#0a1e36] to-[#061424] overflow-hidden text-slate-100 selection:bg-blue-500/30 selection:text-white print:hidden">
 
       {/* ======================================================== */}
       {/* LEFT SIDEBAR (Executive Deep Oceanic Sapphire Theme)     */}
+      {/* Seamless integration with the canvas background           */}
       {/* ======================================================== */}
       <aside 
         className={`${
           isSidebarOpen ? 'w-60' : 'w-[74px]'
-        } bg-gradient-to-b from-[#0c2340] via-[#0a1e36] to-[#061424] border-r border-sky-500/10 flex flex-col justify-between shrink-0 transition-all duration-300 z-30 select-none relative`}
+        } bg-transparent flex flex-col justify-between shrink-0 transition-all duration-300 z-10 select-none relative`}
       >
         <div className="flex flex-col h-full">
           
           {/* Sidebar Top: Logo Branding + Menu Toggle Button */}
-          <div className="h-16 flex items-center justify-between px-3.5 border-b border-white/10">
+          <div className="h-16 flex items-center justify-between px-3.5 border-b border-white/5">
             {isSidebarOpen ? (
               <div className="flex items-center gap-2.5 cursor-pointer overflow-hidden" onClick={() => setActiveTab('dashboard')}>
                 <div className="w-9 h-9 rounded-xl bg-white/10 p-1 border border-white/15 backdrop-blur-md flex items-center justify-center shrink-0 shadow-inner">
