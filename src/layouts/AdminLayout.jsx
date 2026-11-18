@@ -20,11 +20,6 @@ import {
   HelpCircle,
   Menu,
   ChevronDown,
-  Search,
-  Grid,
-  Headphones,
-  Zap,
-  ShieldCheck,
   Plus,
   MessageCircle
 } from 'lucide-react';
@@ -126,37 +121,52 @@ export default function AdminLayout({
         <div className="flex flex-col h-full">
           
           {/* Sidebar Top: Logo Branding + Menu Toggle Button */}
-          <div className="h-16 flex items-center justify-between px-3.5 border-b border-white/5">
+          <div className="h-16 flex items-center px-3.5 border-b border-white/5">
             {isSidebarOpen ? (
-              <div className="flex items-center gap-2.5 cursor-pointer overflow-hidden" onClick={() => setActiveTab('dashboard')}>
-                <div className="w-9 h-9 rounded-xl bg-white/10 p-1 border border-white/15 backdrop-blur-md flex items-center justify-center shrink-0 shadow-inner">
-                  <img src="/pwa-192x192.png" alt="DESH Logo" className="w-full h-full object-contain" />
+              <div className="flex items-center justify-between w-full">
+                <div 
+                  className="flex items-center gap-2.5 cursor-pointer overflow-hidden group" 
+                  onClick={() => setActiveTab('dashboard')}
+                  title="Go to Dashboard"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-white/10 p-1 border border-white/15 backdrop-blur-md flex items-center justify-center shrink-0 shadow-inner group-hover:border-sky-400/40 transition-colors">
+                    <img src="/pwa-192x192.png" alt="DESH Logo" className="w-full h-full object-contain" />
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-sm font-black text-white tracking-tight leading-none truncate group-hover:text-sky-300 transition-colors">
+                      DESH Digital Hub
+                    </span>
+                    <span className="text-[10px] text-sky-200/80 font-semibold tracking-wider uppercase mt-1 truncate">
+                      Management Portal
+                    </span>
+                  </div>
                 </div>
-                <div className="flex flex-col min-w-0">
-                  <span className="text-sm font-black text-white tracking-tight leading-none truncate">
-                    DESH Digital Hub
-                  </span>
-                  <span className="text-[10px] text-sky-200/80 font-semibold tracking-wider uppercase mt-1 truncate">
-                    Management Portal
-                  </span>
-                </div>
+
+                {/* Collapse Button */}
+                <button
+                  onClick={() => setIsSidebarOpen(false)}
+                  className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0 ml-1"
+                  title="Collapse Menu"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
               </div>
             ) : (
-              <div className="w-full flex justify-center cursor-pointer" onClick={() => setIsSidebarOpen(true)}>
-                <div className="w-9 h-9 rounded-xl bg-white/10 p-1 border border-white/15 backdrop-blur-md flex items-center justify-center shadow-inner">
-                  <img src="/pwa-192x192.png" alt="DESH Logo" className="w-full h-full object-contain" />
-                </div>
+              <div className="w-full flex justify-center">
+                <button
+                  onClick={() => setIsSidebarOpen(true)}
+                  className="group relative w-10 h-10 rounded-xl bg-white/10 p-1 border border-white/15 hover:border-sky-400/50 hover:bg-sky-500/20 backdrop-blur-md flex items-center justify-center cursor-pointer transition-all duration-200 shadow-inner"
+                  title="Click to Expand Sidebar"
+                >
+                  <img 
+                    src="/pwa-192x192.png" 
+                    alt="DESH Logo" 
+                    className="w-full h-full object-contain transition-all duration-200 group-hover:scale-75 group-hover:opacity-0" 
+                  />
+                  <ChevronRight className="w-5 h-5 text-sky-400 absolute opacity-0 group-hover:opacity-100 transition-all duration-200 group-hover:scale-110" />
+                </button>
               </div>
             )}
-
-            {/* Hamburger Toggle Icon */}
-            <button
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0 ml-1"
-              title={isSidebarOpen ? "Collapse Menu" : "Expand Menu"}
-            >
-              {isSidebarOpen ? <ChevronLeft className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
           </div>
 
           {/* Navigation Links Area */}
@@ -270,26 +280,17 @@ export default function AdminLayout({
 
           </nav>
 
-          {/* Sidebar Bottom Footer */}
-          <div className="p-3 border-t border-white/15 bg-black/10">
+          {/* Sidebar Bottom Footer: Version Number Only */}
+          <div className="p-3 border-t border-white/5">
             {isSidebarOpen ? (
-              <div className="space-y-2">
-                <div className="text-[10px] text-white/70 font-mono flex items-center justify-between">
-                  <span>DESH Hub v1.25.1</span>
-                  <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                </div>
-                {/* 4 Bottom Quick Icons from screenshot: Headset, Zap, Shield, Settings */}
-                <div className="flex items-center justify-between text-white/70 pt-1">
-                  <button title="Customer Support" className="hover:text-white cursor-pointer"><Headphones className="w-3.5 h-3.5" /></button>
-                  <button title="System Speed" className="hover:text-white cursor-pointer"><Zap className="w-3.5 h-3.5" /></button>
-                  <button title="Security Verified" className="hover:text-white cursor-pointer"><ShieldCheck className="w-3.5 h-3.5" /></button>
-                  <button onClick={() => setActiveTab('settings')} title="Settings" className="hover:text-white cursor-pointer"><Settings className="w-3.5 h-3.5" /></button>
-                </div>
+              <div className="text-[11px] text-white/60 font-mono flex items-center justify-between px-1">
+                <span>DESH Hub v1.25.1</span>
+                <span className="w-2 h-2 rounded-full bg-emerald-400" title="System Online"></span>
               </div>
             ) : (
-              <div className="flex flex-col items-center gap-1.5 text-white/70">
-                <span className="text-[9px] font-mono">1.25</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+              <div className="flex flex-col items-center gap-1.5 text-white/60">
+                <span className="text-[9px] font-mono font-medium">1.25</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" title="System Online"></span>
               </div>
             )}
           </div>
@@ -323,10 +324,10 @@ export default function AdminLayout({
             </div>
           </div>
 
-          {/* Right: Round Utility Action Buttons matching StoreMate screenshot */}
+          {/* Right: Round Utility Action Buttons */}
           <div className="flex items-center justify-end gap-2 sm:gap-2.5 shrink-0">
             
-            {/* Primary Action Button (Pill shape with plus icon) */}
+            {/* Primary Action Button (+ New Sale) */}
             <button
               onClick={() => {
                 if (activeTab === 'pos') {
@@ -338,16 +339,7 @@ export default function AdminLayout({
               className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-blue-600/30 hover:shadow-blue-500/50 transition-all cursor-pointer"
             >
               <Plus className="w-4 h-4 stroke-[2.5]" />
-              <span className="hidden sm:inline">Add Your First Order</span>
-              <span className="sm:hidden">New</span>
-            </button>
-
-            {/* Round Search Button */}
-            <button 
-              title="Global Search"
-              className="w-9 h-9 rounded-full bg-slate-900/80 border border-slate-800 text-slate-300 hover:text-sky-400 hover:border-sky-500/40 flex items-center justify-center transition-all cursor-pointer shadow-sm"
-            >
-              <Search className="w-4 h-4" />
+              <span>New Sale</span>
             </button>
 
             {/* Round Notification Bell Button */}
@@ -359,15 +351,6 @@ export default function AdminLayout({
               {pendingOrders.length > 0 && (
                 <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-sky-400 animate-pulse"></span>
               )}
-            </button>
-
-            {/* Round Grid Launcher Button */}
-            <button 
-              title="App Launcher"
-              onClick={() => setActiveTab('dashboard')}
-              className="w-9 h-9 rounded-full bg-slate-900/80 border border-slate-800 text-slate-300 hover:text-sky-400 hover:border-sky-500/40 flex items-center justify-center transition-all cursor-pointer shadow-sm"
-            >
-              <Grid className="w-4 h-4" />
             </button>
 
             {/* Quick Calculator Dropdown (Round button) */}
