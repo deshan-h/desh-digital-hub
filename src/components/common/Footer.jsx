@@ -21,8 +21,8 @@ export default function Footer() {
 
       <div className="container mx-auto px-4 md:px-6 max-w-7xl relative z-10">
         
-        {/* Main 4-Column Footer Content */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 lg:gap-12 pb-12 border-b border-white/5">
+        {/* Main 3-Column Footer Content (Map moved to Store Location section) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 lg:gap-12 pb-12 border-b border-white/5">
           
           {/* Column 1: Brand & Operational Hours */}
           <div className="space-y-4">
@@ -45,7 +45,7 @@ export default function Footer() {
             </p>
 
             {/* Operating Hours Badge */}
-            <div className="p-3 rounded-2xl bg-[#09172c]/80 border border-sky-500/20 space-y-1">
+            <div className="p-3.5 rounded-2xl bg-[#09172c]/80 border border-sky-500/20 space-y-1.5">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                 <span className="text-xs font-bold text-white">විවෘත වේලාවන් (Open Hours)</span>
@@ -57,22 +57,34 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* Column 2: Contact Information */}
+          {/* Column 2: Contact Information & Location Address */}
           <div className="space-y-4">
             <h4 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
               <span className="w-1.5 h-4 rounded-full bg-sky-500"></span>
-              <span>සම්බන්ධතා තොරතුරු</span>
+              <span>සම්බන්ධතා සහ ස්ථානය</span>
             </h4>
 
             <div className="space-y-3 text-xs">
-              {/* Address */}
-              <div className="flex items-start gap-3 p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
-                <MapPin className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
-                <span className="text-slate-300 leading-relaxed">
-                  204/1, Pitapahamuna, Hiriyala,<br />
-                  Lenawa, Melsiripura, 60540, LK
-                </span>
-              </div>
+              {/* Address with Google Maps link */}
+              <a
+                href="https://maps.app.goo.gl/9vC3Xq2K7sKjX9n28"
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-start gap-3 p-3 rounded-2xl bg-slate-950/60 border border-slate-800/80 hover:border-sky-500/40 transition-colors group cursor-pointer"
+              >
+                <MapPin className="w-4 h-4 text-sky-400 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
+                <div className="flex-1">
+                  <span className="text-[10px] text-slate-500 block uppercase font-bold tracking-wider">Our Address (Google Maps)</span>
+                  <span className="text-slate-300 leading-relaxed group-hover:text-white transition-colors">
+                    204/1, Pitapahamuna, Hiriyala,<br />
+                    Lenawa, Melsiripura, 60540, LK
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-400 mt-1.5">
+                    <span>Open in Google Maps</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </span>
+                </div>
+              </a>
 
               {/* Phone */}
               <a
@@ -102,39 +114,7 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* Column 3: Interactive Location Map */}
-          <div className="space-y-4">
-            <h4 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
-              <span className="w-1.5 h-4 rounded-full bg-blue-500"></span>
-              <span>අප පිහිටි ස්ථානය (Location)</span>
-            </h4>
-
-            <div className="w-full h-44 rounded-2xl overflow-hidden border border-sky-500/20 shadow-lg relative group">
-              <iframe 
-                src="https://maps.google.com/maps?q=DESH+Digital+Hub,+Melsiripura&t=&z=15&ie=UTF8&iwloc=&output=embed" 
-                width="100%" 
-                height="100%" 
-                style={{ border: 0 }} 
-                allowFullScreen="" 
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-                className="opacity-70 group-hover:opacity-100 transition-opacity duration-300 mix-blend-luminosity group-hover:mix-blend-normal"
-                title="DESH Digital Hub Location Map"
-              ></iframe>
-
-              <a 
-                href="https://maps.app.goo.gl/9vC3Xq2K7sKjX9n28" 
-                target="_blank" 
-                rel="noreferrer"
-                className="absolute bottom-2.5 right-2.5 bg-[#061222]/90 backdrop-blur-md text-sky-400 hover:text-slate-950 hover:bg-sky-400 text-[11px] font-bold px-3 py-1.5 rounded-xl border border-sky-500/30 transition-all flex items-center gap-1 shadow-md"
-              >
-                <span>Google Maps</span>
-                <ExternalLink className="w-3 h-3" />
-              </a>
-            </div>
-          </div>
-
-          {/* Column 4: Quick Portals & Social Media */}
+          {/* Column 3: Quick Portals & Social Media */}
           <div className="space-y-4">
             <h4 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
               <span className="w-1.5 h-4 rounded-full bg-indigo-500"></span>

@@ -280,13 +280,13 @@ export default function Services() {
                   onMouseEnter={() => setHoveredId(service.id)}
                   onMouseLeave={() => setHoveredId(null)}
                   onClick={() => setSelectedServiceModal(service)}
-                  className="group relative aspect-square rounded-[24px] sm:rounded-[30px] overflow-hidden border border-white/10 hover:border-sky-400/60 shadow-[0_12px_35px_rgba(0,0,0,0.6)] hover:shadow-[0_20px_50px_rgba(14,165,233,0.3)] hover:-translate-y-2 hover:scale-[1.02] transition-all duration-300 cursor-pointer select-none bg-slate-950"
+                  className="group relative aspect-square rounded-[24px] sm:rounded-[30px] overflow-hidden border border-white/10 hover:border-sky-400/60 shadow-[0_12px_35px_rgba(0,0,0,0.6)] hover:shadow-[0_20px_50px_rgba(14,165,233,0.3)] hover:-translate-y-1.5 transition-all duration-300 cursor-pointer select-none bg-[#050c18] isolate"
                 >
                   {/* Full Box Edge-to-Edge Image */}
                   <img 
                     src={service.image} 
                     alt={service.title} 
-                    className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-108"
+                    className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-108 block"
                     loading="lazy"
                   />
 
@@ -300,12 +300,12 @@ export default function Services() {
                     </p>
                   </div>
 
-                  {/* Hover / Auto-Cycling Description Overlay Covering the Tile */}
+                  {/* Hover / Auto-Cycling Description Overlay Covering the FULL Tile Seamlessly */}
                   <div 
-                    className={`absolute inset-0 bg-[#061224]/92 backdrop-blur-md p-4 sm:p-5 flex flex-col justify-between z-20 text-left transition-all duration-300 ${
+                    className={`absolute inset-0 w-full h-full rounded-[24px] sm:rounded-[30px] bg-[#050c18]/95 backdrop-blur-md p-4 sm:p-5 flex flex-col justify-between z-20 text-left transition-opacity duration-300 border border-sky-400/40 shadow-inner ${
                       isOverlayActive 
-                        ? 'opacity-100 translate-y-0 pointer-events-auto' 
-                        : 'opacity-0 translate-y-2 pointer-events-none'
+                        ? 'opacity-100 pointer-events-auto' 
+                        : 'opacity-0 pointer-events-none'
                     }`}
                   >
                     <div>
@@ -326,8 +326,8 @@ export default function Services() {
                     </div>
                   </div>
 
-                  {/* Subtle Top Glow Border */}
-                  <div className="absolute top-0 left-1/4 right-1/4 h-[2px] bg-gradient-to-r from-transparent via-sky-300 to-transparent opacity-0 group-hover:opacity-100 transition-opacity z-30" />
+                  {/* Subtle Top Glow Border (Only visible when overlay is inactive) */}
+                  <div className={`absolute top-0 left-1/4 right-1/4 h-[2px] bg-gradient-to-r from-transparent via-sky-300 to-transparent transition-opacity z-10 ${isOverlayActive ? 'opacity-0' : 'opacity-0 group-hover:opacity-100'}`} />
                 </motion.div>
               );
             })}

@@ -211,7 +211,7 @@ export default function WorkingHoursAndLocation() {
                 </div>
 
                 <a
-                  href="https://maps.google.com/?q=204/1+Pitapahamuna+Lenawa+Melsiripura"
+                  href="https://maps.app.goo.gl/9vC3Xq2K7sKjX9n28"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/30 text-sky-300 transition-all self-start sm:self-center cursor-pointer shadow-sm"
@@ -221,24 +221,24 @@ export default function WorkingHoursAndLocation() {
                 </a>
               </div>
 
-              {/* Styled Interactive Google Map Embed */}
+              {/* Styled Interactive Google Map Embed (Using Exact Footer Location Embed) */}
               <div className="relative rounded-2xl overflow-hidden border border-slate-700/80 aspect-video w-full bg-slate-950 shadow-inner group">
                 <iframe
                   title="DESH Digital Hub Location Map"
-                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3953.541097223783!2d80.49089531477785!3d7.731215494427495!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3afcad37b3f9ffc3%3A0x6b1076f272e2cf5a!2sMelsiripura!5e0!3m2!1sen!2slk!4v1650000000000!5m2!1sen!2slk"
+                  src="https://maps.google.com/maps?q=DESH+Digital+Hub,+Melsiripura&t=&z=15&ie=UTF8&iwloc=&output=embed"
                   width="100%"
                   height="100%"
-                  style={{ border: 0, filter: 'invert(90%) hue-rotate(180deg) contrast(110%)' }}
+                  style={{ border: 0 }}
                   allowFullScreen=""
                   loading="lazy"
                   referrerPolicy="no-referrer-when-downgrade"
-                  className="w-full h-full opacity-85 group-hover:opacity-100 transition-opacity"
+                  className="w-full h-full opacity-90 group-hover:opacity-100 transition-opacity"
                 />
 
                 {/* Floating Map Overlay Badge */}
                 <div className="absolute top-3 left-3 bg-[#0b1c36]/90 backdrop-blur-md border border-white/10 px-3 py-1.5 rounded-xl shadow-lg flex items-center gap-2 text-xs">
                   <MapPin className="w-3.5 h-3.5 text-sky-400" />
-                  <span className="font-bold text-white">Melsiripura, Sri Lanka</span>
+                  <span className="font-bold text-white">DESH Digital Hub • Melsiripura</span>
                 </div>
               </div>
             </div>
@@ -246,7 +246,7 @@ export default function WorkingHoursAndLocation() {
             <div className="flex items-center justify-between text-xs text-slate-400 pt-2">
               <span>Easy roadside parking available for customers.</span>
               <a
-                href="https://maps.google.com/?q=204/1+Pitapahamuna+Lenawa+Melsiripura"
+                href="https://maps.app.goo.gl/9vC3Xq2K7sKjX9n28"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sky-400 hover:text-sky-300 font-semibold flex items-center gap-1"
