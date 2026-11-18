@@ -30,11 +30,11 @@ export default function Footer() {
               <div className="w-10 h-10 rounded-xl bg-white/10 p-1 border border-white/15 flex items-center justify-center shadow-inner">
                 <img src="/pwa-192x192.png" alt="DESH Logo" className="w-full h-full object-contain" />
               </div>
-              <div className="flex flex-col">
-                <span className="text-lg font-black text-white tracking-tight leading-tight">
+              <div className="flex flex-col justify-center">
+                <span className="text-lg font-black text-white tracking-tight leading-normal pb-0.5">
                   DESH Digital Hub
                 </span>
-                <span className="text-[10px] text-sky-400 font-bold uppercase tracking-wider">
+                <span className="text-[10px] text-sky-400 font-bold uppercase tracking-wider leading-normal">
                   Your One Step Digital Solution
                 </span>
               </div>

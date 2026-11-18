@@ -39,11 +39,11 @@ export default function Navbar() {
                   className="w-full h-full object-contain drop-shadow-md group-hover:scale-105 transition-transform" 
                 />
               </div>
-              <div className="flex flex-col">
-                <span className="text-base sm:text-lg font-black tracking-tight text-white group-hover:text-sky-300 transition-colors leading-tight">
+              <div className="flex flex-col justify-center">
+                <span className="text-base sm:text-lg font-black tracking-tight text-white group-hover:text-sky-300 transition-colors leading-normal pb-0.5">
                   DESH Digital Hub
                 </span>
-                <span className="text-[10px] text-sky-300/80 font-semibold tracking-wider uppercase">
+                <span className="text-[10px] text-sky-300/80 font-semibold tracking-wider uppercase leading-normal">
                   Your One Step Digital Solution
                 </span>
               </div>

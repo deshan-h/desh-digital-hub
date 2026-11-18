@@ -135,11 +135,11 @@ export default function AdminLayout({
                   <div className="w-9 h-9 rounded-xl bg-white/10 p-1 border border-white/15 backdrop-blur-md flex items-center justify-center shrink-0 shadow-inner group-hover:border-sky-400/40 transition-colors">
                     <img src="/pwa-192x192.png" alt="DESH Logo" className="w-full h-full object-contain" />
                   </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-sm font-black text-white tracking-tight leading-none truncate group-hover:text-sky-300 transition-colors">
+                  <div className="flex flex-col min-w-0 justify-center">
+                    <span className="text-sm font-black text-white tracking-tight leading-normal pb-0.5 truncate group-hover:text-sky-300 transition-colors">
                       DESH Digital Hub
                     </span>
-                    <span className="text-[10px] text-sky-200/80 font-semibold tracking-wider uppercase mt-1 truncate">
+                    <span className="text-[10px] text-sky-200/80 font-semibold tracking-wider uppercase truncate">
                       Management Portal
                     </span>
                   </div>
