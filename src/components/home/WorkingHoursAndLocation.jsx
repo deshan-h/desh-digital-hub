@@ -18,13 +18,28 @@ export default function WorkingHoursAndLocation() {
         const minutes = slDate.getMinutes();
         const currentMinuteOfDay = hours * 60 + minutes;
 
-        // Mon-Sat: 8:00 AM (480 mins) to 8:30 PM (1230 mins)
-        // Sunday: 8:00 AM (480 mins) to 2:00 PM (840 mins)
-        if (day === 0) {
-          setIsOpenNow(currentMinuteOfDay >= 480 && currentMinuteOfDay <= 840);
-        } else {
-          setIsOpenNow(currentMinuteOfDay >= 480 && currentMinuteOfDay <= 1230);
+        // Schedule:
+        // Mon (1), Tue (2), Wed (3): 7:00 AM (420) - 5:00 PM (1020)
+        // Thu (4): 7:00 AM (420) - 8:00 PM (1200)
+        // Fri (5): 7:00 AM (420) - 5:00 PM (1020)
+        // Sat (6): 7:00 AM (420) - 4:00 PM (960)
+        // Sun (0): 7:00 AM (420) - 9:00 PM (1260)
+        let openMin = 420; // 7:00 AM
+        let closeMin = 1020; // 5:00 PM
+
+        if (day >= 1 && day <= 3) {
+          closeMin = 1020; // 5:00 PM
+        } else if (day === 4) {
+          closeMin = 1200; // 8:00 PM
+        } else if (day === 5) {
+          closeMin = 1020; // 5:00 PM
+        } else if (day === 6) {
+          closeMin = 960;  // 4:00 PM
+        } else if (day === 0) {
+          closeMin = 1260; // 9:00 PM
         }
+
+        setIsOpenNow(currentMinuteOfDay >= openMin && currentMinuteOfDay < closeMin);
       } catch (e) {
         setIsOpenNow(true);
       }
@@ -85,30 +100,54 @@ export default function WorkingHoursAndLocation() {
               </div>
 
               {/* Schedule List */}
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
                   Weekly Schedule (සතියේ දින සටහන)
                 </h4>
 
-                <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-white/5 flex items-center justify-between text-xs sm:text-sm">
-                  <div className="flex items-center gap-2.5">
+                <div className="p-3 rounded-2xl bg-slate-950/70 border border-white/5 flex items-center justify-between text-xs sm:text-sm">
+                  <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-sky-400"></span>
-                    <span className="font-bold text-white">Monday – Saturday (සඳුදා - සෙනසුරාදා)</span>
+                    <span className="font-bold text-white">Monday – Wednesday (සඳුදා - බදාදා)</span>
                   </div>
-                  <span className="font-mono font-bold text-sky-300">8:00 AM – 8:30 PM</span>
+                  <span className="font-mono font-bold text-sky-300">7:00 AM – 5:00 PM</span>
                 </div>
 
-                <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-white/5 flex items-center justify-between text-xs sm:text-sm">
-                  <div className="flex items-center gap-2.5">
+                <div className="p-3 rounded-2xl bg-slate-950/70 border border-white/5 flex items-center justify-between text-xs sm:text-sm">
+                  <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                    <span className="font-bold text-white">Thursday (බ්‍රහස්පතින්දා)</span>
+                  </div>
+                  <span className="font-mono font-bold text-emerald-300">7:00 AM – 8:00 PM</span>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-slate-950/70 border border-white/5 flex items-center justify-between text-xs sm:text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-sky-400"></span>
+                    <span className="font-bold text-white">Friday (සිකුරාදා)</span>
+                  </div>
+                  <span className="font-mono font-bold text-sky-300">7:00 AM – 5:00 PM</span>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-slate-950/70 border border-white/5 flex items-center justify-between text-xs sm:text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                    <span className="font-bold text-white">Saturday (සෙනසුරාදා)</span>
+                  </div>
+                  <span className="font-mono font-bold text-amber-300">7:00 AM – 4:00 PM</span>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-slate-950/70 border border-white/5 flex items-center justify-between text-xs sm:text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-purple-400"></span>
                     <span className="font-bold text-white">Sunday (ඉරිදා)</span>
                   </div>
-                  <span className="font-mono font-bold text-emerald-300">8:00 AM – 2:00 PM</span>
+                  <span className="font-mono font-bold text-purple-300">7:00 AM – 9:00 PM</span>
                 </div>
 
-                <div className="p-3.5 rounded-2xl bg-slate-950/40 border border-white/5 flex items-center justify-between text-xs text-slate-400">
-                  <span>Poya Days & Special Holidays</span>
-                  <span className="font-mono font-medium">8:00 AM – 1:00 PM</span>
+                <div className="p-3 rounded-2xl bg-slate-950/40 border border-white/5 flex items-center justify-between text-xs text-slate-400">
+                  <span>Poya Days & Special Holidays (පෝය සහ නිවාඩු දින)</span>
+                  <span className="font-mono font-bold text-slate-300">7:00 AM – 8:00 PM</span>
                 </div>
               </div>
 

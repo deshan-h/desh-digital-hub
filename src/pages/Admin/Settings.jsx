@@ -98,15 +98,22 @@ export default function Settings({ isAdmin, posCategories, fetchCategories }) {
   const [pingLatency, setPingLatency] = useState(null);
   const [testingPing, setTestingPing] = useState(false);
 
+  // ==========================================
+  // 4. PUBLIC CATEGORY VISIBILITY STATE
+  // ==========================================
+  const [hiddenCategories, setHiddenCategories] = useState([]);
+  const [savingCategoryVisibility, setSavingCategoryVisibility] = useState(false);
+
   useEffect(() => {
     fetchInitialSettings();
   }, []);
 
   const fetchInitialSettings = async () => {
     try {
-      const [bannersData, appearanceData] = await Promise.all([
+      const [bannersData, appearanceData, hiddenIds] = await Promise.all([
         settingsService.getSetting('banners').catch(() => null),
-        settingsService.getSetting('appearance_settings').catch(() => null)
+        settingsService.getSetting('appearance_settings').catch(() => null),
+        settingsService.getPublicCategoryVisibility().catch(() => [])
       ]);
 
       if (bannersData && Array.isArray(bannersData.items) && bannersData.items.length > 0) {
@@ -118,11 +125,30 @@ export default function Settings({ isAdmin, posCategories, fetchCategories }) {
       if (appearanceData && typeof appearanceData === 'object') {
         setAppearance((prev) => ({ ...prev, ...appearanceData }));
       }
+
+      setHiddenCategories(Array.isArray(hiddenIds) ? hiddenIds : []);
     } catch (error) {
       console.error(error);
       notify.error('Failed to load settings data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleToggleCategoryVisibility = async (catIdOrName) => {
+    setSavingCategoryVisibility(true);
+    const isHidden = hiddenCategories.includes(catIdOrName);
+    const updated = isHidden
+      ? hiddenCategories.filter(id => id !== catIdOrName)
+      : [...hiddenCategories, catIdOrName];
+    setHiddenCategories(updated);
+    try {
+      await settingsService.setPublicCategoryVisibility(updated);
+      notify.success(isHidden ? 'Category is now visible on public website!' : 'Category hidden from public website!');
+    } catch (e) {
+      notify.error('Failed to update category visibility');
+    } finally {
+      setSavingCategoryVisibility(false);
     }
   };
 
@@ -682,7 +708,7 @@ export default function Settings({ isAdmin, posCategories, fetchCategories }) {
       {/* TAB 2: PRODUCT AND ITEMS (Embedded ItemsManager)         */}
       {/* ======================================================== */}
       {activeTab === 'items' && (
-        <div className="space-y-4 animate-in fade-in duration-200">
+        <div className="space-y-6 animate-in fade-in duration-200">
           <div className="bg-[#0b101d]/90 border border-slate-800/80 rounded-2xl p-5 shadow-sm flex items-center justify-between">
             <div>
               <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
@@ -690,8 +716,66 @@ export default function Settings({ isAdmin, posCategories, fetchCategories }) {
                 Product & Services Catalog Management
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                Manage your product prices, service categories, adding/editing items, and PDF price sheet exports.
+                Manage your product prices, service categories, public website visibility, and PDF price sheets.
               </p>
+            </div>
+          </div>
+
+          {/* Public Website Category Visibility Manager */}
+          <div className="bg-[#0b101d]/90 border border-slate-800/80 rounded-2xl p-5 sm:p-6 shadow-xl space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+              <div>
+                <h3 className="font-bold text-slate-100 text-sm sm:text-base flex items-center gap-2">
+                  <Eye className="w-4 h-4 text-sky-400" />
+                  Public Website Category Visibility (ප්‍රසිද්ධ වෙබ් අඩවියේ පෙන්වීම/සැඟවීම)
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Click the toggle to show or hide specific service categories from the public website home page.
+                </p>
+              </div>
+              <span className="text-xs font-mono px-2.5 py-1 rounded-full bg-slate-900 border border-slate-800 text-slate-400 self-start sm:self-auto">
+                {posCategories?.length || 0} Total Categories
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              {(posCategories || []).map((cat) => {
+                const isHidden = hiddenCategories.includes(cat.id) || hiddenCategories.includes(cat.category);
+                return (
+                  <div
+                    key={cat.id || cat.category}
+                    className={`p-3.5 rounded-xl border transition-all flex items-center justify-between gap-2 ${
+                      isHidden
+                        ? 'bg-slate-950/60 border-slate-800/80 opacity-60'
+                        : 'bg-[#09172c]/70 border-sky-500/20 hover:border-sky-500/40'
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-slate-200 truncate">{cat.category}</div>
+                      <div className={`text-[10px] font-semibold flex items-center gap-1 mt-0.5 ${
+                        isHidden ? 'text-slate-500' : 'text-emerald-400'
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${isHidden ? 'bg-slate-500' : 'bg-emerald-400'}`}></span>
+                        <span>{isHidden ? 'Hidden on Web' : 'Visible on Web'}</span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleToggleCategoryVisibility(cat.id || cat.category)}
+                      disabled={savingCategoryVisibility}
+                      className={`p-2 rounded-lg transition-colors cursor-pointer shrink-0 ${
+                        isHidden
+                          ? 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
+                          : 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/30'
+                      }`}
+                      title={isHidden ? 'Click to show on public website' : 'Click to hide from public website'}
+                    >
+                      {isHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
 

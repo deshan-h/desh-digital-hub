@@ -21,7 +21,8 @@ import {
   Menu,
   ChevronDown,
   Plus,
-  MessageCircle
+  MessageCircle,
+  MessageSquare
 } from 'lucide-react';
 import CalculatorDropdown from '../components/common/CalculatorDropdown';
 
@@ -84,6 +85,7 @@ export default function AdminLayout({
     { id: 'repairs', label: 'PC Repairs', icon: Wrench, hasDropdown: false },
     { id: 'customers', label: 'Customers', icon: Users, hasDropdown: false },
     { id: 'expenses', label: 'Expenses', icon: Wallet, hasDropdown: false },
+    { id: 'inquiries', label: 'Messages', icon: MessageSquare, hasDropdown: false },
     { id: 'settings', label: 'Settings', icon: Settings, hasDropdown: true },
   ];
 
@@ -96,6 +98,7 @@ export default function AdminLayout({
       case 'customers': return { section: 'CRM & Client Records', page: 'Customer Directory' };
       case 'expenses': return { section: 'Accounting', page: 'Shop Expenses' };
       case 'items': return { section: 'Inventory Management', page: 'Products & Stock' };
+      case 'inquiries': return { section: 'Customer Support', page: 'Messages & Inquiries' };
       case 'history': return { section: 'Sales Orders', page: 'Sales Invoices & Receipts' };
       case 'reports': return { section: 'Business Intelligence', page: 'Analytics & Reports' };
       case 'settings': return { section: 'System Configuration', page: 'Settings' };
@@ -145,7 +148,7 @@ export default function AdminLayout({
                 {/* Collapse Button */}
                 <button
                   onClick={() => setIsSidebarOpen(false)}
-                  className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0 ml-1"
+                  className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0 mr-1"
                   title="Collapse Menu"
                 >
                   <ChevronLeft className="w-5 h-5" />
@@ -299,13 +302,12 @@ export default function AdminLayout({
       </aside>
 
       {/* ======================================================== */}
-      {/* MAIN CONTENT CARD WITH THE SIGNATURE TOP-LEFT CURVE      */}
-      {/* (rounded-tl-[34px] revealing the sapphire blue corner)   */}
+      {/* MAIN CONTENT CARD WITH SLEEK SEAMLESS TOP-LEFT CURVE     */}
       {/* ======================================================== */}
-      <div className="flex-1 bg-[#090d16] rounded-tl-[34px] sm:rounded-tl-[38px] overflow-hidden flex flex-col shadow-[-18px_0_45px_rgba(0,0,0,0.85)] relative min-w-0 border-t border-l border-sky-400/20">
+      <div className="flex-1 bg-[#090d16] rounded-tl-[24px] sm:rounded-tl-[28px] overflow-hidden flex flex-col shadow-[-16px_0_35px_rgba(0,0,0,0.75)] relative min-w-0">
         
-        {/* Top Header Bar (Uda Bar) inside the curved card */}
-        <header className="h-16 px-5 sm:px-8 bg-[#0b101d]/90 backdrop-blur-2xl border-b border-slate-800/80 shrink-0 flex items-center justify-between gap-4 sticky top-0 z-20">
+        {/* Top Header Bar inside the curved card */}
+        <header className="h-16 pl-8 sm:pl-10 pr-5 sm:pr-8 bg-[#0b101d]/90 backdrop-blur-2xl border-b border-slate-800/80 shrink-0 flex items-center justify-between gap-4 sticky top-0 z-20">
           
           {/* Left: Breadcrumbs / Title */}
           <div className="flex items-center gap-2 min-w-0">

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { categoryService } from '../../services/supabaseService';
+import { categoryService, settingsService } from '../../services/supabaseService';
 import { 
   Printer, 
   Layers, 
@@ -49,8 +49,12 @@ export default function Services() {
   useEffect(() => {
     async function fetchServices() {
       try {
-        let data = await categoryService.getCategories();
-        data = data.filter(cat => cat.category !== 'Custom & Utilities');
+        const [categoriesData, hiddenIds] = await Promise.all([
+          categoryService.getCategories(),
+          settingsService.getPublicCategoryVisibility().catch(() => [])
+        ]);
+
+        let data = (categoriesData || []).filter(cat => cat.category !== 'Custom & Utilities');
         data.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
         // Add PC Repairs as a dedicated service category
@@ -74,7 +78,12 @@ export default function Services() {
           }
         ];
 
-        setCategories(allServices);
+        // Filter out categories hidden by Admin in Settings
+        const visibleServices = allServices.filter(
+          cat => !hiddenIds.includes(cat.id) && !hiddenIds.includes(cat.category)
+        );
+
+        setCategories(visibleServices);
       } catch (error) {
         console.error('Error fetching services:', error);
       } finally {
@@ -148,37 +157,76 @@ export default function Services() {
           )}
         </div>
 
-        {/* Category Filter Tabs */}
-        <div className="flex items-center justify-start sm:justify-center gap-2 overflow-x-auto no-scrollbar pb-3 mb-10 px-2">
-          <button
-            onClick={() => setActiveCategory('all')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-              activeCategory === 'all'
-                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-600/30'
-                : 'bg-[#09172c]/80 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800/80'
-            }`}
-          >
-            All Services (සියල්ල)
-          </button>
-
-          {categories.map((cat) => {
-            const Icon = ICON_MAP[cat.icon] || Package;
-            const isActive = activeCategory === cat.id || activeCategory === cat.category;
-            return (
+        {/* Main Category Tiles (Grid Layout) */}
+        <div className="mb-12">
+          <div className="flex items-center justify-between mb-3.5 px-1">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-sky-400" />
+              <span>Main Categories • ප්‍රධාන සේවා අංශ</span>
+            </span>
+            {activeCategory !== 'all' && (
               <button
-                key={cat.id}
-                onClick={() => setActiveCategory(cat.id || cat.category)}
-                className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                  isActive
-                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-md shadow-blue-600/30'
-                    : 'bg-[#09172c]/80 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800/80'
-                }`}
+                onClick={() => setActiveCategory('all')}
+                className="text-xs font-bold text-sky-400 hover:text-white transition-colors cursor-pointer"
               >
-                <Icon className="w-3.5 h-3.5" />
-                <span>{cat.displayName || cat.category}</span>
+                Show All Categories (සියල්ල)
               </button>
-            );
-          })}
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+            {/* "All" Tile */}
+            <button
+              onClick={() => setActiveCategory('all')}
+              className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all duration-200 cursor-pointer flex items-center gap-3 group ${
+                activeCategory === 'all'
+                  ? 'bg-gradient-to-r from-blue-600/30 to-indigo-600/30 border-blue-500/60 shadow-[0_0_20px_rgba(59,130,246,0.25)]'
+                  : 'bg-[#09172c]/75 border-sky-500/15 hover:border-sky-500/40 hover:bg-[#0c203c]'
+              }`}
+            >
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${
+                activeCategory === 'all' ? 'bg-blue-600 text-white shadow-md' : 'bg-sky-500/10 text-sky-400 border border-sky-500/20'
+              }`}>
+                <Package className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs sm:text-sm font-bold text-white truncate">All Services</div>
+                <div className="text-[10px] text-slate-400 truncate">සියලුම සේවාවන්</div>
+              </div>
+            </button>
+
+            {/* Dynamic Category Tiles */}
+            {categories.map((cat) => {
+              const Icon = ICON_MAP[cat.icon] || Package;
+              const isActive = activeCategory === cat.id || activeCategory === cat.category;
+              const itemCount = (cat.items || []).length;
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => setActiveCategory(cat.id || cat.category)}
+                  className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all duration-200 cursor-pointer flex items-center gap-3 group ${
+                    isActive
+                      ? 'bg-gradient-to-r from-blue-600/30 to-indigo-600/30 border-blue-500/60 shadow-[0_0_20px_rgba(59,130,246,0.25)]'
+                      : 'bg-[#09172c]/75 border-sky-500/15 hover:border-sky-500/40 hover:bg-[#0c203c]'
+                  }`}
+                >
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${
+                    isActive ? 'bg-blue-600 text-white shadow-md' : 'bg-sky-500/10 text-sky-400 border border-sky-500/20'
+                  }`}>
+                    <Icon className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs sm:text-sm font-bold text-white truncate group-hover:text-sky-300 transition-colors">
+                      {cat.displayName || cat.category}
+                    </div>
+                    <div className="text-[10px] text-slate-400 truncate">
+                      {itemCount > 0 ? `${itemCount} Solutions` : 'Available'}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Services Bento Grid (NO PRICES) */}

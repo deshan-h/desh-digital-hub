@@ -681,5 +681,73 @@ export const settingsService = {
   // Alias for backward compatibility
   async setSetting(id, data) {
     return this.saveSetting(id, data);
+  },
+
+  async getPublicCategoryVisibility() {
+    try {
+      const data = await this.getSetting('public_categories_visibility');
+      return Array.isArray(data?.hiddenIds) ? data.hiddenIds : [];
+    } catch (e) {
+      console.error('Failed to load category visibility:', e);
+      return [];
+    }
+  },
+
+  async setPublicCategoryVisibility(hiddenIds) {
+    return await this.saveSetting('public_categories_visibility', { hiddenIds: Array.from(new Set(hiddenIds)) });
+  }
+};
+
+// ==========================================
+// 10. CUSTOMER INQUIRIES & CHAT SERVICE
+// ==========================================
+export const inquiryService = {
+  async getInquiries() {
+    try {
+      const data = await settingsService.getSetting('customer_inquiries');
+      if (Array.isArray(data?.items)) {
+        return data.items.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      }
+      return [];
+    } catch (e) {
+      console.error('Failed to load inquiries:', e);
+      return [];
+    }
+  },
+
+  async createInquiry({ name, phone, service, message }) {
+    try {
+      const existing = await this.getInquiries();
+      const newInquiry = {
+        id: 'inq_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+        name: name.trim(),
+        phone: phone.trim(),
+        service: service || 'General Inquiry',
+        message: message ? message.trim() : '',
+        status: 'new', // 'new' | 'read' | 'replied'
+        createdAt: new Date().toISOString()
+      };
+
+      const updated = [newInquiry, ...existing];
+      await settingsService.saveSetting('customer_inquiries', { items: updated });
+      return newInquiry;
+    } catch (e) {
+      console.error('Failed to save inquiry:', e);
+      throw e;
+    }
+  },
+
+  async updateInquiryStatus(id, status) {
+    const existing = await this.getInquiries();
+    const updated = existing.map(item => item.id === id ? { ...item, status } : item);
+    await settingsService.saveSetting('customer_inquiries', { items: updated });
+    return true;
+  },
+
+  async deleteInquiry(id) {
+    const existing = await this.getInquiries();
+    const updated = existing.filter(item => item.id !== id);
+    await settingsService.saveSetting('customer_inquiries', { items: updated });
+    return true;
   }
 };

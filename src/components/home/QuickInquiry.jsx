@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Send, MessageSquare, Phone, User, CheckCircle2, MessageCircle, Sparkles, HelpCircle } from 'lucide-react';
 import { notify } from '../../utils/toast';
+import { inquiryService } from '../../services/supabaseService';
 
 export default function QuickInquiry() {
   const [formData, setFormData] = useState({
@@ -23,7 +24,7 @@ export default function QuickInquiry() {
     'Software & OS Installation (මෘදුකාංග ස්ථාපනය)'
   ];
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.name.trim() || !formData.phone.trim()) {
       notify.error('කරුණාකර ඔබගේ නම සහ දුරකථන අංකය ඇතුළත් කරන්න.');
@@ -32,6 +33,14 @@ export default function QuickInquiry() {
 
     setSubmitting(true);
     try {
+      // 1. Save inquiry to Supabase so it appears in Admin Messages tab
+      await inquiryService.createInquiry({
+        name: formData.name,
+        phone: formData.phone,
+        service: formData.service,
+        message: formData.message
+      }).catch(err => console.warn('Could not store inquiry locally:', err));
+
       const formattedMessage = `*New Customer Inquiry - DESH Digital Hub*\n\n` +
         `👤 *Name:* ${formData.name.trim()}\n` +
         `📞 *Phone / WhatsApp:* ${formData.phone.trim()}\n` +
@@ -42,7 +51,7 @@ export default function QuickInquiry() {
       const encodedText = encodeURIComponent(formattedMessage);
       const whatsappUrl = `https://wa.me/94719989000?text=${encodedText}`;
 
-      notify.success('WhatsApp පණිවිඩය සූදානම්! WhatsApp විවෘත වේ...');
+      notify.success('පණිවිඩය සාර්ථකව යොමු කෙරිණි! WhatsApp විවෘත වේ...');
       setTimeout(() => {
         window.open(whatsappUrl, '_blank');
         setSubmitting(false);
@@ -52,7 +61,7 @@ export default function QuickInquiry() {
           service: 'General Inquiry',
           message: ''
         });
-      }, 500);
+      }, 400);
     } catch (err) {
       console.error(err);
       notify.error('පණිවිඩය යැවීමට නොහැකි විය.');

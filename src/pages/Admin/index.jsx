@@ -29,6 +29,7 @@ const Expenses = lazy(() => import('./Expenses'));
 const ItemsManager = lazy(() => import('./ItemsManager'));
 const Reports = lazy(() => import('./Reports'));
 const Settings = lazy(() => import('./Settings'));
+const Inquiries = lazy(() => import('./Inquiries'));
 
 
 
@@ -613,8 +614,9 @@ export default function Admin() {
           {activeTab === 'history' && <History salesHistory={salesHistory} fetchSales={fetchSales} handleDeleteSale={handleDeleteSale} user={user} posCategories={posCategories} isAdmin={isAdmin} customersList={customersList} />}
           {activeTab === 'repairs' && <Repairs user={user} fetchSales={fetchSales} />}
           {activeTab === 'items' && <ItemsManager posCategories={posCategories} fetchCategories={fetchCategories} />}
+          {activeTab === 'inquiries' && <Inquiries />}
           {activeTab === 'reports' && <Reports salesHistory={salesHistory} customersList={customersList} isAdmin={isAdmin} />}
-          {activeTab === 'settings' && <Settings isAdmin={isAdmin} />}
+          {activeTab === 'settings' && <Settings isAdmin={isAdmin} posCategories={posCategories} fetchCategories={fetchCategories} />}
         </Suspense>
       </AdminLayout>
 

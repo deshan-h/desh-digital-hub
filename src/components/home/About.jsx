@@ -35,10 +35,10 @@ export default function About() {
   ];
 
   const stats = [
-    { value: '5,000+', label: 'සම්පූර්ණ කළ ඇණවුම්', sub: 'Completed Orders' },
-    { value: '100%', label: 'දත්ත රහස්‍යතාව', sub: 'Privacy Guaranteed' },
-    { value: 'Speed', label: 'ක්ෂණික සේවය', sub: 'Instant Turnaround' },
-    { value: '7 Days', label: 'සතියේ දින 7 ම', sub: 'Open All Week' }
+    { value: '365 Days', label: 'වසරේ දින 365 ම විවෘතයි', sub: 'Open All 365 Days' },
+    { value: 'Online', label: 'දිවයින පුරා ඔන්ලයින් සේවා', sub: 'Island-wide Service' },
+    { value: '6+ Years', label: 'වසර 6+ ක අඛණ්ඩ විශ්වාසය', sub: '6+ Years of Proven Service' },
+    { value: '100%', label: 'උසස් ප්‍රමිතිය සහ වේගය', sub: 'Fast & High Quality' }
   ];
 
   return (

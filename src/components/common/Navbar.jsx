@@ -23,16 +23,14 @@ export default function Navbar() {
   ];
 
   return (
-    <header className="fixed w-full z-40 top-0 left-0 right-0">
+    <header className="fixed w-full z-40 top-0 left-0 right-0 px-2 sm:px-6 pt-0 sm:pt-1.5 pointer-events-none">
       <nav 
         aria-label="Main Navigation"
-        className={`transition-all duration-300 ${
-          scrolled 
-            ? 'bg-[#061222]/90 backdrop-blur-2xl border-b border-sky-500/15 shadow-[0_12px_40px_rgba(0,0,0,0.7)] py-2.5 md:py-3' 
-            : 'bg-[#061222]/60 backdrop-blur-xl border-b border-white/5 py-3 md:py-4'
+        className={`max-w-7xl mx-auto pointer-events-auto rounded-b-[24px] sm:rounded-b-[30px] border-b border-l border-r border-sky-400/20 bg-gradient-to-b from-[#0c2340]/95 via-[#0a1e36]/95 to-[#061424]/95 backdrop-blur-2xl shadow-[0_18px_45px_rgba(0,0,0,0.75)] transition-all duration-300 ${
+          scrolled ? 'py-2 sm:py-2.5' : 'py-2.5 sm:py-3.5'
         }`}
       >
-        <div className="container mx-auto px-4 md:px-6">
+        <div className="px-4 sm:px-6">
           <div className="flex justify-between items-center">
             
             {/* Brand Logo & Name */}
@@ -49,7 +47,7 @@ export default function Navbar() {
                   DESH Digital Hub
                 </span>
                 <span className="text-[10px] text-sky-300/80 font-semibold tracking-wider uppercase">
-                  Printing & IT Solutions
+                  Your One Step Digital Solution
                 </span>
               </div>
             </Link>

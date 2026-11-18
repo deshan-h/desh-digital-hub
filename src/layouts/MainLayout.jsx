@@ -1,5 +1,4 @@
 import React from 'react';
-import NoticeBar from '../components/common/NoticeBar';
 import Navbar from '../components/common/Navbar';
 import Footer from '../components/common/Footer';
 
@@ -13,10 +12,9 @@ export default function MainLayout({ children }) {
       <div className="fixed top-[-15%] left-[-10%] w-[45rem] h-[45rem] bg-sky-600/10 rounded-full blur-[160px] pointer-events-none -z-10 mix-blend-screen"></div>
       <div className="fixed bottom-[-15%] right-[-10%] w-[45rem] h-[45rem] bg-indigo-600/10 rounded-full blur-[160px] pointer-events-none -z-10 mix-blend-screen"></div>
 
-      <NoticeBar />
       <Navbar />
 
-      <main className="flex-grow pt-24 md:pt-28">
+      <main className="flex-grow pt-20 md:pt-24">
         {children}
       </main>
 
