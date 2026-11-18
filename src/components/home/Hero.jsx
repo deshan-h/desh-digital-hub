@@ -70,7 +70,6 @@ export default function Hero() {
           transition={{ duration: 0.7 }}
           className="mb-3 relative"
         >
-          <div className="absolute -inset-6 bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500 blur-[80px] opacity-25 -z-10 rounded-full" />
           <h1 className="font-black tracking-tight text-white drop-shadow-2xl flex flex-col items-center lg:items-start leading-[1.05]">
             <span className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl tracking-tighter">
               DESH
