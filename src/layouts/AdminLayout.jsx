@@ -445,7 +445,7 @@ export default function AdminLayout({
         </header>
 
         {/* Scrollable Content Body */}
-        <main className="flex-1 p-2 sm:p-3 overflow-y-auto">
+        <main className="flex-1 p-2 sm:p-2.5 overflow-y-auto flex flex-col">
           {children}
         </main>
 

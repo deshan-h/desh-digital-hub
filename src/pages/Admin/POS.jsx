@@ -281,18 +281,18 @@ export default function POS({
   const cashDiff = cashVal - Math.max(0, finalPayable);
 
   return (
-    <div className="w-full space-y-2.5">
+    <div className="w-full flex-1 flex flex-col space-y-2.5">
 
       {/* Main 2-Column Split POS Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-2.5 items-stretch flex-1">
         
         {/* ======================================================== */}
         {/* LEFT SIDE (65% Width): Categories + POS Items + Customer */}
         {/* ======================================================== */}
-        <div className="lg:col-span-7 xl:col-span-8 space-y-3">
+        <div className="lg:col-span-7 xl:col-span-8 flex flex-col space-y-2.5">
           
           {/* Top Bar: Search + Custom Item + Refresh */}
-          <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-3 sm:p-3.5 shadow-xl space-y-3">
+          <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-3 sm:p-3.5 shadow-xl space-y-3 shrink-0">
             
             <div className="flex items-center gap-2.5">
               {/* Search Bar */}
@@ -391,7 +391,7 @@ export default function POS({
           </div>
 
           {/* Services & Products Items Grid */}
-          <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-3.5 sm:p-4 shadow-xl min-h-[420px]">
+          <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-3.5 sm:p-4 shadow-xl flex-1 min-h-[460px] flex flex-col">
             <POSItemsGrid
               filteredItems={filteredItems}
               handleAddToCart={addToCart}
@@ -403,7 +403,7 @@ export default function POS({
           </div>
 
           {/* Customer Details Box (Placed Under POS Items Box) */}
-          <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-3.5 sm:p-4 shadow-xl space-y-2.5">
+          <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-3.5 sm:p-4 shadow-xl space-y-2.5 shrink-0">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
                 Customer Details <span className="text-rose-400">*</span>
@@ -453,11 +453,11 @@ export default function POS({
         {/* ======================================================== */}
         {/* RIGHT SIDE (35% Width): Current Cart -> Total & Pay      */}
         {/* ======================================================== */}
-        <div className="lg:col-span-5 xl:col-span-4 space-y-3 lg:sticky lg:top-14">
+        <div className="lg:col-span-5 xl:col-span-4 flex flex-col space-y-2.5 lg:sticky lg:top-0">
           
           {/* BOX 1: Current Order / Cart Box (Top Right) */}
-          <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-3.5 sm:p-4 shadow-xl space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+          <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-3.5 sm:p-4 shadow-xl space-y-3 flex-1 flex flex-col min-h-[220px]">
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5 shrink-0">
               <div className="flex items-center gap-2">
                 <ShoppingCart className="w-4 h-4 text-sky-400" />
                 <h3 className="font-bold text-slate-200 text-xs uppercase tracking-wider">
@@ -477,7 +477,7 @@ export default function POS({
             </div>
 
             {/* Cart Items List */}
-            <div className="max-h-60 overflow-y-auto space-y-2 no-scrollbar pr-0.5">
+            <div className="flex-1 overflow-y-auto space-y-2 no-scrollbar pr-0.5 min-h-[140px] max-h-[38vh]">
               {cart.length === 0 ? (
                 <div className="text-center text-slate-500 py-8 text-xs font-medium italic">
                   Cart is empty. Tap items on the left to add.
@@ -534,7 +534,7 @@ export default function POS({
           </div>
 
           {/* BOX 2: Total & Cash Given / Payment Box */}
-          <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-3.5 sm:p-4 shadow-xl space-y-3 text-xs">
+          <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-3.5 sm:p-4 shadow-xl space-y-3 text-xs shrink-0">
             
             {/* Subtotal & Discount */}
             <div className="flex items-center justify-between text-slate-300">
