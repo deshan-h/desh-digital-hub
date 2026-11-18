@@ -11,10 +11,10 @@ import About from '../components/home/About';
 export default function Home() {
   return (
     <MainLayout>
-      <div className="bg-[#050c18] text-slate-200">
+      <div className="text-slate-200">
         
-        {/* Top Hero Section */}
-        <section id="home" className="relative flex flex-col items-center pt-10 md:pt-14 pb-8 overflow-hidden">
+        {/* Top Hero Section: Completely open & unboxed, directly on the sapphire background */}
+        <section id="home" className="relative flex flex-col items-center pt-8 md:pt-12 pb-14 overflow-hidden bg-transparent">
           {/* Ambient Glowing Orbs */}
           <div className="absolute top-[-10%] left-[-10%] w-[40rem] h-[40rem] bg-sky-500/15 rounded-full blur-[160px] pointer-events-none mix-blend-screen" />
           <div className="absolute bottom-[-10%] right-[-10%] w-[40rem] h-[40rem] bg-indigo-500/10 rounded-full blur-[160px] pointer-events-none mix-blend-screen" />
@@ -36,23 +36,26 @@ export default function Home() {
           <Hero />
         </section>
 
-        {/* 1. Services Showcase (No Prices) */}
-        <Services />
+        {/* Core Content Canvas: Starts smoothly below Hero with top corners curved downwards */}
+        <div className="w-full bg-[#050c18] rounded-t-[32px] sm:rounded-t-[48px] rounded-b-[32px] sm:rounded-b-[48px] shadow-[0_0_50px_rgba(0,0,0,0.85)] relative z-10 overflow-hidden">
+          {/* 1. Services Showcase (No Prices) */}
+          <Services />
 
-        {/* 2. DESH Edu Hub Educational Portal */}
-        <EduHubSection />
+          {/* 2. DESH Edu Hub Educational Portal */}
+          <EduHubSection />
 
-        {/* 3. YouTube & TikTok Digital Channels */}
-        <SocialChannels />
+          {/* 3. YouTube & TikTok Digital Channels */}
+          <SocialChannels />
 
-        {/* 4. Store Working Hours & Google Map Location */}
-        <WorkingHoursAndLocation />
+          {/* 4. Store Working Hours & Google Map Location */}
+          <WorkingHoursAndLocation />
 
-        {/* 5. Direct Message / WhatsApp Inquiry */}
-        <QuickInquiry />
+          {/* 5. Direct Message / WhatsApp Inquiry */}
+          <QuickInquiry />
 
-        {/* 6. About & Quality Standards */}
-        <About />
+          {/* 6. About & Quality Standards */}
+          <About />
+        </div>
 
       </div>
     </MainLayout>

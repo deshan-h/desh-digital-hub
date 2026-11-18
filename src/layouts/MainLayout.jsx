@@ -15,8 +15,8 @@ export default function MainLayout({ children }) {
       {/* Top Navigation Bar in the Sapphire Area */}
       <Navbar />
 
-      {/* Main Content Card (Top 2 corners curved downwards, bottom 2 corners curved upwards, Edge-to-Edge full width) */}
-      <main className="flex-grow w-full bg-[#050c18] rounded-t-[32px] sm:rounded-t-[46px] md:rounded-t-[54px] rounded-b-[32px] sm:rounded-b-[46px] md:rounded-b-[54px] shadow-[0_0_50px_rgba(0,0,0,0.85)] relative z-10 pt-8 sm:pt-12 pb-12 sm:pb-16 overflow-hidden">
+      {/* Main Page Flow (Hero sits open & unboxed, content canvas curves below it) */}
+      <main className="flex-grow w-full">
         {children}
       </main>
 
