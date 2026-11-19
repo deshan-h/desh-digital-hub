@@ -113,13 +113,13 @@ export default function AdminLayout({
   const mainNavItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, hasDropdown: true },
     { id: 'pos', label: 'Sales / POS', icon: ShoppingCart, hasDropdown: true },
+    { id: 'repairs', label: 'PC Repairs', icon: Wrench, hasDropdown: false },
     { id: 'history', label: 'Sales History', icon: History, hasDropdown: true },
     { id: 'reports', label: 'Reports', icon: BarChart3, hasDropdown: false },
   ];
 
   const optionalNavItems = [
     ...(isAdmin ? [{ id: 'items', label: 'Products', icon: Tags, hasDropdown: true }] : []),
-    { id: 'repairs', label: 'PC Repairs', icon: Wrench, hasDropdown: false },
     { id: 'customers', label: 'Customers', icon: Users, hasDropdown: false },
     { id: 'expenses', label: 'Expenses', icon: Wallet, hasDropdown: false },
     { id: 'inquiries', label: 'Messages', icon: MessageSquare, hasDropdown: false },
@@ -890,7 +890,7 @@ export default function AdminLayout({
         </header>
 
         {/* Content Body */}
-        <main className={`flex-1 p-2 sm:p-2.5 flex flex-col min-h-0 ${activeTab === 'pos' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+        <main className={`flex-1 p-2 sm:p-2.5 flex flex-col min-h-0 ${(activeTab === 'pos' || activeTab === 'repairs') ? 'overflow-hidden' : 'overflow-y-auto'}`}>
           {children}
         </main>
 

@@ -871,9 +871,10 @@ export default function Settings({ isAdmin, posCategories, fetchCategories }) {
                 onChange={(e) => setAppearance({ ...appearance, paperSize: e.target.value })}
                 className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-200 text-sm focus:outline-none focus:border-purple-500/50 cursor-pointer"
               >
-                <option value="80mm">80mm Thermal POS Roll (Standard)</option>
-                <option value="58mm">58mm Mini Thermal Roll</option>
+                <option value="a5">A5 Sheet (Standard for DESH Hub)</option>
                 <option value="a4">A4 Full Sheet Formal Invoice</option>
+                <option value="80mm">80mm Thermal POS Roll</option>
+                <option value="58mm">58mm Mini Thermal Roll</option>
               </select>
             </div>
 
