@@ -16,12 +16,17 @@ export default function QuickInquiry() {
   const serviceOptions = [
     'General Inquiry (සාමාන්‍ය විමසීමක්)',
     'Computer & Laptop Repair (පරිගණක අලුත්වැඩියාව)',
-    'Document Printing & Scanning (මුද්‍රණ සහ ස්කෑන්)',
-    'Laminating & Book Binding (ලැමිනේටින් සහ බයින්ඩින්)',
-    'CV & Type Setting (CV සහ ටයිප් සෙටින්)',
-    'Online & Campus Application (ඔන්ලයින් අයදුම්පත්)',
+    'Document Printing & Photocopy (මුද්‍රණ සහ ෆොටෝකොපි)',
+    'Laminating (ලැමිනේටින්)',
+    'Book Binding (පොත් බයින්ඩින්)',
+    'Document Scanning (ස්කෑන් කිරීම්)',
+    'Email & Online Services (ඊ-මේල් සේවා)',
+    'Online Applications (ඔන්ලයින් අයදුම්පත්)',
+    'Media & Software Download (චිත්‍රපට / මෘදුකාංග / ගීත)',
     'Graphic & Poster Design (ග්‍රැෆික් නිර්මාණ)',
-    'Software & OS Installation (මෘදුකාංග ස්ථාපනය)'
+    'Utility Bill Payments (බිල්පත් ගෙවීම්)',
+    'Mobile Reloads & Data Packages (රීලෝඩ් සහ පැකේජ)',
+    'Web Application Development (වෙබ් අඩවි නිර්මාණය)'
   ];
 
   const handleSubmit = async (e) => {

@@ -54,18 +54,18 @@ export default function Navbar() {
             </Link>
             
             {/* Desktop Navigation Links */}
-            <div className="hidden lg:flex items-center space-x-1">
-              <div className="flex items-center p-1 bg-[#091a32]/70 backdrop-blur-md rounded-full border border-sky-500/15 shadow-inner">
-                {navLinks.map((item) => (
-                  <a 
-                    key={item.label}
-                    href={item.href} 
-                    className="px-4 py-1.5 text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-full transition-all duration-200"
-                  >
-                    {item.label}
-                  </a>
-                ))}
-              </div>
+            <div className="hidden lg:flex items-center gap-1">
+              {navLinks.map((item) => (
+                <a 
+                  key={item.label}
+                  href={item.href} 
+                  className="group relative px-3.5 py-2 text-xs font-bold text-slate-300 hover:text-white transition-all duration-200 rounded-xl hover:bg-white/[0.06]"
+                >
+                  <span className="relative z-10 tracking-wide">{item.label}</span>
+                  {/* Sleek Neon Glow Indicator on Hover */}
+                  <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-0 h-0.5 bg-gradient-to-r from-sky-400 to-cyan-300 rounded-full group-hover:w-3/5 transition-all duration-300 shadow-[0_0_8px_#38bdf8]" />
+                </a>
+              ))}
             </div>
 
             {/* Desktop Action Buttons */}
@@ -76,10 +76,11 @@ export default function Navbar() {
                 href="https://wa.me/94719989000?text=Hello%20DESH%20Digital%20Hub,%20I%20would%20like%20to%20order%20or%20inquire." 
                 target="_blank" 
                 rel="noreferrer"
-                className="flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/15 hover:bg-emerald-500 text-emerald-400 hover:text-slate-950 border border-emerald-500/30 text-xs font-black transition-all shadow-[0_0_15px_rgba(16,185,129,0.15)] hover:shadow-[0_0_25px_rgba(16,185,129,0.4)] hover:-translate-y-0.5 cursor-pointer"
+                className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/15 hover:bg-emerald-500 text-emerald-400 hover:text-slate-950 border border-emerald-500/30 text-xs font-bold font-mono transition-all shadow-[0_0_15px_rgba(16,185,129,0.15)] hover:shadow-[0_0_25px_rgba(16,185,129,0.4)] hover:-translate-y-0.5 cursor-pointer"
+                title="WhatsApp: +94 (71) 998 9000"
               >
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span>WhatsApp Order</span>
+                <span>+94 (71) 998 9000</span>
               </a>
 
               {/* Admin Portal Shortcut Link */}
@@ -98,10 +99,11 @@ export default function Navbar() {
                 href="https://wa.me/94719989000" 
                 target="_blank" 
                 rel="noreferrer"
-                className="sm:hidden px-3 py-1.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[11px] font-bold flex items-center gap-1.5"
+                className="sm:hidden px-2.5 py-1.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[11px] font-bold font-mono flex items-center gap-1.5"
+                title="WhatsApp: +94 (71) 998 9000"
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span>WhatsApp</span>
+                <span>+94 (71) 998 9000</span>
               </a>
 
               <button 

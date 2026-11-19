@@ -36,8 +36,19 @@ const Inquiries = lazy(() => import('./Inquiries'));
 export default function Admin() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState(() => {
+    return localStorage.getItem('desh_remember_email') || '';
+  });
+  const [password, setPassword] = useState(() => {
+    const saved = localStorage.getItem('desh_remember_pass');
+    if (saved) {
+      try { return atob(saved); } catch (e) { return ''; }
+    }
+    return '';
+  });
+  const [rememberMe, setRememberMe] = useState(() => {
+    return localStorage.getItem('desh_remember_me') !== 'false';
+  });
 
   // Dashboard State
   const [activeTab, setActiveTab] = useState('pos');
@@ -271,17 +282,34 @@ export default function Admin() {
   }
 
   // 3. Auth Methods
-  const handleLogin = async (e, rememberMe) => {
-    e.preventDefault();
+  const handleLogin = async (e, isRemember) => {
+    if (e) e.preventDefault();
+    setAuthLoading(true);
     try {
-      await authService.login(email, password);
+      const loggedUser = await authService.login(email.trim(), password);
+      setUser(loggedUser);
+
+      const shouldRemember = isRemember !== undefined ? isRemember : rememberMe;
+      if (shouldRemember) {
+        localStorage.setItem('desh_remember_me', 'true');
+        localStorage.setItem('desh_remember_email', email.trim());
+        localStorage.setItem('desh_remember_pass', btoa(password));
+      } else {
+        localStorage.setItem('desh_remember_me', 'false');
+        localStorage.removeItem('desh_remember_email');
+        localStorage.removeItem('desh_remember_pass');
+      }
+      notify.success('Welcome back to DESH Digital Hub!');
     } catch (error) {
       notify.error('Login failed: ' + error.message);
+    } finally {
+      setAuthLoading(false);
     }
   };
 
   const handleLogout = async () => {
     await authService.logout();
+    setUser(null);
   };
 
   // 4. POS Cart Methods
@@ -493,10 +521,7 @@ export default function Admin() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center">
-        <div className="w-12 h-12 border-4 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin mb-4"></div>
-        <p className="text-cyan-400/70 text-sm font-medium animate-pulse">Loading Admin...</p>
-      </div>
+      <Loader fullScreen text="Loading Admin Portal..." subText="Authenticating Session & Syncing" size="lg" />
     );
   }
 
@@ -507,7 +532,10 @@ export default function Admin() {
         setEmail={setEmail}
         password={password}
         setPassword={setPassword}
+        rememberMe={rememberMe}
+        setRememberMe={setRememberMe}
         handleLogin={handleLogin}
+        loading={authLoading}
       />
     );
   }

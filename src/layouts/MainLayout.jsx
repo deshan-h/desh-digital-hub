@@ -1,6 +1,8 @@
 import React from 'react';
 import Navbar from '../components/common/Navbar';
 import Footer from '../components/common/Footer';
+import ScrollToTop from '../components/common/ScrollToTop';
+import FloatingInquiryButton from '../components/common/FloatingInquiryButton';
 
 export default function MainLayout({ children }) {
   return (
@@ -22,6 +24,12 @@ export default function MainLayout({ children }) {
 
       {/* Footer in the Sapphire Area */}
       <Footer />
+
+      {/* Floating Support Agent & Quick Inquiry Widget */}
+      <FloatingInquiryButton />
+
+      {/* Floating Back to Top Button */}
+      <ScrollToTop />
     </div>
   );
 }

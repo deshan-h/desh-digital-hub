@@ -41,14 +41,14 @@ export default function Footer() {
             </Link>
 
             <p className="text-xs text-slate-400 leading-relaxed font-medium">
-              පරිගණක අලුත්වැඩියාව, අධිවේගී ලේසර් මුද්‍රණ, ලැමිනේටින්, බයින්ඩින් සහ සියලුම මාර්ගගත (Online) සේවා එකම වහලක් යටින් ලබාගන්න.
+              Your premier destination for professional computer repairs, high-speed laser printing, laminating, book binding, and all digital online services under one roof.
             </p>
 
             {/* Operating Hours Badge */}
             <div className="p-3.5 rounded-2xl bg-[#09172c]/80 border border-sky-500/20 space-y-1.5">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span className="text-xs font-bold text-white">විවෘත වේලාවන් (Open Hours)</span>
+                <span className="text-xs font-bold text-white">Store Operating Hours</span>
               </div>
               <p className="text-[11px] text-slate-300 flex items-center gap-1.5 pl-4">
                 <Clock className="w-3.5 h-3.5 text-sky-400 shrink-0" />
@@ -61,7 +61,7 @@ export default function Footer() {
           <div className="space-y-4">
             <h4 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
               <span className="w-1.5 h-4 rounded-full bg-sky-500"></span>
-              <span>සම්බන්ධතා සහ ස්ථානය</span>
+              <span>Contact & Location</span>
             </h4>
 
             <div className="space-y-3 text-xs">
@@ -75,14 +75,14 @@ export default function Footer() {
                 <MapPin className="w-4 h-4 text-sky-400 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
                 <div className="flex-1">
                   <span className="text-[10px] text-slate-500 block uppercase font-bold tracking-wider">Our Address (Google Maps)</span>
-                  <span className="text-slate-300 leading-relaxed group-hover:text-white transition-colors">
+                  <p className="text-slate-300 leading-relaxed group-hover:text-white transition-colors">
                     204/1, Pitapahamuna, Hiriyala,<br />
                     Lenawa, Melsiripura, 60540, LK
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-400 mt-1.5">
+                  </p>
+                  <div className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-400 mt-2">
                     <span>Open in Google Maps</span>
                     <ExternalLink className="w-3 h-3" />
-                  </span>
+                  </div>
                 </div>
               </a>
 
@@ -118,7 +118,7 @@ export default function Footer() {
           <div className="space-y-4">
             <h4 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
               <span className="w-1.5 h-4 rounded-full bg-indigo-500"></span>
-              <span>සමාජ මාධ්‍ය සහ Portals</span>
+              <span>Social Media & Portals</span>
             </h4>
 
             {/* Social Media Buttons */}
@@ -181,13 +181,12 @@ export default function Footer() {
 
         </div>
 
-        {/* Bottom Copyright & Version Strip */}
+        {/* Bottom Copyright & Developed By Strip */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 font-medium">
           <p>© {new Date().getFullYear()} DESH Digital Hub. All Rights Reserved.</p>
-          <div className="flex items-center gap-3">
-            <span>Powered by Supabase & Cloudflare</span>
-            <span>•</span>
-            <span className="font-mono text-sky-400/80">DESH Portal v1.25.1</span>
+          <div className="flex items-center gap-2">
+            <span className="text-slate-400">Developed by</span>
+            <span className="font-bold text-sky-400 hover:text-sky-300 transition-colors">DESH</span>
           </div>
         </div>
 

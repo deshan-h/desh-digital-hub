@@ -266,7 +266,7 @@ export default function Settings({ isAdmin, posCategories, fetchCategories }) {
     }
   };
 
-  if (loading) return <Loader />;
+  if (loading) return <Loader text="Loading Settings..." subText="Configuring Preferences" />;
 
   // 4 Primary Setting Sections
   const navTabs = [

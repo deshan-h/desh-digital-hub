@@ -94,7 +94,7 @@ export default function Inquiries() {
   const newCount = inquiries.filter(i => i.status === 'new').length;
   const repliedCount = inquiries.filter(i => i.status === 'replied').length;
 
-  if (loading) return <Loader />;
+  if (loading) return <Loader text="Loading Inquiries..." subText="Syncing with Supabase" />;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300 pb-12">

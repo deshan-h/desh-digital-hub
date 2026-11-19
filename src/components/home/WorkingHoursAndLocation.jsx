@@ -86,7 +86,7 @@ export default function WorkingHoursAndLocation() {
                 <div className="flex items-center gap-2.5">
                   <div className={`w-3.5 h-3.5 rounded-full ${isOpenNow ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}`} />
                   <span className="text-sm font-black text-white tracking-wide">
-                    {isOpenNow ? 'Currently Open (දැන් විවෘතයි)' : 'Closed Now (දැනට වසා ඇත)'}
+                    {isOpenNow ? 'Currently Open' : 'Closed Now'}
                   </span>
                 </div>
 
@@ -99,16 +99,16 @@ export default function WorkingHoursAndLocation() {
                 </span>
               </div>
 
-              {/* Schedule List */}
+              {/* Schedule List - 100% English */}
               <div className="space-y-2.5">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                  Weekly Schedule (සතියේ දින සටහන)
+                  Weekly Operating Schedule
                 </h4>
 
                 <div className="p-3 rounded-2xl bg-slate-950/70 border border-white/5 flex items-center justify-between text-xs sm:text-sm">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-sky-400"></span>
-                    <span className="font-bold text-white">Monday – Wednesday (සඳුදා - බදාදා)</span>
+                    <span className="font-bold text-white">Monday – Wednesday</span>
                   </div>
                   <span className="font-mono font-bold text-sky-300">7:00 AM – 5:00 PM</span>
                 </div>
@@ -116,7 +116,7 @@ export default function WorkingHoursAndLocation() {
                 <div className="p-3 rounded-2xl bg-slate-950/70 border border-white/5 flex items-center justify-between text-xs sm:text-sm">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                    <span className="font-bold text-white">Thursday (බ්‍රහස්පතින්දා)</span>
+                    <span className="font-bold text-white">Thursday</span>
                   </div>
                   <span className="font-mono font-bold text-emerald-300">7:00 AM – 8:00 PM</span>
                 </div>
@@ -124,7 +124,7 @@ export default function WorkingHoursAndLocation() {
                 <div className="p-3 rounded-2xl bg-slate-950/70 border border-white/5 flex items-center justify-between text-xs sm:text-sm">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-sky-400"></span>
-                    <span className="font-bold text-white">Friday (සිකුරාදා)</span>
+                    <span className="font-bold text-white">Friday</span>
                   </div>
                   <span className="font-mono font-bold text-sky-300">7:00 AM – 5:00 PM</span>
                 </div>
@@ -132,7 +132,7 @@ export default function WorkingHoursAndLocation() {
                 <div className="p-3 rounded-2xl bg-slate-950/70 border border-white/5 flex items-center justify-between text-xs sm:text-sm">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-                    <span className="font-bold text-white">Saturday (සෙනසුරාදා)</span>
+                    <span className="font-bold text-white">Saturday</span>
                   </div>
                   <span className="font-mono font-bold text-amber-300">7:00 AM – 4:00 PM</span>
                 </div>
@@ -140,13 +140,13 @@ export default function WorkingHoursAndLocation() {
                 <div className="p-3 rounded-2xl bg-slate-950/70 border border-white/5 flex items-center justify-between text-xs sm:text-sm">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-purple-400"></span>
-                    <span className="font-bold text-white">Sunday (ඉරිදා)</span>
+                    <span className="font-bold text-white">Sunday</span>
                   </div>
                   <span className="font-mono font-bold text-purple-300">7:00 AM – 9:00 PM</span>
                 </div>
 
                 <div className="p-3 rounded-2xl bg-slate-950/40 border border-white/5 flex items-center justify-between text-xs text-slate-400">
-                  <span>Poya Days & Special Holidays (පෝය සහ නිවාඩු දින)</span>
+                  <span className="font-medium text-slate-300">Poya Days & Special Holidays</span>
                   <span className="font-mono font-bold text-slate-300">7:00 AM – 8:00 PM</span>
                 </div>
               </div>

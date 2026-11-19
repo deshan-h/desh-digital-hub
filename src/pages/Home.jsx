@@ -4,8 +4,8 @@ import Hero from '../components/home/Hero';
 import Services from '../components/home/Services';
 import SocialChannels from '../components/home/SocialChannels';
 import WorkingHoursAndLocation from '../components/home/WorkingHoursAndLocation';
-import QuickInquiry from '../components/home/QuickInquiry';
 import About from '../components/home/About';
+import QuickInquiry from '../components/home/QuickInquiry';
 
 export default function Home() {
   return (
@@ -44,11 +44,11 @@ export default function Home() {
         {/* 3. Store Working Hours & Google Map Location */}
         <WorkingHoursAndLocation />
 
-        {/* 4. Direct Message / WhatsApp Inquiry */}
-        <QuickInquiry />
-
-        {/* 5. About & Quality Standards */}
+        {/* 4. About & Quality Standards */}
         <About />
+
+        {/* 5. Direct Message / WhatsApp Inquiry Form */}
+        <QuickInquiry />
 
       </div>
     </MainLayout>

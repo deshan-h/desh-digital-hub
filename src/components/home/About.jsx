@@ -50,24 +50,71 @@ export default function About() {
 
       <div className="container mx-auto px-4 md:px-6 max-w-7xl relative z-10">
         
-        {/* Header */}
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-xs font-bold uppercase tracking-wider mb-3">
-            <Award className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Why Choose DESH Digital Hub</span>
+        {/* Attractive Showcase Header */}
+        <motion.div 
+          initial={{ opacity: 0, y: 25 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="relative max-w-4xl mx-auto mb-16 rounded-3xl p-8 sm:p-12 bg-gradient-to-b from-[#0c2340]/90 via-[#08172c]/90 to-[#050f1e]/95 border border-sky-500/30 shadow-[0_20px_60px_rgba(0,0,0,0.7),0_0_40px_rgba(56,189,248,0.15)] backdrop-blur-2xl text-center overflow-hidden"
+        >
+          {/* Subtle Ambient Radial Lighting in Background */}
+          <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-96 h-96 bg-gradient-to-br from-sky-500/20 via-cyan-500/10 to-transparent rounded-full blur-3xl pointer-events-none -z-10" />
+
+          {/* Top Pill Badge */}
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-sky-500/10 border border-sky-400/30 text-sky-300 text-xs font-bold uppercase tracking-wider mb-5 shadow-sm">
+            <Award className="w-4 h-4 text-emerald-400" />
+            <span>Why Choose DESH Digital Hub • අසමසම විශ්වාසය</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse ml-0.5" />
           </div>
 
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight leading-tight">
+          {/* Attractive Gradient Heading */}
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight leading-tight mb-4">
             විශ්වාසදායී තාක්ෂණය සහ{' '}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-indigo-400">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-cyan-300 to-indigo-300 drop-shadow-[0_0_30px_rgba(56,189,248,0.4)]">
               උසස් පාරිභෝගික සේවාව
             </span>
           </h2>
 
-          <p className="text-sm sm:text-base text-slate-400 mt-3 font-medium leading-relaxed">
-            අපගේ මධ්‍යස්ථානය සතු නවීන තාක්ෂණික උපකරණ සහ වසර ගණනාවක විශ්වාසය හරහා ඔබගේ සෑම ඩිජිටල් අවශ්‍යතාවක්ම ඉහළම ප්‍රමිතියෙන් ඉටු කරනු ලැබේ.
+          {/* Stylized Description Text with Bold Key Value Highlights */}
+          <p className="text-sm sm:text-base md:text-lg text-slate-200 font-normal leading-relaxed max-w-2xl mx-auto">
+            අපගේ මධ්‍යස්ථානය සතු <span className="text-sky-300 font-bold">නවීන තාක්ෂණික උපකරණ</span> සහ{' '}
+            <span className="text-emerald-400 font-bold">වසර ගණනාවක අඛණ්ඩ විශ්වාසය</span> හරහා ඔබගේ සෑම ඩිජිටල් අවශ්‍යතාවක්ම ඉහළම ප්‍රමිතියෙන් හා කඩිනමින් ඉටු කරනු ලැබේ.
           </p>
-        </div>
+
+          {/* 3 Core Trust Badges */}
+          <div className="mt-8 pt-6 border-t border-sky-500/20 grid grid-cols-1 sm:grid-cols-3 gap-3.5 text-left">
+            <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/[0.03] border border-sky-500/15">
+              <div className="w-9 h-9 rounded-xl bg-sky-500/15 border border-sky-400/30 flex items-center justify-center text-sky-400 shrink-0">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="text-xs font-bold text-white block">100% විශ්වාසදායී</span>
+                <span className="text-[11px] text-slate-400 block">පුද්ගලිකත්ව ආරක්ෂාව</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/[0.03] border border-sky-500/15">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-400/30 flex items-center justify-center text-emerald-400 shrink-0">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="text-xs font-bold text-white block">උසස්ම ප්‍රමිතිය</span>
+                <span className="text-[11px] text-slate-400 block">High-DPI මුද්‍රණ තාක්ෂණය</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/[0.03] border border-sky-500/15">
+              <div className="w-9 h-9 rounded-xl bg-indigo-500/15 border border-indigo-400/30 flex items-center justify-center text-indigo-400 shrink-0">
+                <Clock className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="text-xs font-bold text-white block">කඩිනම් සේවාව</span>
+                <span className="text-[11px] text-slate-400 block">Same-Day Express Service</span>
+              </div>
+            </div>
+          </div>
+        </motion.div>
 
         {/* 4 Technical Capabilities Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
