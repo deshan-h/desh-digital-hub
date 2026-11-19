@@ -11,7 +11,8 @@ export default function QuickInquiry() {
     service: 'General Inquiry',
     message: ''
   });
-  const [submitting, setSubmitting] = useState(false);
+  const [submittingWhatsApp, setSubmittingWhatsApp] = useState(false);
+  const [submittingSystem, setSubmittingSystem] = useState(false);
 
   const serviceOptions = [
     'General Inquiry (සාමාන්‍ය විමසීමක්)',
@@ -29,48 +30,75 @@ export default function QuickInquiry() {
     'Web Application Development (වෙබ් අඩවි නිර්මාණය)'
   ];
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSendMessage = async (type) => {
     if (!formData.name.trim() || !formData.phone.trim()) {
       notify.error('කරුණාකර ඔබගේ නම සහ දුරකථන අංකය ඇතුළත් කරන්න.');
       return;
     }
 
-    setSubmitting(true);
-    try {
-      // 1. Save inquiry to Supabase so it appears in Admin Messages tab
-      await inquiryService.createInquiry({
-        name: formData.name,
-        phone: formData.phone,
-        service: formData.service,
-        message: formData.message
-      }).catch(err => console.warn('Could not store inquiry locally:', err));
+    if (type === 'whatsapp') {
+      setSubmittingWhatsApp(true);
+      try {
+        // Save to system database as WhatsApp inquiry
+        await inquiryService.createInquiry({
+          name: formData.name,
+          phone: formData.phone,
+          service: formData.service,
+          message: formData.message,
+          source: 'WhatsApp'
+        }).catch(err => console.warn('Could not store inquiry locally:', err));
 
-      const formattedMessage = `*New Customer Inquiry - DESH Digital Hub*\n\n` +
-        `👤 *Name:* ${formData.name.trim()}\n` +
-        `📞 *Phone / WhatsApp:* ${formData.phone.trim()}\n` +
-        `🛠️ *Service Needed:* ${formData.service}\n` +
-        `💬 *Message:* ${formData.message.trim() || 'No additional message provided.'}\n\n` +
-        `_Sent via deshdigitalhub.lk web portal_`;
+        const formattedMessage = `*New Customer Inquiry - DESH Digital Hub*\n\n` +
+          `👤 *Name:* ${formData.name.trim()}\n` +
+          `📞 *Phone / WhatsApp:* ${formData.phone.trim()}\n` +
+          `🛠️ *Service Needed:* ${formData.service}\n` +
+          `💬 *Message:* ${formData.message.trim() || 'No additional message provided.'}\n\n` +
+          `_Sent via deshdigitalhub.lk web portal_`;
 
-      const encodedText = encodeURIComponent(formattedMessage);
-      const whatsappUrl = `https://wa.me/94719989000?text=${encodedText}`;
+        const encodedText = encodeURIComponent(formattedMessage);
+        const whatsappUrl = `https://wa.me/94719989000?text=${encodedText}`;
 
-      notify.success('පණිවිඩය සාර්ථකව යොමු කෙරිණි! WhatsApp විවෘත වේ...');
-      setTimeout(() => {
-        window.open(whatsappUrl, '_blank');
-        setSubmitting(false);
+        notify.success('පණිවිඩය සාර්ථකව යොමු කෙරිණි! WhatsApp විවෘත වේ...');
+        setTimeout(() => {
+          window.open(whatsappUrl, '_blank');
+          setSubmittingWhatsApp(false);
+          setFormData({
+            name: '',
+            phone: '',
+            service: 'General Inquiry',
+            message: ''
+          });
+        }, 350);
+      } catch (err) {
+        console.error(err);
+        notify.error('පණිවිඩය යැවීමට නොහැකි විය.');
+        setSubmittingWhatsApp(false);
+      }
+    } else {
+      // Normal system message submission
+      setSubmittingSystem(true);
+      try {
+        await inquiryService.createInquiry({
+          name: formData.name,
+          phone: formData.phone,
+          service: formData.service,
+          message: formData.message,
+          source: 'System Web'
+        });
+
+        notify.success('ඔබගේ පණිවිඩය සාර්ථකව පද්ධතිය වෙත ලැබුණි! අප කඩිනමින් ඔබව අමතන්නෙමු.');
         setFormData({
           name: '',
           phone: '',
           service: 'General Inquiry',
           message: ''
         });
-      }, 400);
-    } catch (err) {
-      console.error(err);
-      notify.error('පණිවිඩය යැවීමට නොහැකි විය.');
-      setSubmitting(false);
+      } catch (err) {
+        console.error(err);
+        notify.error('පණිවිඩය යැවීමට නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.');
+      } finally {
+        setSubmittingSystem(false);
+      }
     }
   };
 
@@ -101,7 +129,7 @@ export default function QuickInquiry() {
         {/* Form Container */}
         <div className="rounded-3xl p-7 sm:p-10 bg-gradient-to-br from-[#09152b] via-[#081224] to-[#050c18] border border-sky-500/25 shadow-2xl relative overflow-hidden">
           
-          <form onSubmit={handleSubmit} className="space-y-5 relative z-10">
+          <form onSubmit={(e) => { e.preventDefault(); handleSendMessage('system'); }} className="space-y-5 relative z-10">
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               
@@ -173,16 +201,45 @@ export default function QuickInquiry() {
               />
             </div>
 
-            {/* Action Submit Button */}
-            <div className="pt-2">
+            {/* Dual Action Buttons: Send via WhatsApp & Send Normal Message */}
+            <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              
+              {/* WhatsApp Button */}
               <button
-                type="submit"
-                disabled={submitting}
-                className="w-full py-3.5 px-6 rounded-2xl font-bold text-sm bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 flex items-center justify-center gap-2.5 transition-all shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[1.01] cursor-pointer disabled:opacity-50"
+                type="button"
+                onClick={() => handleSendMessage('whatsapp')}
+                disabled={submittingWhatsApp || submittingSystem}
+                className="w-full py-3 px-5 rounded-2xl font-bold text-sm bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 flex items-center justify-center gap-2.5 transition-all shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[1.01] active:scale-[0.98] cursor-pointer disabled:opacity-50"
               >
-                <MessageCircle className="w-5 h-5 fill-current" />
-                <span>{submitting ? 'Preparing WhatsApp Message...' : 'Send Message via WhatsApp (ක්ෂණිකව එවන්න)'}</span>
+                <MessageCircle className="w-5 h-5 fill-current shrink-0" />
+                <div className="flex flex-col items-start text-left leading-tight">
+                  <span className="font-extrabold text-sm">
+                    {submittingWhatsApp ? 'Connecting...' : 'Send via WhatsApp'}
+                  </span>
+                  <span className="text-[10px] font-semibold opacity-85">
+                    WhatsApp හරහා එවන්න
+                  </span>
+                </div>
               </button>
+
+              {/* Normal System Message Button */}
+              <button
+                type="button"
+                onClick={() => handleSendMessage('system')}
+                disabled={submittingWhatsApp || submittingSystem}
+                className="w-full py-3 px-5 rounded-2xl font-bold text-sm bg-gradient-to-r from-blue-600 via-sky-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white flex items-center justify-center gap-2.5 transition-all shadow-lg shadow-sky-500/25 hover:shadow-sky-500/40 hover:scale-[1.01] active:scale-[0.98] cursor-pointer disabled:opacity-50"
+              >
+                <Send className="w-4 h-4 shrink-0" />
+                <div className="flex flex-col items-start text-left leading-tight">
+                  <span className="font-extrabold text-sm">
+                    {submittingSystem ? 'Sending...' : 'Send Normal Message'}
+                  </span>
+                  <span className="text-[10px] font-semibold text-sky-200">
+                    පද්ධතියට සෘජුව එවන්න
+                  </span>
+                </div>
+              </button>
+
             </div>
 
             {/* Helpful Notice */}

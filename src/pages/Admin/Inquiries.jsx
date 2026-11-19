@@ -14,7 +14,8 @@ import {
   Search, 
   Clock, 
   Filter,
-  Check
+  Check,
+  Send
 } from 'lucide-react';
 import Loader from '../../components/Loader';
 
@@ -245,6 +246,19 @@ export default function Inquiries() {
                       <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/25">
                         {inq.service}
                       </span>
+
+                      {/* Channel Badge (WhatsApp vs System Web) */}
+                      {inq.source === 'WhatsApp' ? (
+                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                          <MessageCircle className="w-2.5 h-2.5" />
+                          <span>WhatsApp</span>
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-sky-500/15 text-sky-300 border border-sky-500/30 flex items-center gap-1">
+                          <Send className="w-2.5 h-2.5" />
+                          <span>System Web</span>
+                        </span>
+                      )}
 
                       <span className="text-[11px] text-slate-400 flex items-center gap-1 ml-auto md:ml-0">
                         <Calendar className="w-3 h-3 text-slate-500" />

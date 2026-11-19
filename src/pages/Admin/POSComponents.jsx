@@ -101,8 +101,8 @@ export const CartItem = React.memo(({ item, updateCartItem, removeFromCart }) =>
 ));
 
 export const POSItemsGrid = React.memo(({ filteredItems, handleAddToCart, favoriteItemIds, toggleFavorite, activeCategory, searchQuery }) => (
-  <div className="flex-1 overflow-y-auto mb-6 pr-2 relative" style={{ scrollbarWidth: 'thin' }}>
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 relative z-10">
+  <div className="flex-1 min-h-0 overflow-y-auto pr-1 relative" style={{ scrollbarWidth: 'thin' }}>
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2.5 relative z-10 pb-2">
       {filteredItems.map((item) => (
         <POSItem 
           key={`${item.id}-${item.name}`} 
@@ -176,6 +176,7 @@ export const CustomerInput = React.memo(({
     <div className="flex-1 relative">
       <div className="relative">
         <input
+          id="pos-customer-name-input"
           type="text"
           placeholder={isCredit ? "Customer Name (Required)" : "Customer Name (Optional)"}
           value={localVal}
@@ -300,7 +301,7 @@ export const SavePendingModal = ({
     <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
       <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md overflow-visible shadow-2xl">
         <div className="p-6 border-b border-slate-800 flex justify-between items-center">
-          <h3 className="text-xl font-black text-slate-100 uppercase tracking-wide">Save Pending Order</h3>
+          <h3 className="text-xl font-black text-slate-100 uppercase tracking-wide">Save Pending Sale</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
             <X className="w-6 h-6" />
           </button>
@@ -324,7 +325,7 @@ export const SavePendingModal = ({
             disabled={pendingLoading || !pendingCustomerName.trim()}
             className="w-full bg-orange-500 hover:bg-orange-400 text-slate-950 font-black py-4 rounded-xl text-lg uppercase tracking-wide transition-all disabled:opacity-50"
           >
-            {pendingLoading ? 'Saving...' : 'Save Pending Order'}
+            {pendingLoading ? 'Saving...' : 'Save Pending Sale'}
           </button>
         </div>
       </div>
@@ -355,7 +356,7 @@ export const POSReminderModal = ({
         </div>
         <div className="p-6 space-y-4">
           <p className="text-sm text-slate-400">
-            Send a WhatsApp message to <span className="text-slate-200 font-bold">{data.order?.note}</span> that their order is ready.
+            Send a WhatsApp message to <span className="text-slate-200 font-bold">{data.order?.note}</span> that their sale is ready.
           </p>
           <div>
             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">

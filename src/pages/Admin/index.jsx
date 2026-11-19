@@ -1,11 +1,12 @@
-import React, { useState, useEffect, Suspense, lazy, useCallback } from 'react';
+import React, { useState, useEffect, Suspense, lazy, useCallback, useMemo } from 'react';
 import { 
   authService, 
   salesService, 
   categoryService, 
   duesService, 
   customerService, 
-  pendingOrderService 
+  pendingOrderService,
+  inquiryService 
 } from '../../services/supabaseService';
 import { format } from 'date-fns';
 import { parseTimestamp } from '../../utils/helpers';
@@ -56,6 +57,15 @@ export default function Admin() {
     const saved = localStorage.getItem('salesHistory');
     return saved ? JSON.parse(saved) : [];
   });
+
+  const todaySalesList = useMemo(() => {
+    const todayStr = new Date().toDateString();
+    return salesHistory.filter(s => s.timestamp && parseTimestamp(s.timestamp).toDateString() === todayStr);
+  }, [salesHistory]);
+
+  const todaySalesSum = useMemo(() => {
+    return todaySalesList.reduce((sum, s) => sum + Number(s.amount || 0), 0);
+  }, [todaySalesList]);
   const [customersList, setCustomersList] = useState(() => {
     const saved = localStorage.getItem('customersList');
     return saved ? JSON.parse(saved) : [];
@@ -84,6 +94,10 @@ export default function Admin() {
   const [whatsappNumber, setWhatsappNumber] = useState('');
   const [pendingOrders, setPendingOrders] = useState([]);
   const [showPendingOrdersModal, setShowPendingOrdersModal] = useState(false);
+  const [inquiries, setInquiries] = useState([]);
+
+  const newInquiries = useMemo(() => inquiries.filter(i => i.status === 'new'), [inquiries]);
+  const newInquiriesCount = newInquiries.length;
 
   const isAdmin = user?.email === 'admin@desh.lk';
 
@@ -106,14 +120,20 @@ export default function Admin() {
   useEffect(() => {
     let pendingUnsubscribe = null;
     let categoriesUnsubscribe = null;
+    let inquiriesUnsubscribe = null;
 
-    const unsubscribe = authService.onAuthStateChange((currentUser) => {
-      setUser(currentUser);
+    const unsubscribe = authService.onAuthStateChange(async (currentUser) => {
       if (currentUser) {
+        setUser(currentUser);
         fetchSales();
         fetchCategories();
         fetchCustomerDues();
         fetchCustomersList();
+
+        // Attach inquiries listener
+        inquiriesUnsubscribe = inquiryService.subscribe((data) => {
+          setInquiries(data || []);
+        });
 
         // Attach categories listener for realtime favorites and catalog sync across devices
         categoriesUnsubscribe = categoryService.subscribe((data) => {
@@ -153,7 +173,25 @@ export default function Admin() {
         pendingOrderService.getPendingOrders().then(orders => setPendingOrders(orders || [])).catch(console.error);
 
         setActiveTab('pos');
+        setAuthLoading(false);
       } else {
+        // Auto-login check if rememberMe was chosen and user did not explicitly click Logout
+        const shouldRemember = localStorage.getItem('desh_remember_me') !== 'false';
+        const savedEmail = localStorage.getItem('desh_remember_email');
+        const savedPassBase64 = localStorage.getItem('desh_remember_pass');
+        const explicitLogout = localStorage.getItem('desh_explicit_logout') === 'true';
+
+        if (shouldRemember && savedEmail && savedPassBase64 && !explicitLogout) {
+          try {
+            const savedPass = atob(savedPassBase64);
+            const loggedUser = await authService.login(savedEmail.trim(), savedPass);
+            setUser(loggedUser);
+            return;
+          } catch (autoErr) {
+            console.warn("Auto-login attempt failed:", autoErr);
+          }
+        }
+
         if (pendingUnsubscribe) {
           pendingUnsubscribe();
           pendingUnsubscribe = null;
@@ -162,15 +200,22 @@ export default function Admin() {
           categoriesUnsubscribe();
           categoriesUnsubscribe = null;
         }
+        if (inquiriesUnsubscribe) {
+          inquiriesUnsubscribe();
+          inquiriesUnsubscribe = null;
+        }
         setPendingOrders([]);
+        setInquiries([]);
+        setUser(null);
+        setAuthLoading(false);
       }
-      setAuthLoading(false);
     });
 
     return () => {
       if (unsubscribe) unsubscribe();
       if (pendingUnsubscribe) pendingUnsubscribe();
       if (categoriesUnsubscribe) categoriesUnsubscribe();
+      if (inquiriesUnsubscribe) inquiriesUnsubscribe();
     };
   }, []);
 
@@ -288,6 +333,7 @@ export default function Admin() {
     try {
       const loggedUser = await authService.login(email.trim(), password);
       setUser(loggedUser);
+      localStorage.removeItem('desh_explicit_logout');
 
       const shouldRemember = isRemember !== undefined ? isRemember : rememberMe;
       if (shouldRemember) {
@@ -308,8 +354,20 @@ export default function Admin() {
   };
 
   const handleLogout = async () => {
+    localStorage.setItem('desh_explicit_logout', 'true');
     await authService.logout();
     setUser(null);
+  };
+
+  const handleMarkAllInquiriesRead = async () => {
+    try {
+      await inquiryService.markAllAsRead();
+      setInquiries(prev => prev.map(i => ({ ...i, status: 'read' })));
+      notify.success('All messages marked as read');
+    } catch (e) {
+      console.error(e);
+      notify.error('Failed to mark messages as read');
+    }
   };
 
   // 4. POS Cart Methods
@@ -595,12 +653,14 @@ export default function Admin() {
         setIsSidebarOpen={setIsSidebarOpen}
         handleLogout={handleLogout}
         user={user}
-        todaySalesSum={salesHistory
-          .filter(s => s.timestamp && parseTimestamp(s.timestamp).toDateString() === new Date().toDateString())
-          .reduce((sum, s) => sum + Number(s.amount), 0)}
+        todaySalesSum={todaySalesSum}
+        todaySalesList={todaySalesList}
         totalPendingDues={totalPendingDues}
         pendingOrders={pendingOrders}
         setShowPendingOrdersModal={setShowPendingOrdersModal}
+        inquiries={inquiries}
+        newInquiriesCount={newInquiriesCount}
+        onMarkAllInquiriesRead={handleMarkAllInquiriesRead}
       >
         <Suspense fallback={<Loader />}>
           {activeTab === 'dashboard' && <Dashboard salesHistory={salesHistory} setActiveTab={setActiveTab} posCategories={posCategories} totalPendingDues={totalPendingDues} fetchSales={fetchSales} fetchCustomerDues={fetchCustomerDues} pendingOrders={pendingOrders} customerDuesList={customerDuesList} />}

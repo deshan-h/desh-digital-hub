@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { format } from 'date-fns';
-import { Calendar, Search, Filter, Download, ArrowRight, Printer, AlertTriangle, FileText, ChevronDown, ChevronUp, Package, Wrench, X, RefreshCw, Smartphone, Monitor, Battery, CheckCircle, Clock, Trash2, HelpCircle, ShoppingCart, User, History as HistoryIcon, MessageCircle } from 'lucide-react';
-import { generateInvoiceHtml } from '../../utils/invoiceTemplate';
+import { Calendar, Search, Filter, Download, ArrowRight, Printer, AlertTriangle, FileText, ChevronDown, ChevronUp, Package, Wrench, X, RefreshCw, Smartphone, Monitor, Battery, CheckCircle, Clock, Trash2, HelpCircle, ShoppingCart, User, History as HistoryIcon, MessageCircle, Zap, Edit3 } from 'lucide-react';
+import { generateInvoiceHtml, generateUtilityReceiptHtml } from '../../utils/invoiceTemplate';
 import { notify } from '../../utils/toast';
-import { customerService } from '../../services/supabaseService';
+import { customerService, salesService } from '../../services/supabaseService';
 import { supabase } from '../../config/supabase';
 
 export default function History({ salesHistory, fetchSales, handleDeleteSale, user, posCategories = [], isAdmin, customersList = [] }) {
@@ -24,6 +24,72 @@ export default function History({ salesHistory, fetchSales, handleDeleteSale, us
   const [whatsappModalData, setWhatsappModalData] = useState(null);
   const [whatsappNumberInput, setWhatsappNumberInput] = useState('');
   const [isUpdatingCustomer, setIsUpdatingCustomer] = useState(false);
+
+  // Utility Bill Edit State
+  const [utilityModalSale, setUtilityModalSale] = useState(null);
+  const [editAccountNo, setEditAccountNo] = useState('');
+  const [editRefNo, setEditRefNo] = useState('');
+  const [isUpdatingUtility, setIsUpdatingUtility] = useState(false);
+
+  const handleOpenUtilityModal = (sale) => {
+    setUtilityModalSale(sale);
+    const utilityItem = sale.cartItems?.find(i => i.isUtility || i.accountNumber || i.referenceNumber);
+    setEditAccountNo(utilityItem?.accountNumber || '');
+    setEditRefNo(utilityItem?.referenceNumber || '');
+  };
+
+  const handleSaveUtilityUpdate = async () => {
+    if (!utilityModalSale) return;
+    setIsUpdatingUtility(true);
+    try {
+      const sale = utilityModalSale;
+      const cleanAcc = editAccountNo.trim();
+      const cleanRef = editRefNo.trim();
+
+      const updatedCartItems = (sale.cartItems && sale.cartItems.length > 0)
+        ? sale.cartItems.map(item => {
+            if (item.isUtility || item.name?.toLowerCase().includes('bill payment')) {
+              return {
+                ...item,
+                accountNumber: cleanAcc,
+                referenceNumber: cleanRef
+              };
+            }
+            return item;
+          })
+        : [{
+            id: 'utility-' + Date.now(),
+            name: 'Utility Bill Payment',
+            price: Number(sale.amount || 50),
+            qty: 1,
+            accountNumber: cleanAcc,
+            referenceNumber: cleanRef,
+            isUtility: true
+          }];
+
+      let providerName = 'Utility';
+      if (sale.description && sale.description.includes(' - ')) {
+        const afterDash = sale.description.split(' - ')[1];
+        providerName = afterDash.split('|')[0].trim();
+      }
+
+      const updatedDesc = `Utility Bill - ${providerName}${cleanAcc ? ' | A/C: ' + cleanAcc : ''}${cleanRef ? ' | Ref: ' + cleanRef : ''}`;
+
+      await salesService.updateSale(sale.id, {
+        description: updatedDesc,
+        cartItems: updatedCartItems
+      });
+
+      notify.success("Utility Bill details updated successfully!");
+      setUtilityModalSale(null);
+      if (fetchSales) fetchSales();
+    } catch (err) {
+      console.error(err);
+      notify.error("Failed to update utility bill details");
+    } finally {
+      setIsUpdatingUtility(false);
+    }
+  };
 
 // Send WhatsApp for a sale
 const handleOpenWhatsappModal = (sale) => {
@@ -122,8 +188,12 @@ const submitWhatsappModal = async () => {
   }, [posCategories]);
 
   const handlePrint = (sale) => {
+    const isUtility = sale.isUtility || 
+      (sale.cartItems && sale.cartItems.some(i => i.isUtility)) || 
+      (sale.description && sale.description.startsWith('Utility Bill'));
+
     const printWindow = window.open('', '_blank');
-    const html = generateInvoiceHtml(sale);
+    const html = isUtility ? generateUtilityReceiptHtml(sale) : generateInvoiceHtml(sale);
     printWindow.document.write(html);
     printWindow.document.close();
     printWindow.focus();
@@ -452,8 +522,16 @@ const submitWhatsappModal = async () => {
                   const userName = email.includes('@') ? email.split('@')[0] : (sale.userEmail || sale.userId || 'Admin');
                   const income = getSaleIncome(sale);
 
+                  const isUtilitySale = Boolean(
+                    sale.isUtility ||
+                    sale.description?.toLowerCase().includes('utility bill') ||
+                    sale.cartItems?.some(item => item.isUtility || item.accountNumber || item.referenceNumber || item.name?.toLowerCase().includes('bill payment'))
+                  );
+
                   let badgeCategory = 'SALE';
-                  if (sale.isRepair) {
+                  if (isUtilitySale) {
+                    badgeCategory = 'UTILITY';
+                  } else if (sale.isRepair) {
                     badgeCategory = 'REPAIR';
                   } else if (sale.cartItems && sale.cartItems.length > 0) {
                     const cats = sale.cartItems.map(item => itemToCategoryMap[item.name]).filter(Boolean);
@@ -488,8 +566,14 @@ const submitWhatsappModal = async () => {
                         <span className="text-xs font-mono font-bold text-slate-400">#{invoiceNo}</span>
                       </td>
                       <td className="px-5 py-3 whitespace-nowrap">
-                        <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-md border ${sale.isRepair ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'}`}>
-                          {badgeCategory}
+                        <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-md border ${
+                          isUtilitySale 
+                            ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                            : sale.isRepair 
+                            ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' 
+                            : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
+                        }`}>
+                          {isUtilitySale ? '⚡ UTILITY' : badgeCategory}
                         </span>
                       </td>
                       <td className="px-5 py-3 whitespace-nowrap">
@@ -526,23 +610,32 @@ const submitWhatsappModal = async () => {
                       </td>
                       <td className="px-5 py-3 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1 transition-opacity">
+                          {isUtilitySale && (
+                            <button
+                              onClick={() => handleOpenUtilityModal(sale)}
+                              className="text-amber-400 hover:text-amber-300 hover:bg-amber-500/15 p-1.5 rounded-lg transition-all cursor-pointer"
+                              title="Update Account & Reference No"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                          )}
                           <button
                             onClick={() => handlePrint(sale)}
-                            className="text-slate-500 hover:text-cyan-400 hover:bg-cyan-500/10 p-1.5 rounded-lg transition-all"
+                            className="text-slate-500 hover:text-cyan-400 hover:bg-cyan-500/10 p-1.5 rounded-lg transition-all cursor-pointer"
                             title="Print Receipt"
                           >
                             <Printer className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDeleteSale(sale.id)}
-                            className="text-slate-500 hover:text-red-400 hover:bg-red-500/10 p-1.5 rounded-lg transition-all"
+                            className="text-slate-500 hover:text-red-400 hover:bg-red-500/10 p-1.5 rounded-lg transition-all cursor-pointer"
                             title="Delete Record"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleOpenWhatsappModal(sale)}
-                            className="text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10 p-1.5 rounded-lg transition-all"
+                            className="text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10 p-1.5 rounded-lg transition-all cursor-pointer"
                             title="Send WhatsApp"
                           >
                             <MessageCircle className="w-4 h-4" />
@@ -643,6 +736,100 @@ const submitWhatsappModal = async () => {
               >
                 {isUpdatingCustomer ? 'Sending...' : 'Send Message'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Utility Bill Update Modal */}
+      {utilityModalSale && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-150">
+            <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+              <h3 className="text-base font-black text-slate-100 uppercase tracking-wide flex items-center gap-2">
+                <Zap className="w-5 h-5 text-amber-400" /> Update Utility Bill Details
+              </h3>
+              <button 
+                onClick={() => setUtilityModalSale(null)} 
+                className="text-slate-400 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800 text-xs space-y-1">
+                <p className="font-bold text-slate-200 truncate">{utilityModalSale.description || 'Utility Bill Payment'}</p>
+                <div className="flex items-center justify-between text-[11px] text-slate-400 pt-0.5">
+                  <span>Customer: <span className="text-slate-200 font-semibold">{utilityModalSale.customerName || 'Walk-in'}</span></span>
+                  <span className="text-amber-400 font-mono font-bold">Fee: Rs. {Number(utilityModalSale.amount || 0).toFixed(2)}</span>
+                </div>
+              </div>
+
+              {/* Account Number */}
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
+                  Account Number <span className="text-slate-500 lowercase font-normal">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. 10492830 / 037..."
+                  value={editAccountNo}
+                  onChange={(e) => setEditAccountNo(e.target.value)}
+                  className="w-full text-sm bg-slate-950 border border-slate-800 text-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-amber-500/50 transition-all font-mono"
+                />
+              </div>
+
+              {/* Reference Number */}
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
+                  Reference Number <span className="text-slate-500 lowercase font-normal">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. TXN-948120 / Ref No"
+                  value={editRefNo}
+                  onChange={(e) => setEditRefNo(e.target.value)}
+                  className="w-full text-sm bg-slate-950 border border-slate-800 text-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-amber-500/50 transition-all font-mono"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="grid grid-cols-3 gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setUtilityModalSale(null)}
+                  className="py-2.5 px-3 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handlePrint({
+                      ...utilityModalSale,
+                      cartItems: (utilityModalSale.cartItems || []).map(i => i.isUtility ? {
+                        ...i,
+                        accountNumber: editAccountNo.trim(),
+                        referenceNumber: editRefNo.trim()
+                      } : i)
+                    });
+                  }}
+                  className="py-2.5 px-3 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-sky-400 border border-sky-500/30 transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                  title="Print Utility Receipt"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Print</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveUtilityUpdate}
+                  disabled={isUpdatingUtility}
+                  className="py-2.5 px-3 rounded-xl text-xs font-black bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-md shadow-amber-500/20 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {isUpdatingUtility ? 'Saving...' : 'Save'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

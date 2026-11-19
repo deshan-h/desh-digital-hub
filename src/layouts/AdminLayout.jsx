@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { format, formatDistanceToNow } from 'date-fns';
+import { parseTimestamp } from '../utils/helpers';
 import { 
   LayoutDashboard, 
   ShoppingCart, 
@@ -22,9 +24,17 @@ import {
   ChevronDown,
   Plus,
   MessageCircle,
-  MessageSquare
+  MessageSquare,
+  Receipt,
+  Clock,
+  Trash2,
+  CheckCircle2,
+  Send,
+  Check
 } from 'lucide-react';
 import CalculatorDropdown from '../components/common/CalculatorDropdown';
+import { pendingOrderService } from '../services/supabaseService';
+import { notify } from '../utils/toast';
 
 export default function AdminLayout({ 
   children, 
@@ -35,15 +45,33 @@ export default function AdminLayout({
   setIsSidebarOpen, 
   handleLogout, 
   user, 
-  todaySalesSum, 
+  todaySalesSum = 0, 
+  todaySalesList = [],
   totalPendingDues, 
   pendingOrders = [], 
-  setShowPendingOrdersModal 
+  setShowPendingOrdersModal,
+  inquiries = [],
+  newInquiriesCount = 0,
+  onMarkAllInquiriesRead
 }) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
+  const [isTodaySalesOpen, setIsTodaySalesOpen] = useState(false);
+  const [isPendingSalesOpen, setIsPendingSalesOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const dropdownRef = useRef(null);
   const calculatorRef = useRef(null);
+  const todaySalesDropdownRef = useRef(null);
+  const pendingSalesDropdownRef = useRef(null);
+  const notificationsRef = useRef(null);
+
+  const pendingSalesSum = (pendingOrders || []).reduce(
+    (acc, curr) => acc + (Number(curr.totalAmount || curr.total_amount) || 0), 
+    0
+  );
+
+  const newInquiries = (inquiries || []).filter(i => i.status === 'new');
+  const totalNotificationsCount = newInquiriesCount + (pendingOrders || []).length;
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -52,6 +80,15 @@ export default function AdminLayout({
       }
       if (calculatorRef.current && !calculatorRef.current.contains(event.target)) {
         setIsCalculatorOpen(false);
+      }
+      if (todaySalesDropdownRef.current && !todaySalesDropdownRef.current.contains(event.target)) {
+        setIsTodaySalesOpen(false);
+      }
+      if (pendingSalesDropdownRef.current && !pendingSalesDropdownRef.current.contains(event.target)) {
+        setIsPendingSalesOpen(false);
+      }
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target)) {
+        setIsNotificationsOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -75,7 +112,7 @@ export default function AdminLayout({
   // Grouped Navigation Items matching StoreMate layout
   const mainNavItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, hasDropdown: true },
-    { id: 'pos', label: 'Orders / POS', icon: ShoppingCart, hasDropdown: true },
+    { id: 'pos', label: 'Sales / POS', icon: ShoppingCart, hasDropdown: true },
     { id: 'history', label: 'Sales History', icon: History, hasDropdown: true },
     { id: 'reports', label: 'Reports', icon: BarChart3, hasDropdown: false },
   ];
@@ -92,14 +129,14 @@ export default function AdminLayout({
   // Dynamic Breadcrumb text helper
   const getBreadcrumbs = () => {
     switch (activeTab) {
-      case 'pos': return { section: 'Sales Order Management', page: 'Add New Sale' };
+      case 'pos': return { section: 'Sales Management', page: 'Add New Sale' };
       case 'dashboard': return { section: 'Executive Overview', page: 'Main Dashboard' };
       case 'repairs': return { section: 'Services & Support', page: 'PC Repair Management' };
       case 'customers': return { section: 'CRM & Client Records', page: 'Customer Directory' };
       case 'expenses': return { section: 'Accounting', page: 'Shop Expenses' };
       case 'items': return { section: 'Inventory Management', page: 'Products & Stock' };
       case 'inquiries': return { section: 'Customer Support', page: 'Messages & Inquiries' };
-      case 'history': return { section: 'Sales Orders', page: 'Sales Invoices & Receipts' };
+      case 'history': return { section: 'Sales History', page: 'Sales Invoices & Receipts' };
       case 'reports': return { section: 'Business Intelligence', page: 'Analytics & Reports' };
       case 'settings': return { section: 'System Configuration', page: 'Settings' };
       default: return { section: 'DESH Management', page: 'Home' };
@@ -256,7 +293,12 @@ export default function AdminLayout({
                       }`}
                     >
                       <div className={`flex items-center ${isSidebarOpen ? 'gap-3' : 'flex-col gap-1'}`}>
-                        <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-white/80 group-hover:text-white'}`} />
+                        <div className="relative">
+                          <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-white/80 group-hover:text-white'}`} />
+                          {!isSidebarOpen && item.id === 'inquiries' && newInquiriesCount > 0 && (
+                            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                          )}
+                        </div>
                         {isSidebarOpen ? (
                           <span className="truncate">{item.label}</span>
                         ) : (
@@ -265,6 +307,13 @@ export default function AdminLayout({
                           </span>
                         )}
                       </div>
+
+                      {/* Unread Inquiries Badge */}
+                      {isSidebarOpen && item.id === 'inquiries' && newInquiriesCount > 0 && (
+                        <span className="ml-auto px-2 py-0.5 text-[10px] font-black rounded-full bg-rose-500 text-white shadow-sm animate-pulse">
+                          {newInquiriesCount}
+                        </span>
+                      )}
 
                       {isSidebarOpen && item.hasDropdown && (
                         <ChevronDown className={`w-3.5 h-3.5 text-white/60 transition-transform ${isActive ? 'rotate-180 text-white' : 'group-hover:text-white'}`} />
@@ -307,10 +356,10 @@ export default function AdminLayout({
       <div className="flex-1 bg-[#090d16] rounded-tl-[24px] sm:rounded-tl-[28px] overflow-hidden flex flex-col shadow-[-16px_0_35px_rgba(0,0,0,0.75)] relative min-w-0">
         
         {/* Top Header Bar inside the curved card */}
-        <header className="h-16 pl-8 sm:pl-10 pr-5 sm:pr-8 bg-[#0b101d]/90 backdrop-blur-2xl border-b border-slate-800/80 shrink-0 flex items-center justify-between gap-4 sticky top-0 z-20">
+        <header className="h-16 pl-8 sm:pl-10 pr-5 sm:pr-8 bg-[#0b101d]/90 backdrop-blur-2xl border-b border-slate-800/80 shrink-0 flex items-center justify-between gap-4 sticky top-0 z-50">
           
           {/* Left: Breadcrumbs / Title */}
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-3 min-w-0">
             {/* Mobile menu button */}
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -324,6 +373,258 @@ export default function AdminLayout({
                 {activeTab === 'pos' ? 'Add New Sale' : breadcrumb.page}
               </h2>
             </div>
+
+            {/* Today Sales Quick Stat Dropdown Button */}
+            <div className="relative ml-1 sm:ml-2" ref={todaySalesDropdownRef}>
+              <button
+                onClick={() => setIsTodaySalesOpen(!isTodaySalesOpen)}
+                className="flex items-center gap-2 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 transition-all cursor-pointer shadow-sm group"
+                title="Click to view today's bills"
+              >
+                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
+                <div className="flex items-center gap-1.5 text-xs font-bold">
+                  <span className="text-slate-400 font-semibold hidden md:inline">Today:</span>
+                  <span className="text-emerald-300 font-black tracking-tight">
+                    Rs. {Number(todaySalesSum).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                  <span className="px-1.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 text-[10px] font-black border border-emerald-500/30">
+                    {todaySalesList.length} {todaySalesList.length === 1 ? 'Bill' : 'Bills'}
+                  </span>
+                </div>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 text-emerald-400 ${isTodaySalesOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* Dropdown displaying today's bills */}
+              {isTodaySalesOpen && (
+                <div className="absolute left-0 mt-2 w-80 sm:w-96 bg-[#0c1222] border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden z-50 backdrop-blur-xl animate-in fade-in duration-150">
+                  <div className="p-3.5 bg-gradient-to-r from-emerald-950/40 via-slate-900 to-slate-900 border-b border-slate-800 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                        <Receipt className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black text-white tracking-wide">Today's Sales & Bills</h4>
+                        <p className="text-[10px] text-emerald-400 font-semibold">
+                          {todaySalesList.length} completed transactions
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] text-slate-400 font-semibold">Total Revenue</p>
+                      <p className="text-xs font-black text-emerald-300">
+                        Rs. {Number(todaySalesSum).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* List of bills */}
+                  <div className="max-h-72 overflow-y-auto divide-y divide-slate-800/60 p-1">
+                    {todaySalesList.length === 0 ? (
+                      <div className="py-8 text-center text-slate-400">
+                        <Receipt className="w-8 h-8 mx-auto mb-2 opacity-30 text-emerald-400" />
+                        <p className="text-xs font-semibold">No sales recorded today yet.</p>
+                        <p className="text-[10px] text-slate-500 mt-0.5">Completed POS sales will show up here</p>
+                      </div>
+                    ) : (
+                      todaySalesList.map((sale, idx) => {
+                        const timeStr = sale.timestamp 
+                          ? format(parseTimestamp(sale.timestamp), 'hh:mm a') 
+                          : '--:--';
+                        return (
+                          <div 
+                            key={sale.id || idx}
+                            onClick={() => {
+                              setIsTodaySalesOpen(false);
+                              setActiveTab('history');
+                            }}
+                            className="p-2.5 hover:bg-slate-800/60 rounded-xl transition-colors cursor-pointer flex items-center justify-between group"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className="w-6 h-6 rounded-lg bg-slate-800 text-slate-400 group-hover:text-emerald-300 group-hover:bg-emerald-500/10 text-[10px] font-bold flex items-center justify-center border border-slate-700/60">
+                                #{todaySalesList.length - idx}
+                              </span>
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-slate-200 group-hover:text-emerald-300 truncate">
+                                  {sale.customerName || 'Walk-in Customer'}
+                                </p>
+                                <div className="flex items-center gap-2 text-[10px] text-slate-400">
+                                  <span>{timeStr}</span>
+                                  {sale.paymentMethod && (
+                                    <>
+                                      <span>•</span>
+                                      <span className="capitalize text-slate-400">{sale.paymentMethod}</span>
+                                    </>
+                                  )}
+                                  {sale.items?.length > 0 && (
+                                    <>
+                                      <span>•</span>
+                                      <span className="text-slate-400">{sale.items.length} {sale.items.length === 1 ? 'item' : 'items'}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0 pl-2">
+                              <p className="text-xs font-black text-slate-100 group-hover:text-emerald-300">
+                                Rs. {Number(sale.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* Footer action to go to history */}
+                  <div className="p-2 bg-slate-900/90 border-t border-slate-800 flex items-center justify-between">
+                    <button
+                      onClick={() => {
+                        setIsTodaySalesOpen(false);
+                        setActiveTab('history');
+                      }}
+                      className="w-full py-1.5 px-3 rounded-lg bg-slate-800 hover:bg-emerald-600/20 text-slate-300 hover:text-emerald-300 text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <span>View All in Sales History</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Pending Sales Dropdown (Shown ONLY if there are pending sales) */}
+            {pendingOrders && pendingOrders.length > 0 && (
+              <div className="relative ml-1" ref={pendingSalesDropdownRef}>
+                <button
+                  onClick={() => setIsPendingSalesOpen(!isPendingSalesOpen)}
+                  className="flex items-center gap-2 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 transition-all cursor-pointer shadow-sm group"
+                  title="Click to view pending sales"
+                >
+                  <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></div>
+                  <div className="flex items-center gap-1.5 text-xs font-bold">
+                    <span className="text-slate-400 font-semibold hidden md:inline">Pending:</span>
+                    <span className="text-amber-300 font-black tracking-tight">
+                      Rs. {Number(pendingSalesSum).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 text-[10px] font-black border border-amber-500/30">
+                      {pendingOrders.length} {pendingOrders.length === 1 ? 'Sale' : 'Sales'}
+                    </span>
+                  </div>
+                  <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 text-amber-400 ${isPendingSalesOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {/* Dropdown displaying pending sales */}
+                {isPendingSalesOpen && (
+                  <div className="absolute left-0 mt-2 w-80 sm:w-96 bg-[#0c1222] border border-amber-500/40 rounded-2xl shadow-2xl overflow-hidden z-50 backdrop-blur-xl animate-in fade-in duration-150">
+                    <div className="p-3.5 bg-gradient-to-r from-amber-950/40 via-slate-900 to-slate-900 border-b border-slate-800 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                          <Clock className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-black text-white tracking-wide">Pending Sales</h4>
+                          <p className="text-[10px] text-amber-400 font-semibold">
+                            {pendingOrders.length} saved pending transactions
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] text-slate-400 font-semibold">Pending Total</p>
+                        <p className="text-xs font-black text-amber-300">
+                          Rs. {Number(pendingSalesSum).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* List of pending sales */}
+                    <div className="max-h-72 overflow-y-auto divide-y divide-slate-800/60 p-1">
+                      {pendingOrders.map((order, idx) => {
+                        const timeStr = order.createdAt || order.timestamp
+                          ? format(parseTimestamp(order.createdAt || order.timestamp), 'hh:mm a')
+                          : '--:--';
+                        return (
+                          <div
+                            key={order.id || idx}
+                            className="p-2.5 hover:bg-slate-800/60 rounded-xl transition-colors flex items-center justify-between group"
+                          >
+                            <div 
+                              className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer"
+                              onClick={() => {
+                                setIsPendingSalesOpen(false);
+                                window.dispatchEvent(new CustomEvent('pos-resume-pending-sale', { detail: order }));
+                                setActiveTab('pos');
+                              }}
+                              title="Click to resume this sale in POS"
+                            >
+                              <span className="w-6 h-6 rounded-lg bg-slate-800 text-amber-400 group-hover:bg-amber-500/20 text-[10px] font-bold flex items-center justify-center border border-slate-700/60 shrink-0">
+                                #{idx + 1}
+                              </span>
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-slate-200 group-hover:text-amber-300 truncate">
+                                  {order.note || 'No Name Provided'}
+                                </p>
+                                <div className="flex items-center gap-2 text-[10px] text-slate-400">
+                                  <span>{timeStr}</span>
+                                  {order.phone && (
+                                    <>
+                                      <span>•</span>
+                                      <span className="text-slate-400">{order.phone}</span>
+                                    </>
+                                  )}
+                                  {order.items?.length > 0 && (
+                                    <>
+                                      <span>•</span>
+                                      <span className="text-slate-400">{order.items.length} {order.items.length === 1 ? 'item' : 'items'}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 pl-2 shrink-0">
+                              <p className="text-xs font-black text-amber-300">
+                                Rs. {Number(order.totalAmount || order.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </p>
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  try {
+                                    await pendingOrderService.deletePendingOrder(order.id);
+                                    notify.success("Pending sale deleted");
+                                  } catch (err) {
+                                    console.error(err);
+                                    notify.error("Failed to delete pending sale");
+                                  }
+                                }}
+                                className="p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                                title="Delete pending sale"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Total Arrears Badge in Navbar */}
+            <button
+              onClick={() => setActiveTab('customers')}
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 transition-all cursor-pointer shadow-sm group"
+              title="Click to view Customer Arrears"
+            >
+              <div className="w-2 h-2 rounded-full bg-rose-500"></div>
+              <div className="flex items-center gap-1.5 text-xs font-bold">
+                <span className="text-slate-400 font-semibold hidden md:inline">Arrears:</span>
+                <span className="text-rose-300 font-black tracking-tight">
+                  Rs. {Number(totalPendingDues || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            </button>
           </div>
 
           {/* Right: Round Utility Action Buttons */}
@@ -344,16 +645,177 @@ export default function AdminLayout({
               <span>New Sale</span>
             </button>
 
-            {/* Round Notification Bell Button */}
-            <button 
-              title="Notifications"
-              className="relative w-9 h-9 rounded-full bg-slate-900/80 border border-slate-800 text-slate-300 hover:text-sky-400 hover:border-sky-500/40 flex items-center justify-center transition-all cursor-pointer shadow-sm"
-            >
-              <Bell className="w-4 h-4" />
-              {pendingOrders.length > 0 && (
-                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-sky-400 animate-pulse"></span>
+            {/* Round Notification Bell Button & Dropdown */}
+            <div className="relative" ref={notificationsRef}>
+              <button 
+                onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                title="Notifications"
+                className={`relative w-9 h-9 rounded-full border flex items-center justify-center transition-all cursor-pointer shadow-sm ${
+                  isNotificationsOpen
+                    ? 'bg-blue-600 border-blue-500 text-white shadow-blue-500/30'
+                    : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:text-sky-400 hover:border-sky-500/40'
+                }`}
+              >
+                <Bell className="w-4 h-4" />
+                {totalNotificationsCount > 0 && (
+                  <span className="absolute -top-1 -right-1 px-1 min-w-[17px] h-[17px] rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center shadow-md shadow-rose-500/50 animate-pulse">
+                    {totalNotificationsCount > 9 ? '9+' : totalNotificationsCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Notification Popover Dropdown */}
+              {isNotificationsOpen && (
+                <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl bg-[#09152b]/98 backdrop-blur-2xl border border-sky-500/30 shadow-[0_20px_50px_rgba(0,0,0,0.85)] z-50 overflow-hidden text-slate-200 animate-in fade-in zoom-in-95 duration-150">
+                  
+                  {/* Dropdown Header */}
+                  <div className="p-3.5 px-4 bg-slate-900/90 border-b border-white/5 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Bell className="w-4 h-4 text-sky-400" />
+                      <span className="font-bold text-xs text-white">Notifications</span>
+                      {totalNotificationsCount > 0 && (
+                        <span className="px-2 py-0.5 text-[10px] font-extrabold rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                          {totalNotificationsCount} new
+                        </span>
+                      )}
+                    </div>
+
+                    {newInquiries.length > 0 && (
+                      <button
+                        onClick={onMarkAllInquiriesRead}
+                        className="text-[10px] font-bold text-slate-400 hover:text-sky-300 transition-colors flex items-center gap-1 cursor-pointer"
+                        title="Mark all messages as read"
+                      >
+                        <Check className="w-3 h-3 text-emerald-400" />
+                        <span>Mark all read</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Dropdown Body */}
+                  <div className="max-h-[360px] overflow-y-auto divide-y divide-white/5">
+                    
+                    {/* Customer Messages Section */}
+                    {newInquiries.length > 0 && (
+                      <div>
+                        <div className="px-4 py-1.5 bg-blue-950/40 text-[10px] font-bold uppercase tracking-wider text-sky-400 flex items-center justify-between">
+                          <span>New Customer Inquiries</span>
+                          <span>{newInquiries.length}</span>
+                        </div>
+                        {newInquiries.map((inq) => {
+                          const timeStr = inq.createdAt 
+                            ? formatDistanceToNow(new Date(inq.createdAt), { addSuffix: true })
+                            : 'Just now';
+
+                          return (
+                            <div
+                              key={inq.id}
+                              onClick={() => {
+                                setActiveTab('inquiries');
+                                setIsNotificationsOpen(false);
+                              }}
+                              className="p-3 px-4 hover:bg-slate-800/60 transition-colors cursor-pointer group"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse shrink-0" />
+                                  <span className="font-bold text-xs text-white group-hover:text-sky-300 transition-colors truncate">
+                                    {inq.name}
+                                  </span>
+                                  {inq.source === 'WhatsApp' ? (
+                                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shrink-0">
+                                      WA
+                                    </span>
+                                  ) : (
+                                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-sky-500/15 text-sky-400 border border-sky-500/30 shrink-0">
+                                      Web
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-[10px] text-slate-500 whitespace-nowrap shrink-0">
+                                  {timeStr}
+                                </span>
+                              </div>
+
+                              <div className="text-[11px] font-semibold text-amber-300 mt-0.5 truncate">
+                                {inq.service}
+                              </div>
+
+                              {inq.message && (
+                                <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">
+                                  {inq.message}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Pending Sales Section */}
+                    {pendingOrders.length > 0 && (
+                      <div>
+                        <div className="px-4 py-1.5 bg-amber-950/40 text-[10px] font-bold uppercase tracking-wider text-amber-400 flex items-center justify-between">
+                          <span>Pending Sales</span>
+                          <span>{pendingOrders.length}</span>
+                        </div>
+                        {pendingOrders.slice(0, 5).map((order, idx) => (
+                          <div
+                            key={order.id || idx}
+                            onClick={() => {
+                              setShowPendingOrdersModal(true);
+                              setIsNotificationsOpen(false);
+                            }}
+                            className="p-3 px-4 hover:bg-slate-800/60 transition-colors cursor-pointer group flex items-center justify-between"
+                          >
+                            <div>
+                              <div className="font-bold text-xs text-white group-hover:text-amber-300 transition-colors">
+                                {order.customerName || 'Customer Sale'}
+                              </div>
+                              <div className="text-[10px] text-slate-400 mt-0.5">
+                                {(order.items || order.cartItems || []).length} items pending
+                              </div>
+                            </div>
+                            <span className="font-mono font-bold text-xs text-amber-400">
+                              Rs {Number(order.totalAmount || order.total_amount || 0).toFixed(2)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Empty State */}
+                    {totalNotificationsCount === 0 && (
+                      <div className="py-8 px-4 text-center">
+                        <div className="w-10 h-10 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center mx-auto mb-2">
+                          <CheckCircle2 className="w-5 h-5" />
+                        </div>
+                        <p className="text-xs font-bold text-slate-300">All caught up!</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          No unread customer messages or pending sales.
+                        </p>
+                      </div>
+                    )}
+
+                  </div>
+
+                  {/* Dropdown Footer */}
+                  <div className="p-2.5 bg-slate-900/90 border-t border-white/5 text-center">
+                    <button
+                      onClick={() => {
+                        setActiveTab('inquiries');
+                        setIsNotificationsOpen(false);
+                      }}
+                      className="text-xs font-bold text-sky-400 hover:text-sky-300 transition-colors cursor-pointer inline-flex items-center gap-1"
+                    >
+                      <span>Open Customer Messages Center</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                </div>
               )}
-            </button>
+            </div>
 
             {/* Quick Calculator Dropdown (Round button) */}
             <div className="relative" ref={calculatorRef}>
@@ -427,8 +889,8 @@ export default function AdminLayout({
           </div>
         </header>
 
-        {/* Scrollable Content Body */}
-        <main className="flex-1 p-2 sm:p-2.5 overflow-y-auto flex flex-col">
+        {/* Content Body */}
+        <main className={`flex-1 p-2 sm:p-2.5 flex flex-col min-h-0 ${activeTab === 'pos' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
           {children}
         </main>
 

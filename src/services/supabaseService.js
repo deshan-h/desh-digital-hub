@@ -233,6 +233,25 @@ export const salesService = {
 
     if (error) throw error;
     return true;
+  },
+
+  async updateSale(id, updates) {
+    const payload = {};
+    if (updates.description !== undefined) payload.description = updates.description;
+    if (updates.cartItems !== undefined) payload.cart_items = updates.cartItems;
+    if (updates.amount !== undefined) payload.amount = Number(updates.amount);
+    if (updates.discount !== undefined) payload.discount = Number(updates.discount);
+    if (updates.isCredit !== undefined) payload.is_credit = Boolean(updates.isCredit);
+
+    const { data, error } = await supabase
+      .from('daily_sales')
+      .update(payload)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
   }
 };
 
@@ -584,19 +603,27 @@ export const pendingOrderService = {
   async createPendingOrder({ note, phone = '', items = [], totalAmount, discount = 0 }) {
     let customerId = null;
     if (note && note.trim() && note.trim() !== 'No Name Provided') {
-      customerId = await customerService.findOrCreateCustomerByName(note, phone);
+      try {
+        customerId = await customerService.findOrCreateCustomerByName(note, phone);
+      } catch (err) {
+        console.warn('Could not find/create customer for pending sale:', err);
+      }
+    }
+
+    const payload = {
+      note,
+      items,
+      total_amount: Number(totalAmount),
+      discount: Number(discount || 0)
+    };
+
+    if (customerId) {
+      payload.customer_id = customerId;
     }
 
     const { data, error } = await supabase
       .from('pending_orders')
-      .insert({
-        customer_id: customerId,
-        note,
-        phone,
-        items,
-        total_amount: Number(totalAmount),
-        discount: Number(discount || 0)
-      })
+      .insert(payload)
       .select()
       .single();
 
@@ -604,7 +631,7 @@ export const pendingOrderService = {
     return {
       id: data.id,
       note: data.note,
-      phone: data.phone,
+      phone: phone || '',
       items: data.items,
       totalAmount: Number(data.total_amount),
       createdAt: data.created_at
@@ -613,11 +640,19 @@ export const pendingOrderService = {
 
   async updatePendingOrder(id, updates) {
     const payload = {};
-    if (updates.phone !== undefined) payload.phone = updates.phone;
     if (updates.note !== undefined) payload.note = updates.note;
     if (updates.items !== undefined) payload.items = updates.items;
     if (updates.totalAmount !== undefined) payload.total_amount = Number(updates.totalAmount);
     if (updates.discount !== undefined) payload.discount = Number(updates.discount);
+    if (updates.customerId !== undefined) payload.customer_id = updates.customerId;
+
+    if (updates.phone && updates.note) {
+      try {
+        await customerService.findOrCreateCustomerByName(updates.note, updates.phone);
+      } catch (e) {
+        console.warn('Could not update customer phone:', e);
+      }
+    }
 
     const { data, error } = await supabase
       .from('pending_orders')
@@ -715,7 +750,7 @@ export const inquiryService = {
     }
   },
 
-  async createInquiry({ name, phone, service, message }) {
+  async createInquiry({ name, phone, service, message, source = 'System Web' }) {
     try {
       const existing = await this.getInquiries();
       const newInquiry = {
@@ -724,6 +759,7 @@ export const inquiryService = {
         phone: phone.trim(),
         service: service || 'General Inquiry',
         message: message ? message.trim() : '',
+        source: source || 'System Web',
         status: 'new', // 'new' | 'read' | 'replied'
         createdAt: new Date().toISOString()
       };
@@ -749,5 +785,40 @@ export const inquiryService = {
     const updated = existing.filter(item => item.id !== id);
     await settingsService.saveSetting('customer_inquiries', { items: updated });
     return true;
+  },
+
+  async markAllAsRead() {
+    try {
+      const existing = await this.getInquiries();
+      const updated = existing.map(item => ({ ...item, status: 'read' }));
+      await settingsService.saveSetting('customer_inquiries', { items: updated });
+      return updated;
+    } catch (e) {
+      console.error('Failed to mark inquiries as read:', e);
+      throw e;
+    }
+  },
+
+  subscribe(callback) {
+    // Initial fetch
+    this.getInquiries().then(callback).catch(console.error);
+
+    // Realtime channel
+    const channel = supabase
+      .channel('customer_inquiries_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings', filter: 'id=eq.customer_inquiries' }, () => {
+        this.getInquiries().then(callback).catch(console.error);
+      })
+      .subscribe();
+
+    // Polling fallback every 15 seconds to catch inquiries across devices
+    const interval = setInterval(() => {
+      this.getInquiries().then(callback).catch(console.error);
+    }, 15000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(interval);
+    };
   }
 };

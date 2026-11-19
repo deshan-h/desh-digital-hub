@@ -8,17 +8,20 @@ const parseTimestamp = (ts) => {
   return new Date(ts);
 };
 
+// =========================================================================
+// 1. STANDARD SALES & POS INVOICE TEMPLATE (A5 PORTRAIT - SYSTEM COLORS)
+// =========================================================================
 export const generateInvoiceHtml = (sale) => {
   const date = parseTimestamp(sale.timestamp);
   const items = sale.cartItems || [];
-  
+
   const itemsHtml = items.map((item, index) => `
     <tr>
-      <td class="text-center" style="color: #64748b; font-size: 11px;">${(index + 1).toString().padStart(2, '0')}</td>
-      <td class="text-left" style="color: #334155; font-weight: 500;">${item.name}</td>
-      <td class="text-center" style="color: #64748b;">Rs ${Number(item.price).toFixed(2)}</td>
-      <td class="text-center" style="color: #64748b;">${item.qty}</td>
-      <td class="text-right" style="color: #0f172a; font-weight: 600;">Rs ${(Number(item.price) * Number(item.qty)).toFixed(2)}</td>
+      <td class="text-center" style="color: #64748b; font-size: 9px;">${(index + 1).toString().padStart(2, '0')}</td>
+      <td class="text-left" style="color: #1e293b; font-weight: 600;">${item.name}</td>
+      <td class="text-center" style="color: #475569;">Rs ${Number(item.price).toFixed(2)}</td>
+      <td class="text-center" style="color: #475569;">${item.qty}</td>
+      <td class="text-right" style="color: #0f172a; font-weight: 700;">Rs ${(Number(item.price) * Number(item.qty)).toFixed(2)}</td>
     </tr>
   `).join('');
 
@@ -27,31 +30,44 @@ export const generateInvoiceHtml = (sale) => {
     <html lang="en">
     <head>
       <meta charset="UTF-8">
-      <title>Invoice - #${sale.id.slice(0,6).toUpperCase()}</title>
+      <title>Invoice - #${sale.id.slice(0, 6).toUpperCase()}</title>
       <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
         
-        @page { size: A4; margin: 0; }
+        @page { 
+          size: A5 portrait; 
+          margin: 0; 
+        }
         
-        * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        * { 
+          box-sizing: border-box; 
+          -webkit-print-color-adjust: exact !important; 
+          print-color-adjust: exact !important; 
+        }
         
         body { 
           font-family: 'Inter', sans-serif; 
           margin: 0; 
-          padding: 0; 
-          background: #e2e8f0; /* Gray background outside */
+          padding: 10px 0; 
+          background: #f1f5f9; 
           color: #0f172a;
-          font-size: 12px;
+          font-size: 10px;
+          display: flex;
+          justify-content: center;
         }
         
         .invoice-box {
-          width: 210mm;
-          min-height: 297mm;
+          width: 148mm;
+          min-height: 208mm;
+          max-width: 148mm;
           margin: 0 auto;
-          padding: 40px 50px;
+          padding: 20px 22px 28px 22px;
           position: relative;
-          background: white;
-          box-shadow: 0 0 10px rgba(0,0,0,0.1);
+          background: #ffffff;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
         }
 
         /* Header */
@@ -59,22 +75,23 @@ export const generateInvoiceHtml = (sale) => {
           display: flex;
           justify-content: space-between;
           align-items: flex-start;
-          margin-bottom: 40px;
+          margin-bottom: 18px;
         }
         
         .logo-section {
           width: 50%;
         }
         .logo-section img {
-          height: 120px;
+          height: 52px;
           object-fit: contain;
-          margin-bottom: 10px;
+          margin-bottom: 4px;
         }
         .logo-underline {
-          width: 150px;
+          width: 110px;
           height: 3px;
-          background-color: #0f172a;
-          margin-top: 5px;
+          background: linear-gradient(90deg, #1d4ed8, #0284c7);
+          border-radius: 2px;
+          margin-top: 2px;
         }
 
         .title-section {
@@ -82,202 +99,190 @@ export const generateInvoiceHtml = (sale) => {
           text-align: right;
         }
         .title-section h1 {
-          color: #10b981; 
-          font-size: 48px;
+          color: #1d4ed8; 
+          font-size: 28px;
           font-weight: 900;
-          margin: 0 0 15px 0;
-          letter-spacing: 2px;
+          margin: 0 0 6px 0;
+          letter-spacing: 1.5px;
+          line-height: 1;
         }
         
         .meta-grid {
           display: inline-grid;
           grid-template-columns: auto auto;
-          gap: 5px 15px;
+          gap: 2px 10px;
           text-align: right;
-          font-size: 11px;
+          font-size: 9px;
           color: #64748b;
         }
         .meta-grid .val {
           color: #0f172a;
-          font-weight: 600;
+          font-weight: 700;
         }
 
         /* Invoice To & Intro */
         .info-row {
           display: flex;
           justify-content: space-between;
-          margin-bottom: 40px;
+          margin-bottom: 16px;
+          gap: 15px;
         }
         
         .invoice-to {
-          width: 45%;
+          width: 48%;
         }
         .invoice-to-title {
-          color: #10b981;
-          font-weight: 700;
-          font-size: 12px;
-          margin-bottom: 12px;
+          color: #0284c7;
+          font-weight: 800;
+          font-size: 9.5px;
+          margin-bottom: 4px;
           text-transform: uppercase;
+          letter-spacing: 0.5px;
         }
         .customer-name {
-          font-size: 20px;
+          font-size: 13px;
           font-weight: 800;
-          margin-bottom: 8px;
+          margin-bottom: 3px;
           color: #0f172a;
         }
         .customer-details {
           color: #64748b;
-          font-size: 11px;
-          line-height: 1.6;
+          font-size: 8.5px;
+          line-height: 1.4;
         }
 
         .intro-text {
-          width: 50%;
-          font-size: 11px;
+          width: 48%;
+          font-size: 8.5px;
           color: #64748b;
-          line-height: 1.6;
+          line-height: 1.4;
+          background: #f8fafc;
+          border-left: 2.5px solid #0284c7;
+          padding: 6px 8px;
+          border-radius: 2px;
         }
         .intro-text strong {
           color: #0f172a;
           display: block;
-          margin-bottom: 8px;
+          margin-bottom: 2px;
         }
 
         /* Table */
         .table-wrapper {
-          margin-bottom: 40px;
+          margin-bottom: 14px;
         }
         table {
           width: 100%;
           border-collapse: collapse;
         }
         thead tr {
-          background: #10b981; 
+          background: linear-gradient(90deg, #071739 0%, #1d4ed8 70%, #0284c7 100%);
         }
         th {
           color: white;
-          font-size: 11px;
-          font-weight: 700;
+          font-size: 9px;
+          font-weight: 800;
           text-transform: uppercase;
-          padding: 12px 10px;
+          padding: 7px 8px;
+          letter-spacing: 0.5px;
         }
         th.bg-dark {
-          background: #0f172a; 
+          background: #071739; 
         }
         
         tbody tr {
           border-bottom: 1px solid #f1f5f9;
         }
         tbody td {
-          padding: 15px 10px;
-          font-size: 12px;
+          padding: 8px 8px;
+          font-size: 9.5px;
         }
 
         /* Footer Info */
         .bottom-section {
           display: flex;
           justify-content: flex-end;
-          margin-bottom: 40px;
+          margin-bottom: 16px;
         }
 
         .totals-box {
-          width: 35%;
+          width: 45%;
         }
         .totals-row {
           display: flex;
           justify-content: space-between;
-          padding: 8px 0;
-          font-size: 12px;
+          padding: 4px 0;
+          font-size: 9.5px;
           color: #64748b;
         }
-        .totals-row .val { color: #0f172a; font-weight: 600; }
+        .totals-row .val { color: #0f172a; font-weight: 700; }
         
         .grand-total {
           display: flex;
           justify-content: space-between;
-          background: #10b981;
+          background: linear-gradient(135deg, #071739 0%, #1d4ed8 100%);
           color: white;
-          padding: 12px 15px;
-          font-weight: 700;
-          font-size: 16px;
-          margin-top: 10px;
+          padding: 8px 10px;
+          font-weight: 800;
+          font-size: 13px;
+          margin-top: 6px;
           border-radius: 4px;
-        }
-
-        /* Signatures */
-        .signature-section {
-          display: flex;
-          justify-content: center;
-          margin: 50px 0;
-        }
-        .signature-box {
-          text-align: center;
-          width: 200px;
-        }
-        .signature-line {
-          border-bottom: 1px solid #cbd5e1;
-          margin-bottom: 10px;
-          height: 50px;
-        }
-        .signature-name {
-          font-size: 12px;
-          font-weight: 700;
-          color: #0f172a;
-        }
-        .signature-title {
-          font-size: 10px;
-          color: #64748b;
-          margin-top: 2px;
+          letter-spacing: 0.5px;
         }
 
         /* Absolute Footer */
         .footer {
           display: flex;
           justify-content: space-between;
-          margin-top: 60px;
+          margin-top: auto;
+          padding-top: 10px;
+          gap: 15px;
         }
         .contact-col {
-          width: 45%;
+          width: 48%;
         }
         .thank-you {
-          color: #10b981;
+          color: #1d4ed8;
           font-weight: 800;
-          font-size: 14px;
-          margin-bottom: 20px;
+          font-size: 11px;
+          margin-bottom: 8px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
         }
         .contact-item {
           display: flex;
           align-items: center;
-          gap: 12px;
-          margin-bottom: 10px;
-          font-size: 11px;
+          gap: 7px;
+          margin-bottom: 5px;
+          font-size: 8.5px;
           color: #64748b;
         }
         .icon-box {
-          width: 24px;
-          height: 24px;
-          background: #10b981;
+          width: 18px;
+          height: 18px;
+          background: #0284c7;
           color: white;
-          border-radius: 6px;
+          border-radius: 4px;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 12px;
+          font-size: 9px;
+          shrink: 0;
         }
 
         .terms-col {
-          width: 50%;
+          width: 48%;
         }
         .terms-title {
           font-weight: 800;
-          font-size: 13px;
-          margin-bottom: 10px;
+          font-size: 10px;
+          margin-bottom: 4px;
           color: #0f172a;
         }
         .terms-text {
-          font-size: 10px;
+          font-size: 8px;
           color: #64748b;
-          line-height: 1.6;
+          line-height: 1.4;
         }
         
         /* Bottom Decoration */
@@ -286,140 +291,714 @@ export const generateInvoiceHtml = (sale) => {
           bottom: 0;
           left: 0;
           right: 0;
-          height: 35px;
+          height: 16px;
           display: flex;
         }
-        .dec-blue { width: 40%; background: #10b981; }
+        .dec-blue { width: 45%; background: #0284c7; }
         .dec-angle { 
           width: 0;
           height: 0;
-          border-left: 35px solid #10b981;
-          border-bottom: 35px solid #0f172a;
+          border-left: 16px solid #0284c7;
+          border-bottom: 16px solid #071739;
         }
-        .dec-black { flex: 1; background: #0f172a; }
+        .dec-black { flex: 1; background: #071739; }
         
         .text-center { text-align: center; }
         .text-right { text-align: right; }
         .text-left { text-align: left; }
+
+        @media print {
+          body {
+            background: #ffffff;
+            padding: 0;
+          }
+          .invoice-box {
+            box-shadow: none;
+            width: 148mm;
+            min-height: 208mm;
+            padding: 16px 18px 24px 18px;
+          }
+        }
       </style>
     </head>
     <body>
       <div class="invoice-box">
         
-        <!-- Header -->
-        <div class="header">
-          <div class="logo-section">
-            <img src="${window.location.origin}${logo}" alt="Logo" />
-            <div class="logo-underline"></div>
-          </div>
-          <div class="title-section">
-            <h1>INVOICE</h1>
-            <div class="meta-grid">
-              <span>Invoice Number:</span> <span class="val">#${sale.id.slice(0,6).toUpperCase()}</span>
-              <span>Cashier:</span> <span class="val">${sale.userEmail ? sale.userEmail.split('@')[0] : (sale.userId || 'Admin')}</span>
-              <span>Invoice Date:</span> <span class="val">${format(date, 'MMMM dd, yyyy')}</span>
+        <div>
+          <!-- Header -->
+          <div class="header">
+            <div class="logo-section">
+              <img src="${window.location.origin}${logo}" alt="Logo" />
+              <div class="logo-underline"></div>
+            </div>
+            <div class="title-section">
+              <h1>INVOICE</h1>
+              <div class="meta-grid">
+                <span>Invoice Number:</span> <span class="val">#${sale.id.slice(0,6).toUpperCase()}</span>
+                <span>Cashier:</span> <span class="val">${sale.userEmail ? sale.userEmail.split('@')[0] : (sale.userId || 'Admin')}</span>
+                <span>Invoice Date:</span> <span class="val">${format(date, 'MMM dd, yyyy')}</span>
+              </div>
             </div>
           </div>
-        </div>
 
-        <!-- Invoice To -->
-        <div class="info-row">
-          <div class="invoice-to">
-            <div class="invoice-to-title">INVOICE TO:</div>
-            <div class="customer-name">${sale.customerName || 'Walk-in Customer'}</div>
-            <div class="customer-details">
-              Client of DESH Digital Hub.<br>
-              Date: ${format(date, 'MMM dd, yyyy')}<br>
-              Time: ${format(date, 'h:mm a')}
+          <!-- Invoice To -->
+          <div class="info-row">
+            <div class="invoice-to">
+              <div class="invoice-to-title">INVOICE TO:</div>
+              <div class="customer-name">${sale.customerName || 'Walk-in Customer'}</div>
+              <div class="customer-details">
+                Client of DESH Digital Hub.<br>
+                Date: ${format(date, 'MMM dd, yyyy')}<br>
+                Time: ${format(date, 'h:mm a')}
+              </div>
+            </div>
+            <div class="intro-text">
+              <strong>Dear Valued Client,</strong>
+              Thank you for choosing DESH Digital Hub. This document serves as the official transaction record of your purchase. For inquiries, please contact us below.
             </div>
           </div>
-          <div class="intro-text">
-            <strong>Dear Client,</strong>
-            Thank you for choosing DESH Digital Hub. This document serves as a record of your transaction. If you have any questions regarding this invoice, please feel free to contact us using the details provided below.
-          </div>
-        </div>
 
-        <!-- Table -->
-        <div class="table-wrapper">
-          <table>
-            <thead>
-              <tr>
-                <th class="text-center" style="width: 10%;">NO.</th>
-                <th class="text-left">PRODUCT DESCRIPTION</th>
-                <th class="text-center bg-dark" style="width: 15%;">PRICE</th>
-                <th class="text-center bg-dark" style="width: 15%;">QUANTITY</th>
-                <th class="text-right bg-dark" style="width: 20%;">TOTAL</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${itemsHtml || `
+          <!-- Table -->
+          <div class="table-wrapper">
+            <table>
+              <thead>
                 <tr>
-                  <td class="text-center" style="color: #64748b;">01</td>
-                  <td class="text-left" style="color: #334155; font-weight: 500;">${sale.description}</td>
-                  <td class="text-center" style="color: #64748b;">-</td>
-                  <td class="text-center" style="color: #64748b;">-</td>
-                  <td class="text-right" style="color: #0f172a; font-weight: 600;">Rs ${Number(sale.amount).toFixed(2)}</td>
+                  <th class="text-center" style="width: 8%;">NO.</th>
+                  <th class="text-left">PRODUCT / SERVICE DESCRIPTION</th>
+                  <th class="text-center bg-dark" style="width: 18%;">PRICE</th>
+                  <th class="text-center bg-dark" style="width: 12%;">QTY</th>
+                  <th class="text-right bg-dark" style="width: 22%;">TOTAL</th>
                 </tr>
-              `}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                ${itemsHtml || `
+                  <tr>
+                    <td class="text-center" style="color: #64748b;">01</td>
+                    <td class="text-left" style="color: #1e293b; font-weight: 600;">${sale.description}</td>
+                    <td class="text-center" style="color: #64748b;">-</td>
+                    <td class="text-center" style="color: #64748b;">1</td>
+                    <td class="text-right" style="color: #0f172a; font-weight: 700;">Rs ${Number(sale.amount).toFixed(2)}</td>
+                  </tr>
+                `}
+              </tbody>
+            </table>
+          </div>
 
-        <!-- Bottom Info -->
-        <div class="bottom-section">
-
-          <div class="totals-box">
-            <div class="totals-row">
-              <span>Subtotal:</span>
-              <span class="val">Rs ${Number(sale.amount).toFixed(2)}</span>
-            </div>
-            <div class="totals-row">
-              <span>Discount:</span>
-              <span class="val">Rs 0.00</span>
-            </div>
-            <div class="grand-total">
-              <span>Total:</span>
-              <span>Rs ${Number(sale.amount).toFixed(2)}</span>
+          <!-- Bottom Info -->
+          <div class="bottom-section">
+            <div class="totals-box">
+              <div class="totals-row">
+                <span>Subtotal:</span>
+                <span class="val">Rs ${Number(sale.amount).toFixed(2)}</span>
+              </div>
+              <div class="totals-row">
+                <span>Discount:</span>
+                <span class="val">Rs 0.00</span>
+              </div>
+              <div class="grand-total">
+                <span>Total Amount:</span>
+                <span>Rs ${Number(sale.amount).toFixed(2)}</span>
+              </div>
             </div>
           </div>
         </div>
 
-
-        <!-- Footer -->
-        <div class="footer">
-          <div class="contact-col">
-            <div class="thank-you">Thank You For Your Business</div>
+        <div>
+          <!-- Footer -->
+          <div class="footer">
+            <div class="contact-col">
+              <div class="thank-you">Thank You For Your Business</div>
+              
+              <div class="contact-item">
+                <div class="icon-box">📞</div>
+                +94(71) 998 9000 / 077 123 4567
+              </div>
+              <div class="contact-item">
+                <div class="icon-box">✉️</div>
+                deshdigitalhub@gmail.com
+              </div>
+              <div class="contact-item">
+                <div class="icon-box">📍</div>
+                204/1, In Front Of Diwrumgala, Pitapahamuna, Melsiripura
+              </div>
+            </div>
             
-            <div class="contact-item">
-              <div class="icon-box">📞</div>
-              +94(71) 998 9000
-            </div>
-            <div class="contact-item">
-              <div class="icon-box">✉️</div>
-              deshdigitalhub@gmail.com
-            </div>
-            <div class="contact-item">
-              <div class="icon-box">📍</div>
-              204/1, In Front Of Diwrumgala, Pitapahamuna, Melsiripura
+            <div class="terms-col">
+              <div class="terms-title">Terms & Conditions:</div>
+              <div class="terms-text">
+                Goods sold are not returnable unless defective.
+                Services & repairs are backed by standard DESH Hub warranty as applicable.
+                Please retain this receipt for any inquiries.
+              </div>
             </div>
           </div>
-          
-          <div class="terms-col">
-            <div class="terms-title">Terms & Conditions:</div>
-            <div class="terms-text">
-              Goods sold are not returnable or exchangeable unless defective.
-              For PC repairs and services, a warranty period applies as specified.
-              Please retain this invoice for any future warranty claims or inquiries.
-              We appreciate your trust in DESH Digital Hub.
+
+          <!-- Bottom Graphic -->
+          <div class="bottom-decoration">
+            <div class="dec-blue"></div>
+            <div class="dec-angle"></div>
+            <div class="dec-black"></div>
+          </div>
+        </div>
+
+      </div>
+    </body>
+    </html>
+  `;
+};
+
+
+// =========================================================================
+// 2. DEDICATED UTILITY BILL PAYMENT RECEIPT (A5 PORTRAIT - SYSTEM COLORS)
+// =========================================================================
+export const generateUtilityReceiptHtml = (sale) => {
+  const date = parseTimestamp(sale.timestamp);
+  const utilityItem = (sale.cartItems && sale.cartItems.find(i => i.isUtility)) || {};
+
+  let billAmount = Number(utilityItem.billAmount || sale.billAmount || 0);
+  let accountNo = utilityItem.accountNumber || sale.accountNumber || '';
+  let refNo = utilityItem.referenceNumber || sale.referenceNumber || '';
+  let provider = utilityItem.provider || 'Utility Bill Payment';
+
+  // Fallback parsers if saved in description
+  if (!billAmount && sale.description) {
+    const match = sale.description.match(/Bill:\s*Rs\s*([0-9.]+)/i);
+    if (match) billAmount = Number(match[1]);
+  }
+  if (!accountNo && sale.description) {
+    const match = sale.description.match(/A\/C:\s*([^|)]+)/i);
+    if (match) accountNo = match[1].trim();
+  }
+  if (!refNo && sale.description) {
+    const match = sale.description.match(/Ref:\s*([^|)]+)/i);
+    if (match) refNo = match[1].trim();
+  }
+
+  const serviceFee = Number(sale.amount || utilityItem.price || 50);
+  const totalPaid = billAmount + serviceFee;
+  const receiptId = (sale.id || Math.random().toString(36).substring(2, 8)).slice(0, 8).toUpperCase();
+  const formattedDate = format(date, 'MMM dd, yyyy');
+  const formattedTime = format(date, 'hh:mm a');
+
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <title>Utility Receipt - #UB-${receiptId}</title>
+      <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+        
+        @page { 
+          size: A5 portrait; 
+          margin: 0; 
+        }
+        
+        * { 
+          box-sizing: border-box; 
+          -webkit-print-color-adjust: exact !important; 
+          print-color-adjust: exact !important; 
+        }
+        
+        body { 
+          font-family: 'Inter', sans-serif; 
+          margin: 0; 
+          padding: 10px 0; 
+          background: #f1f5f9; 
+          color: #0f172a;
+          font-size: 10px;
+          display: flex;
+          justify-content: center;
+        }
+        
+        .invoice-box {
+          width: 148mm;
+          min-height: 208mm;
+          max-width: 148mm;
+          margin: 0 auto;
+          padding: 20px 22px 28px 22px;
+          position: relative;
+          background: #ffffff;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+        }
+
+        /* Header */
+        .header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          margin-bottom: 16px;
+        }
+        
+        .logo-section {
+          width: 50%;
+        }
+        .logo-section img {
+          height: 52px;
+          object-fit: contain;
+          margin-bottom: 4px;
+        }
+        .logo-underline {
+          width: 110px;
+          height: 3px;
+          background: linear-gradient(90deg, #1d4ed8, #0284c7);
+          border-radius: 2px;
+          margin-top: 2px;
+        }
+
+        .title-section {
+          width: 50%;
+          text-align: right;
+        }
+        .title-section h1 {
+          color: #1d4ed8; 
+          font-size: 26px;
+          font-weight: 900;
+          margin: 0 0 4px 0;
+          letter-spacing: 1px;
+          line-height: 1;
+        }
+        .title-section .subtitle-tag {
+          display: inline-block;
+          font-size: 9px;
+          font-weight: 800;
+          color: #0284c7;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+          margin-bottom: 6px;
+        }
+        
+        .meta-grid {
+          display: inline-grid;
+          grid-template-columns: auto auto;
+          gap: 2px 10px;
+          text-align: right;
+          font-size: 9px;
+          color: #64748b;
+        }
+        .meta-grid .val {
+          color: #0f172a;
+          font-weight: 700;
+        }
+
+        /* Customer & Official Notice */
+        .info-row {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 14px;
+          gap: 15px;
+        }
+        
+        .invoice-to {
+          width: 48%;
+        }
+        .invoice-to-title {
+          color: #0284c7;
+          font-weight: 800;
+          font-size: 9.5px;
+          margin-bottom: 4px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        .customer-name {
+          font-size: 13px;
+          font-weight: 800;
+          margin-bottom: 3px;
+          color: #0f172a;
+        }
+        .customer-details {
+          color: #64748b;
+          font-size: 8.5px;
+          line-height: 1.4;
+        }
+
+        .intro-text {
+          width: 48%;
+          font-size: 8.5px;
+          color: #64748b;
+          line-height: 1.4;
+          background: #f8fafc;
+          border-left: 2.5px solid #0284c7;
+          padding: 6px 8px;
+          border-radius: 2px;
+        }
+        .intro-text strong {
+          color: #0f172a;
+          display: block;
+          margin-bottom: 2px;
+        }
+
+        /* Utility Provider Highlight Card */
+        .utility-banner {
+          background: linear-gradient(90deg, #eff6ff 0%, #e0f2fe 100%);
+          border: 1px solid #bfdbfe;
+          border-radius: 8px;
+          padding: 10px 14px;
+          margin-bottom: 14px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .utility-brand {
+          font-size: 13px;
+          font-weight: 800;
+          color: #1e40af;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .utility-brand-icon {
+          width: 20px;
+          height: 20px;
+          border-radius: 5px;
+          background: #1d4ed8;
+          color: white;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 11px;
+        }
+        .utility-meta {
+          text-align: right;
+          font-size: 9.5px;
+        }
+        .utility-meta .ac-val {
+          font-weight: 800;
+          color: #0f172a;
+          font-family: monospace;
+          letter-spacing: 0.5px;
+        }
+        .utility-meta .ref-val {
+          color: #475569;
+          font-size: 8.5px;
+        }
+
+        /* Table */
+        .table-wrapper {
+          margin-bottom: 14px;
+        }
+        table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+        thead tr {
+          background: linear-gradient(90deg, #071739 0%, #1d4ed8 70%, #0284c7 100%);
+        }
+        th {
+          color: white;
+          font-size: 9px;
+          font-weight: 800;
+          text-transform: uppercase;
+          padding: 7px 8px;
+          letter-spacing: 0.5px;
+        }
+        th.bg-dark {
+          background: #071739; 
+        }
+        
+        tbody tr {
+          border-bottom: 1px solid #f1f5f9;
+        }
+        tbody td {
+          padding: 9px 8px;
+          font-size: 9.5px;
+        }
+
+        /* Bottom Section & Totals */
+        .bottom-section {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end;
+          margin-bottom: 16px;
+          gap: 15px;
+        }
+
+        .status-stamp-box {
+          width: 48%;
+        }
+        .status-stamp {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 12px;
+          background: #ecfdf5;
+          border: 1.5px solid #059669;
+          color: #047857;
+          border-radius: 6px;
+          font-weight: 800;
+          font-size: 10px;
+          letter-spacing: 0.5px;
+          text-transform: uppercase;
+        }
+        .status-sub {
+          font-size: 8px;
+          color: #64748b;
+          margin-top: 4px;
+          line-height: 1.3;
+        }
+
+        .totals-box {
+          width: 48%;
+        }
+        .totals-row {
+          display: flex;
+          justify-content: space-between;
+          padding: 3.5px 0;
+          font-size: 9.5px;
+          color: #64748b;
+        }
+        .totals-row .val { color: #0f172a; font-weight: 700; }
+        
+        .grand-total {
+          display: flex;
+          justify-content: space-between;
+          background: linear-gradient(135deg, #071739 0%, #1d4ed8 100%);
+          color: white;
+          padding: 8px 10px;
+          font-weight: 800;
+          font-size: 13px;
+          margin-top: 6px;
+          border-radius: 4px;
+          letter-spacing: 0.5px;
+        }
+
+        /* Absolute Footer */
+        .footer {
+          display: flex;
+          justify-content: space-between;
+          margin-top: auto;
+          padding-top: 10px;
+          gap: 15px;
+        }
+        .contact-col {
+          width: 48%;
+        }
+        .thank-you {
+          color: #1d4ed8;
+          font-weight: 800;
+          font-size: 11px;
+          margin-bottom: 8px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        .contact-item {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          margin-bottom: 5px;
+          font-size: 8.5px;
+          color: #64748b;
+        }
+        .icon-box {
+          width: 18px;
+          height: 18px;
+          background: #0284c7;
+          color: white;
+          border-radius: 4px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 9px;
+          shrink: 0;
+        }
+
+        .terms-col {
+          width: 48%;
+        }
+        .terms-title {
+          font-weight: 800;
+          font-size: 10px;
+          margin-bottom: 4px;
+          color: #0f172a;
+        }
+        .terms-text {
+          font-size: 8px;
+          color: #64748b;
+          line-height: 1.4;
+        }
+        
+        /* Bottom Decoration */
+        .bottom-decoration {
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          height: 16px;
+          display: flex;
+        }
+        .dec-blue { width: 45%; background: #0284c7; }
+        .dec-angle { 
+          width: 0;
+          height: 0;
+          border-left: 16px solid #0284c7;
+          border-bottom: 16px solid #071739;
+        }
+        .dec-black { flex: 1; background: #071739; }
+        
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .text-left { text-align: left; }
+
+        @media print {
+          body {
+            background: #ffffff;
+            padding: 0;
+          }
+          .invoice-box {
+            box-shadow: none;
+            width: 148mm;
+            min-height: 208mm;
+            padding: 16px 18px 24px 18px;
+          }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="invoice-box">
+        
+        <div>
+          <!-- Header -->
+          <div class="header">
+            <div class="logo-section">
+              <img src="${window.location.origin}${logo}" alt="Logo" />
+              <div class="logo-underline"></div>
+            </div>
+            <div class="title-section">
+              <h1>UTILITY RECEIPT</h1>
+              <div class="subtitle-tag">Official Payment Voucher</div>
+              <div class="meta-grid">
+                <span>Receipt Number:</span> <span class="val">#UB-${receiptId}</span>
+                <span>Counter Agent:</span> <span class="val">${sale.userEmail ? sale.userEmail.split('@')[0] : (sale.userId || 'Counter 01')}</span>
+                <span>Payment Date:</span> <span class="val">${formattedDate}</span>
+                <span>Payment Time:</span> <span class="val">${formattedTime}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Customer & Agency Info -->
+          <div class="info-row">
+            <div class="invoice-to">
+              <div class="invoice-to-title">CUSTOMER INFORMATION:</div>
+              <div class="customer-name">${sale.customerName || 'Counter Customer'}</div>
+              <div class="customer-details">
+                Payment Channel: Cash Counter Agent<br>
+                Service Center: DESH Digital Hub Melsiripura<br>
+                Receipt Status: Completed & Synchronized
+              </div>
+            </div>
+            <div class="intro-text">
+              <strong>Official Receipt Certification:</strong>
+              This voucher certifies that the specified utility bill payment has been accepted and processed at DESH Digital Hub authorized agency counter.
+            </div>
+          </div>
+
+          <!-- Utility Provider Highlight Card -->
+          <div class="utility-banner">
+            <div class="utility-brand">
+              <div class="utility-brand-icon">⚡</div>
+              <span>${provider}</span>
+            </div>
+            <div class="utility-meta">
+              <div>Account: <span class="ac-val">${accountNo || 'N/A'}</span></div>
+              <div class="ref-val">Ref / TXN: ${refNo || 'Counter Confirmed'}</div>
+            </div>
+          </div>
+
+          <!-- Table -->
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th class="text-center" style="width: 8%;">NO.</th>
+                  <th class="text-left">BILL & SERVICE DESCRIPTION</th>
+                  <th class="text-center bg-dark" style="width: 32%;">ACCOUNT / REF NO</th>
+                  <th class="text-right bg-dark" style="width: 25%;">AMOUNT</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="text-center" style="color: #64748b; font-size: 9px;">01</td>
+                  <td class="text-left" style="color: #1e293b; font-weight: 700;">${provider} Bill Payment Settlement</td>
+                  <td class="text-center" style="color: #475569; font-family: monospace;">${accountNo || 'Counter Verified'}</td>
+                  <td class="text-right" style="color: #0f172a; font-weight: 700;">Rs ${billAmount > 0 ? billAmount.toFixed(2) : '0.00'}</td>
+                </tr>
+                <tr>
+                  <td class="text-center" style="color: #64748b; font-size: 9px;">02</td>
+                  <td class="text-left" style="color: #1e293b; font-weight: 600;">Counter Processing & Agency Fee</td>
+                  <td class="text-center" style="color: #64748b; font-size: 8.5px;">Authorized Agency Service</td>
+                  <td class="text-right" style="color: #0f172a; font-weight: 700;">Rs ${serviceFee.toFixed(2)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Bottom Info -->
+          <div class="bottom-section">
+            <div class="status-stamp-box">
+              <div class="status-stamp">
+                <span>✔</span>
+                <span>Payment Accepted & Settled</span>
+              </div>
+              <div class="status-sub">
+                Official billing statement will reflect payment within 24-48 hours via national utility banking gateway.
+              </div>
+            </div>
+
+            <div class="totals-box">
+              <div class="totals-row">
+                <span>Bill Amount:</span>
+                <span class="val">Rs ${billAmount > 0 ? billAmount.toFixed(2) : '0.00'}</span>
+              </div>
+              <div class="totals-row">
+                <span>Counter Agency Fee:</span>
+                <span class="val">Rs ${serviceFee.toFixed(2)}</span>
+              </div>
+              <div class="grand-total">
+                <span>Total Paid:</span>
+                <span>Rs ${totalPaid.toFixed(2)}</span>
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- Bottom Graphic -->
-        <div class="bottom-decoration">
-          <div class="dec-blue"></div>
-          <div class="dec-angle"></div>
-          <div class="dec-black"></div>
+        <div>
+          <!-- Footer -->
+          <div class="footer">
+            <div class="contact-col">
+              <div class="thank-you">Thank You For Choosing DESH Hub</div>
+              
+              <div class="contact-item">
+                <div class="icon-box">📞</div>
+                +94(71) 998 9000 / 077 123 4567
+              </div>
+              <div class="contact-item">
+                <div class="icon-box">✉️</div>
+                deshdigitalhub@gmail.com
+              </div>
+              <div class="contact-item">
+                <div class="icon-box">📍</div>
+                204/1, In Front Of Diwrumgala, Pitapahamuna, Melsiripura
+              </div>
+            </div>
+            
+            <div class="terms-col">
+              <div class="terms-title">Important Instructions:</div>
+              <div class="terms-text">
+                Please retain this printed receipt as proof of bill payment.
+                In case of any inquiry or dispute with the service provider, this receipt serves as counter verification.
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Graphic -->
+          <div class="bottom-decoration">
+            <div class="dec-blue"></div>
+            <div class="dec-angle"></div>
+            <div class="dec-black"></div>
+          </div>
         </div>
 
       </div>
