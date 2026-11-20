@@ -1,22 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { parseTimestamp } from '../utils/helpers';
-import { 
-  LayoutDashboard, 
-  ShoppingCart, 
-  History, 
-  LogOut, 
-  Wrench, 
-  UserCog, 
-  User, 
-  Users, 
-  Wallet, 
-  RefreshCw, 
-  Tags, 
-  Settings, 
-  ChevronRight, 
-  ChevronLeft, 
-  BarChart3, 
+import {
+  LayoutDashboard,
+  ShoppingCart,
+  History,
+  LogOut,
+  Wrench,
+  UserCog,
+  User,
+  Users,
+  Wallet,
+  RefreshCw,
+  Tags,
+  Settings,
+  ChevronRight,
+  ChevronLeft,
+  BarChart3,
   Calculator,
   Bell,
   HelpCircle,
@@ -36,19 +36,19 @@ import CalculatorDropdown from '../components/common/CalculatorDropdown';
 import { pendingOrderService } from '../services/supabaseService';
 import { notify } from '../utils/toast';
 
-export default function AdminLayout({ 
-  children, 
-  activeTab, 
-  setActiveTab, 
-  isAdmin, 
-  isSidebarOpen, 
-  setIsSidebarOpen, 
-  handleLogout, 
-  user, 
-  todaySalesSum = 0, 
+export default function AdminLayout({
+  children,
+  activeTab,
+  setActiveTab,
+  isAdmin,
+  isSidebarOpen,
+  setIsSidebarOpen,
+  handleLogout,
+  user,
+  todaySalesSum = 0,
   todaySalesList = [],
-  totalPendingDues, 
-  pendingOrders = [], 
+  totalPendingDues,
+  pendingOrders = [],
   setShowPendingOrdersModal,
   inquiries = [],
   newInquiriesCount = 0,
@@ -67,7 +67,7 @@ export default function AdminLayout({
   const notificationsRef = useRef(null);
 
   const pendingSalesSum = (pendingOrders || []).reduce(
-    (acc, curr) => acc + (Number(curr.totalAmount || curr.total_amount) || 0), 
+    (acc, curr) => acc + (Number(curr.totalAmount || curr.total_amount) || 0),
     0
   );
 
@@ -118,13 +118,13 @@ export default function AdminLayout({
 
   // Grouped Navigation Items matching StoreMate layout
   const mainNavItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, hasDropdown: true },
-    { id: 'pos', label: 'Sales / POS', icon: ShoppingCart, hasDropdown: true },
-    { id: 'repairs', label: 'PC Repairs', icon: Wrench, hasDropdown: false },
-    { 
-      id: 'reports', 
-      label: 'Reports', 
-      icon: BarChart3, 
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'pos', label: 'Sales / POS', icon: ShoppingCart },
+    { id: 'repairs', label: 'PC Repairs', icon: Wrench },
+    {
+      id: 'reports',
+      label: 'Reports',
+      icon: BarChart3,
       hasSubNav: true,
       subItems: [
         { id: 'history', label: 'Sales Report', icon: Receipt },
@@ -134,11 +134,11 @@ export default function AdminLayout({
   ];
 
   const optionalNavItems = [
-    ...(isAdmin ? [{ id: 'items', label: 'Products', icon: Tags, hasDropdown: true }] : []),
-    { id: 'customers', label: 'Customers', icon: Users, hasDropdown: false },
-    { id: 'expenses', label: 'Expenses', icon: Wallet, hasDropdown: false },
-    { id: 'inquiries', label: 'Messages', icon: MessageSquare, hasDropdown: false },
-    { id: 'settings', label: 'Settings', icon: Settings, hasDropdown: true },
+    ...(isAdmin ? [{ id: 'items', label: 'Products', icon: Tags }] : []),
+    { id: 'customers', label: 'Customers', icon: Users },
+    { id: 'expenses', label: 'Expenses', icon: Wallet },
+    { id: 'inquiries', label: 'Messages', icon: MessageSquare },
+    { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
   // Dynamic Breadcrumb text helper
@@ -168,19 +168,18 @@ export default function AdminLayout({
       {/* LEFT SIDEBAR (Executive Deep Oceanic Sapphire Theme)     */}
       {/* Seamless integration with the canvas background           */}
       {/* ======================================================== */}
-      <aside 
-        className={`${
-          isSidebarOpen ? 'w-60' : 'w-[74px]'
-        } bg-transparent flex flex-col justify-between shrink-0 transition-all duration-300 z-10 select-none relative`}
+      <aside
+        className={`${isSidebarOpen ? 'w-60' : 'w-[74px]'
+          } bg-transparent flex flex-col justify-between shrink-0 transition-all duration-300 z-30 select-none relative`}
       >
         <div className="flex flex-col h-full">
-          
+
           {/* Sidebar Top: Logo Branding + Menu Toggle Button */}
           <div className="h-16 flex items-center px-3.5 border-b border-white/5">
             {isSidebarOpen ? (
               <div className="flex items-center justify-between w-full">
-                <div 
-                  className="flex items-center gap-2.5 cursor-pointer overflow-hidden group" 
+                <div
+                  className="flex items-center gap-2.5 cursor-pointer overflow-hidden group"
                   onClick={() => setActiveTab('dashboard')}
                   title="Go to Dashboard"
                 >
@@ -213,10 +212,10 @@ export default function AdminLayout({
                   className="group relative w-10 h-10 rounded-xl bg-white/10 p-1 border border-white/15 hover:border-sky-400/50 hover:bg-sky-500/20 backdrop-blur-md flex items-center justify-center cursor-pointer transition-all duration-200 shadow-inner"
                   title="Click to Expand Sidebar"
                 >
-                  <img 
-                    src="/pwa-192x192.png" 
-                    alt="DESH Logo" 
-                    className="w-full h-full object-contain transition-all duration-200 group-hover:scale-75 group-hover:opacity-0" 
+                  <img
+                    src="/pwa-192x192.png"
+                    alt="DESH Logo"
+                    className="w-full h-full object-contain transition-all duration-200 group-hover:scale-75 group-hover:opacity-0"
                   />
                   <ChevronRight className="w-5 h-5 text-sky-400 absolute opacity-0 group-hover:opacity-100 transition-all duration-200 group-hover:scale-110" />
                 </button>
@@ -225,8 +224,8 @@ export default function AdminLayout({
           </div>
 
           {/* Navigation Links Area */}
-          <nav className="flex-1 py-4 px-3 space-y-4 overflow-y-auto no-scrollbar">
-            
+          <nav className={`flex-1 py-4 px-3 space-y-4 ${isSidebarOpen ? 'overflow-y-auto custom-scrollbar' : 'overflow-visible'}`}>
+
             {/* Group 1: MAIN */}
             <div>
               {isSidebarOpen && (
@@ -252,15 +251,13 @@ export default function AdminLayout({
                             setActiveTab(item.id);
                           }
                         }}
-                        className={`group relative w-full flex items-center rounded-xl transition-all duration-200 cursor-pointer ${
-                          isSidebarOpen 
-                            ? 'justify-between px-3.5 py-2.5 text-xs' 
-                            : 'flex-col justify-center py-2 px-1 text-center'
-                        } ${
-                          isItemActive 
-                            ? 'bg-white/20 text-white font-bold backdrop-blur-md shadow-sm border border-white/20' 
+                        className={`group relative w-full flex items-center rounded-xl transition-all duration-200 cursor-pointer ${isSidebarOpen
+                          ? 'justify-between px-3.5 py-2.5 text-xs'
+                          : 'flex-col justify-center py-2 px-1 text-center'
+                          } ${isItemActive
+                            ? 'bg-white/20 text-white font-bold backdrop-blur-md shadow-sm border border-white/20'
                             : 'text-white/80 hover:text-white hover:bg-white/10 font-medium border border-transparent'
-                        }`}
+                          }`}
                       >
                         <div className={`flex items-center ${isSidebarOpen ? 'gap-3' : 'flex-col gap-1'}`}>
                           <Icon className={`w-4 h-4 shrink-0 ${isItemActive ? 'text-white' : 'text-white/80 group-hover:text-white'}`} />
@@ -273,34 +270,41 @@ export default function AdminLayout({
                           )}
                         </div>
 
-                        {/* Dropdown chevron on right */}
-                        {isSidebarOpen && (item.hasDropdown || item.hasSubNav) && (
-                          <ChevronDown className={`w-3.5 h-3.5 text-white/60 transition-transform ${
-                            item.hasSubNav 
-                              ? (isReportsOpen ? 'rotate-180 text-white' : 'group-hover:text-white') 
-                              : (isItemActive ? 'rotate-180 text-white' : 'group-hover:text-white')
-                          }`} />
+                        {/* Expand chevron ONLY for Reports (item.hasSubNav) */}
+                        {isSidebarOpen && item.hasSubNav && (
+                          <ChevronDown className={`w-3.5 h-3.5 text-white/60 transition-transform ${isReportsOpen ? 'rotate-180 text-white' : 'group-hover:text-white'}`} />
                         )}
 
                         {/* Collapsed Tooltip / Sub-menu Popover */}
                         {!isSidebarOpen && (
-                          <div className="absolute left-16 hidden group-hover:flex flex-col gap-1 bg-slate-900 text-white text-xs font-bold p-2 rounded-xl border border-slate-700 whitespace-nowrap z-50 shadow-2xl">
-                            <span className="text-[10px] uppercase tracking-wider text-slate-400 px-2 py-0.5">{item.label}</span>
-                            {item.subItems ? (
-                              item.subItems.map(sub => (
+                          item.hasSubNav ? (
+                            <div className="absolute left-full ml-3.5 top-0 hidden group-hover:flex flex-col gap-1.5 bg-slate-900/95 backdrop-blur-md text-white text-xs font-bold p-2.5 rounded-xl border border-slate-700/80 shadow-2xl whitespace-nowrap w-max min-w-[150px] z-50">
+                              <div className="text-[10px] uppercase tracking-wider text-slate-400 px-2 py-0.5 border-b border-slate-800 pb-1">
+                                {item.label}
+                              </div>
+                              {item.subItems.map(sub => (
                                 <div
                                   key={sub.id}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setActiveTab(sub.id);
                                   }}
-                                  className={`px-3 py-1.5 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer flex items-center gap-2 ${activeTab === sub.id ? 'text-sky-400 bg-sky-500/10 font-bold' : 'text-slate-300'}`}
+                                  className={`px-3 py-1.5 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer flex items-center gap-2 ${activeTab === sub.id ? 'text-sky-400 bg-sky-500/15 font-bold' : 'text-slate-300'
+                                    }`}
                                 >
                                   <span>{sub.label}</span>
                                 </div>
-                              ))
-                            ) : null}
-                          </div>
+                              ))}
+                              {/* Pointer Arrow */}
+                              <div className="absolute -left-1 top-4 w-2 h-2 bg-slate-900 border-l border-b border-slate-700/80 rotate-45" />
+                            </div>
+                          ) : (
+                            <div className="absolute left-full ml-3.5 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center bg-slate-900/95 backdrop-blur-md text-white text-xs font-bold px-3 py-1.5 rounded-xl border border-slate-700/80 shadow-2xl whitespace-nowrap w-max z-50 pointer-events-none">
+                              <span>{item.label}</span>
+                              {/* Pointer Arrow */}
+                              <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-2 h-2 bg-slate-900 border-l border-b border-slate-700/80 rotate-45" />
+                            </div>
+                          )
                         )}
                       </button>
 
@@ -318,11 +322,10 @@ export default function AdminLayout({
                                     e.stopPropagation();
                                     setActiveTab(sub.id);
                                   }}
-                                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-all cursor-pointer ${
-                                    isSubActive
-                                      ? 'bg-sky-500/25 text-white font-bold border border-sky-400/40 shadow-sm'
-                                      : 'text-white/70 hover:text-white hover:bg-white/10 font-medium border border-transparent'
-                                  }`}
+                                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-all cursor-pointer ${isSubActive
+                                    ? 'bg-sky-500/25 text-white font-bold border border-sky-400/40 shadow-sm'
+                                    : 'text-white/70 hover:text-white hover:bg-white/10 font-medium border border-transparent'
+                                    }`}
                                 >
                                   <div className="flex items-center gap-2.5">
                                     <SubIcon className={`w-3.5 h-3.5 ${isSubActive ? 'text-sky-300' : 'text-white/60'}`} />
@@ -346,17 +349,17 @@ export default function AdminLayout({
                                     e.stopPropagation();
                                     setActiveTab(sub.id);
                                   }}
-                                  className={`relative group/sub w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
-                                    isSubActive
-                                      ? 'bg-sky-500 text-slate-950 font-black shadow-md shadow-sky-500/40 ring-1 ring-sky-300'
-                                      : 'text-white/70 hover:text-white hover:bg-white/15'
-                                  }`}
+                                  className={`relative group/sub w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer ${isSubActive
+                                    ? 'bg-sky-500 text-slate-950 font-black shadow-md shadow-sky-500/40 ring-1 ring-sky-300'
+                                    : 'text-white/70 hover:text-white hover:bg-white/15'
+                                    }`}
                                   title={sub.label}
                                 >
                                   <SubIcon className="w-4 h-4" />
                                   {/* Popover label tooltip on hover */}
-                                  <div className="absolute left-12 hidden group-hover/sub:flex items-center bg-slate-900 text-white text-xs font-bold px-2.5 py-1 rounded-lg border border-slate-700 whitespace-nowrap z-50 shadow-xl pointer-events-none">
-                                    {sub.label}
+                                  <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 hidden group-hover/sub:flex items-center bg-slate-900/95 backdrop-blur-md text-white text-xs font-bold px-3 py-1.5 rounded-xl border border-slate-700/80 shadow-2xl whitespace-nowrap w-max z-50 pointer-events-none">
+                                    <span>{sub.label}</span>
+                                    <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-2 h-2 bg-slate-900 border-l border-b border-slate-700/80 rotate-45" />
                                   </div>
                                 </button>
                               );
@@ -386,15 +389,13 @@ export default function AdminLayout({
                     <button
                       key={item.id}
                       onClick={() => setActiveTab(item.id)}
-                      className={`group relative w-full flex items-center rounded-xl transition-all duration-200 cursor-pointer ${
-                        isSidebarOpen 
-                          ? 'justify-between px-3.5 py-2.5 text-xs' 
-                          : 'flex-col justify-center py-2 px-1 text-center'
-                      } ${
-                        isActive 
-                          ? 'bg-white/20 text-white font-bold backdrop-blur-md shadow-sm border border-white/20' 
+                      className={`group relative w-full flex items-center rounded-xl transition-all duration-200 cursor-pointer ${isSidebarOpen
+                        ? 'justify-between px-3.5 py-2.5 text-xs'
+                        : 'flex-col justify-center py-2 px-1 text-center'
+                        } ${isActive
+                          ? 'bg-white/20 text-white font-bold backdrop-blur-md shadow-sm border border-white/20'
                           : 'text-white/80 hover:text-white hover:bg-white/10 font-medium border border-transparent'
-                      }`}
+                        }`}
                     >
                       <div className={`flex items-center ${isSidebarOpen ? 'gap-3' : 'flex-col gap-1'}`}>
                         <div className="relative">
@@ -419,13 +420,11 @@ export default function AdminLayout({
                         </span>
                       )}
 
-                      {isSidebarOpen && item.hasDropdown && (
-                        <ChevronDown className={`w-3.5 h-3.5 text-white/60 transition-transform ${isActive ? 'rotate-180 text-white' : 'group-hover:text-white'}`} />
-                      )}
-
                       {!isSidebarOpen && (
-                        <div className="absolute left-16 hidden group-hover:block bg-slate-900 text-white text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-700 whitespace-nowrap z-50 shadow-2xl pointer-events-none">
-                          {item.label}
+                        <div className="absolute left-full ml-3.5 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center bg-slate-900/95 backdrop-blur-md text-white text-xs font-bold px-3 py-1.5 rounded-xl border border-slate-700/80 shadow-2xl whitespace-nowrap w-max z-50 pointer-events-none">
+                          <span>{item.label}</span>
+                          {/* Pointer Arrow */}
+                          <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-2 h-2 bg-slate-900 border-l border-b border-slate-700/80 rotate-45" />
                         </div>
                       )}
                     </button>
@@ -458,10 +457,10 @@ export default function AdminLayout({
       {/* MAIN CONTENT CARD WITH SLEEK SEAMLESS TOP-LEFT CURVE     */}
       {/* ======================================================== */}
       <div className="flex-1 bg-[#090d16] rounded-tl-[24px] sm:rounded-tl-[28px] overflow-hidden flex flex-col shadow-[-16px_0_35px_rgba(0,0,0,0.75)] relative min-w-0">
-        
+
         {/* Top Header Bar inside the curved card */}
         <header className="h-16 pl-8 sm:pl-10 pr-5 sm:pr-8 bg-[#0b101d]/90 backdrop-blur-2xl border-b border-slate-800/80 shrink-0 flex items-center justify-between gap-4 sticky top-0 z-50">
-          
+
           {/* Left: Breadcrumbs / Title */}
           <div className="flex items-center gap-3 min-w-0">
             {/* Mobile menu button */}
@@ -531,11 +530,11 @@ export default function AdminLayout({
                       </div>
                     ) : (
                       todaySalesList.map((sale, idx) => {
-                        const timeStr = sale.timestamp 
-                          ? format(parseTimestamp(sale.timestamp), 'hh:mm a') 
+                        const timeStr = sale.timestamp
+                          ? format(parseTimestamp(sale.timestamp), 'hh:mm a')
                           : '--:--';
                         return (
-                          <div 
+                          <div
                             key={sale.id || idx}
                             onClick={() => {
                               setIsTodaySalesOpen(false);
@@ -651,7 +650,7 @@ export default function AdminLayout({
                             key={order.id || idx}
                             className="p-2.5 hover:bg-slate-800/60 rounded-xl transition-colors flex items-center justify-between group"
                           >
-                            <div 
+                            <div
                               className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer"
                               onClick={() => {
                                 setIsPendingSalesOpen(false);
@@ -733,7 +732,7 @@ export default function AdminLayout({
 
           {/* Right: Round Utility Action Buttons */}
           <div className="flex items-center justify-end gap-2 sm:gap-2.5 shrink-0">
-            
+
             {/* Primary Action Button (+ New Sale) */}
             <button
               onClick={() => {
@@ -751,14 +750,13 @@ export default function AdminLayout({
 
             {/* Round Notification Bell Button & Dropdown */}
             <div className="relative" ref={notificationsRef}>
-              <button 
+              <button
                 onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
                 title="Notifications"
-                className={`relative w-9 h-9 rounded-full border flex items-center justify-center transition-all cursor-pointer shadow-sm ${
-                  isNotificationsOpen
-                    ? 'bg-blue-600 border-blue-500 text-white shadow-blue-500/30'
-                    : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:text-sky-400 hover:border-sky-500/40'
-                }`}
+                className={`relative w-9 h-9 rounded-full border flex items-center justify-center transition-all cursor-pointer shadow-sm ${isNotificationsOpen
+                  ? 'bg-blue-600 border-blue-500 text-white shadow-blue-500/30'
+                  : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:text-sky-400 hover:border-sky-500/40'
+                  }`}
               >
                 <Bell className="w-4 h-4" />
                 {totalNotificationsCount > 0 && (
@@ -771,7 +769,7 @@ export default function AdminLayout({
               {/* Notification Popover Dropdown */}
               {isNotificationsOpen && (
                 <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl bg-[#09152b]/98 backdrop-blur-2xl border border-sky-500/30 shadow-[0_20px_50px_rgba(0,0,0,0.85)] z-50 overflow-hidden text-slate-200 animate-in fade-in zoom-in-95 duration-150">
-                  
+
                   {/* Dropdown Header */}
                   <div className="p-3.5 px-4 bg-slate-900/90 border-b border-white/5 flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -798,7 +796,7 @@ export default function AdminLayout({
 
                   {/* Dropdown Body */}
                   <div className="max-h-[360px] overflow-y-auto divide-y divide-white/5">
-                    
+
                     {/* Customer Messages Section */}
                     {newInquiries.length > 0 && (
                       <div>
@@ -807,7 +805,7 @@ export default function AdminLayout({
                           <span>{newInquiries.length}</span>
                         </div>
                         {newInquiries.map((inq) => {
-                          const timeStr = inq.createdAt 
+                          const timeStr = inq.createdAt
                             ? formatDistanceToNow(new Date(inq.createdAt), { addSuffix: true })
                             : 'Just now';
 
@@ -923,14 +921,13 @@ export default function AdminLayout({
 
             {/* Quick Calculator Dropdown (Round button) */}
             <div className="relative" ref={calculatorRef}>
-              <button 
+              <button
                 onClick={() => setIsCalculatorOpen(!isCalculatorOpen)}
                 title="Quick Calculator"
-                className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors cursor-pointer border ${
-                  isCalculatorOpen 
-                    ? 'bg-blue-600 border-blue-500 text-white shadow-blue-500/30' 
-                    : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:text-sky-400 hover:border-sky-500/40'
-                }`}
+                className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors cursor-pointer border ${isCalculatorOpen
+                  ? 'bg-blue-600 border-blue-500 text-white shadow-blue-500/30'
+                  : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:text-sky-400 hover:border-sky-500/40'
+                  }`}
               >
                 <Calculator className="w-4 h-4" />
               </button>
@@ -941,7 +938,7 @@ export default function AdminLayout({
             </div>
 
             {/* Hard Refresh Button */}
-            <button 
+            <button
               onClick={handleHardRefresh}
               title="Hard Refresh Cache"
               className="w-9 h-9 rounded-full bg-slate-900/80 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 flex items-center justify-center transition-all cursor-pointer group shadow-sm"
@@ -952,7 +949,7 @@ export default function AdminLayout({
             {/* User Profile Pill */}
             {user && (
               <div className="relative" ref={dropdownRef}>
-                <button 
+                <button
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                   className="flex items-center gap-2 pl-1.5 pr-3 py-1 bg-slate-900/80 border border-slate-800 hover:border-slate-700 rounded-full cursor-pointer transition-colors shadow-sm"
                 >
@@ -994,7 +991,7 @@ export default function AdminLayout({
         </header>
 
         {/* Content Body */}
-        <main className={`flex-1 p-2 sm:p-2.5 flex flex-col min-h-0 ${(activeTab === 'pos' || activeTab === 'repairs' || activeTab === 'history') ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+        <main className={`flex-1 p-2 sm:p-2.5 flex flex-col min-h-0 ${(activeTab === 'pos' || activeTab === 'repairs' || activeTab === 'history' || activeTab === 'dashboard') ? 'overflow-hidden' : 'overflow-y-auto'}`}>
           {children}
         </main>
 

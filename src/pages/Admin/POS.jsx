@@ -776,25 +776,41 @@ export default function POS({
               favoriteCustomers={favoriteCustomerNames}
             />
 
-            {/* Favorite Customers Quick-Pill Selection */}
-            {favoriteCustomerNames.length > 0 && !customerName && (
-              <div className="flex flex-wrap gap-1.5 pt-0.5">
-                {favoriteCustomerNames.slice(0, 6).map((name, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => {
-                      setCustomerName(name);
-                      const matched = customersList.find(c => c.name?.toLowerCase() === name.toLowerCase());
-                      if (matched && matched.phone && !whatsappNumber) {
-                        setWhatsappNumber(matched.phone);
-                      }
-                    }}
-                    className="text-[10px] font-semibold px-2 py-0.5 rounded-lg bg-[#090d16] border border-slate-800/80 text-slate-300 hover:text-sky-400 hover:border-sky-500/40 transition-colors cursor-pointer"
-                  >
-                    {name}
-                  </button>
-                ))}
+            {/* Favorite Customers Quick-Pill Selection across full available bar width */}
+            {favoriteCustomerNames.length > 0 && (
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1 w-full scroll-smooth">
+                <span className="text-[10px] font-bold text-amber-400/90 flex items-center gap-1 shrink-0 pr-0.5">
+                  <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                  <span className="text-slate-400">Favs:</span>
+                </span>
+                {favoriteCustomerNames.map((name, i) => {
+                  const isSelected = customerName?.toLowerCase() === name.toLowerCase();
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => {
+                        if (isSelected) {
+                          setCustomerName('');
+                          setWhatsappNumber('');
+                        } else {
+                          setCustomerName(name);
+                          const matched = customersList.find(c => c.name?.toLowerCase() === name.toLowerCase());
+                          if (matched && matched.phone && !whatsappNumber) {
+                            setWhatsappNumber(matched.phone);
+                          }
+                        }
+                      }}
+                      className={`text-[10px] font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer whitespace-nowrap shrink-0 shadow-sm ${
+                        isSelected 
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 font-bold shadow-[0_0_8px_rgba(245,158,11,0.2)]'
+                          : 'bg-[#090d16] border-slate-800/80 text-slate-300 hover:text-sky-400 hover:border-sky-500/40 hover:bg-slate-800/60'
+                      }`}
+                    >
+                      {name}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>

@@ -574,11 +574,19 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
     .map(name => ({ name, value: statusMap[name] }))
     .sort((a, b) => b.value - a.value);
 
-  // -- CHART: Combined Monthly Financials (Repair Profit, POS Income, Expenses) --
+  // -- CHART: Combined Monthly Financials (Sales, Bills, Repair Profit, POS Income, Expenses) --
   const monthsList = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const monthlyDataMap = {};
   monthsList.forEach(m => {
-    monthlyDataMap[m] = { month: m, repairProfit: 0, posIncome: 0, expenses: 0 };
+    monthlyDataMap[m] = { 
+      month: m, 
+      sales: 0, 
+      bills: 0, 
+      repairProfit: 0, 
+      posIncome: 0, 
+      netIncome: 0, 
+      expenses: 0 
+    };
   });
 
   salesHistory.forEach(sale => {
@@ -586,10 +594,15 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
       const d = parseTimestamp(sale.timestamp);
       if (d.getFullYear() === currentYear) {
         const monthStr = monthsList[d.getMonth()];
+        const amt = Number(sale.amount || 0);
+        monthlyDataMap[monthStr].sales += amt;
+        monthlyDataMap[monthStr].bills += 1;
+
         if (sale.isRepair) {
-          const profit = Number(sale.amount || 0) - Number(sale.cost || 0);
+          const profit = amt - Number(sale.cost || 0);
           if (profit > 0) {
             monthlyDataMap[monthStr].repairProfit += profit;
+            monthlyDataMap[monthStr].netIncome += profit;
           }
         } else {
           let posProfit = 0;
@@ -598,6 +611,7 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
           });
           if (posProfit > 0) {
             monthlyDataMap[monthStr].posIncome += posProfit;
+            monthlyDataMap[monthStr].netIncome += posProfit;
           }
         }
       }
@@ -615,6 +629,12 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
   });
 
   const combinedMonthlyData = monthsList.map(month => monthlyDataMap[month]);
+
+  // Year summary totals for Monthly Overview
+  const yearSalesTotal = combinedMonthlyData.reduce((sum, m) => sum + m.sales, 0);
+  const yearBillsTotal = combinedMonthlyData.reduce((sum, m) => sum + m.bills, 0);
+  const yearNetIncomeTotal = combinedMonthlyData.reduce((sum, m) => sum + m.netIncome, 0);
+  const yearExpensesTotal = combinedMonthlyData.reduce((sum, m) => sum + m.expenses, 0);
 
   // -- CHART: Daily Orders Counts (This Month) --
   const dailyOrdersMap = {};
@@ -894,7 +914,7 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
       </div>
 
       {/* Main Dashboard Scrollable Canvas */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-1 pb-16">
+      <div className="flex-1 overflow-y-auto no-scrollbar space-y-4 pr-1 pb-16">
         
         {/* SUMMARY FILTER PILLS STRIP */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-1 px-0.5">
@@ -1227,12 +1247,12 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
 
         </div>
 
-        {/* ROW 3: TOP SPENDERS & FAST-MOVING ITEMS (PIE CHART) */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        {/* ROW 3: TOP SPENDERS, FAST-MOVING ITEMS & REVENUE BY CATEGORY */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
           
-          {/* Top Spenders */}
-          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.3 }} className="bg-[#071326] border border-slate-800/80 rounded-2xl p-5 shadow-xl flex flex-col h-[360px] hover:border-slate-700/80 transition-all">
-            <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest mb-4 flex items-center justify-between border-b border-slate-800/80 pb-3">
+          {/* 1. Top Spenders */}
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.3 }} className="bg-[#071326] border border-slate-800/80 rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col h-[370px] hover:border-slate-700/80 transition-all">
+            <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest mb-3 flex items-center justify-between border-b border-slate-800/80 pb-2.5">
               <span className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
                 Top Spenders (This Month)
@@ -1244,17 +1264,17 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
                 <p className="text-slate-500 text-xs text-center mt-6">No customer data yet</p>
               ) : (
                 top5Customers.map((cust, i) => (
-                  <div key={i} className="flex gap-3 items-center p-2.5 rounded-xl bg-slate-950/60 hover:bg-slate-800/40 transition-all border border-slate-800/80 hover:border-slate-700">
-                    <div className="w-8 h-8 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center font-black text-xs shrink-0 shadow-[0_0_10px_rgba(16,185,129,0.15)] font-mono">
+                  <div key={i} className="flex gap-2.5 items-center p-2 rounded-xl bg-slate-950/60 hover:bg-slate-800/40 transition-all border border-slate-800/80 hover:border-slate-700">
+                    <div className="w-7 h-7 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center font-black text-xs shrink-0 shadow-[0_0_10px_rgba(16,185,129,0.15)] font-mono">
                       #{i + 1}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-slate-200 truncate">{cust.name}</p>
-                      <p className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1 font-mono">
+                      <p className="text-xs font-bold text-slate-200 truncate">{cust.name}</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1 font-mono">
                         <ShoppingCart className="w-3 h-3 text-emerald-400/70" /> {cust.orderCount} Orders
                       </p>
                     </div>
-                    <div className="text-xs font-black text-emerald-400 whitespace-nowrap bg-emerald-500/10 px-2.5 py-1.5 rounded-lg border border-emerald-500/20 font-mono">
+                    <div className="text-[11px] font-black text-emerald-400 whitespace-nowrap bg-emerald-500/10 px-2 py-1 rounded-lg border border-emerald-500/20 font-mono">
                       Rs {cust.totalSpend.toFixed(0)}
                     </div>
                   </div>
@@ -1263,9 +1283,9 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
             </div>
           </motion.div>
 
-          {/* Fast-Moving Items (Pie / Donut Chart) */}
-          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.3, delay: 0.1 }} className="bg-[#071326] border border-slate-800/80 rounded-2xl p-5 shadow-xl flex flex-col h-[360px] hover:border-slate-700/80 transition-all">
-            <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest mb-2 flex items-center justify-between border-b border-slate-800/80 pb-3">
+          {/* 2. Fast-Moving Items (Pie / Donut Chart) */}
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.3, delay: 0.08 }} className="bg-[#071326] border border-slate-800/80 rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col h-[370px] hover:border-slate-700/80 transition-all">
+            <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest mb-2 flex items-center justify-between border-b border-slate-800/80 pb-2.5">
               <span className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-amber-400"></span>
                 Fast-Moving Items (Top Sold)
@@ -1276,17 +1296,17 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
             {fastMovingItems.length === 0 ? (
               <p className="text-slate-500 text-xs text-center mt-12">No sales logged for this month</p>
             ) : (
-              <div className="flex-1 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex-1 flex flex-col justify-between">
                 {/* Donut Chart */}
-                <div className="h-[180px] w-full sm:w-[48%] relative">
+                <div className="h-[160px] w-full relative">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
                         data={fastMovingItems}
                         cx="50%"
                         cy="50%"
-                        innerRadius={48}
-                        outerRadius={72}
+                        innerRadius={44}
+                        outerRadius={68}
                         paddingAngle={4}
                         dataKey="qty"
                         nameKey="name"
@@ -1299,7 +1319,7 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
                           value={`${totalFastMovingQty} Sold`} 
                           position="center" 
                           fill="#f1f5f9" 
-                          fontSize={13} 
+                          fontSize={12} 
                           fontWeight="black" 
                         />
                       </Pie>
@@ -1325,18 +1345,18 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
                 </div>
 
                 {/* Legend List */}
-                <div className="w-full sm:w-[52%] space-y-1.5 max-h-[190px] overflow-y-auto no-scrollbar pr-1">
+                <div className="space-y-1 max-h-[130px] overflow-y-auto no-scrollbar bg-slate-950/60 p-2 rounded-xl border border-slate-800/60 mt-1">
                   {fastMovingItems.map((item, idx) => {
                     const color = COLORS_EXTENDED[idx % COLORS_EXTENDED.length];
                     const share = totalFastMovingQty > 0 ? ((item.qty / totalFastMovingQty) * 100).toFixed(0) : 0;
                     return (
-                      <div key={idx} className="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-950/60 border border-slate-800/70 text-xs">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }}></div>
+                      <div key={idx} className="flex items-center justify-between gap-2 p-1.5 rounded-lg bg-slate-900/40 text-[11px]">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }}></div>
                           <span className="text-slate-300 font-medium truncate">{item.name}</span>
                         </div>
                         <span className="font-black font-mono text-amber-400 shrink-0">
-                          {item.qty} <span className="text-[10px] text-slate-500 font-normal">({share}%)</span>
+                          {item.qty} <span className="text-[9px] text-slate-500 font-normal">({share}%)</span>
                         </span>
                       </div>
                     );
@@ -1344,6 +1364,76 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
                 </div>
               </div>
             )}
+          </motion.div>
+
+          {/* 3. Revenue By Category Donut */}
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.3, delay: 0.16 }} className="bg-[#071326] border border-slate-800/80 rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col h-[370px] hover:border-slate-700/80 transition-all">
+            <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest mb-2 flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+              <span className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-indigo-400"></span>
+                Revenue By Category
+              </span>
+              <PieChartIcon className="w-4 h-4 text-indigo-400" />
+            </h3>
+            
+            <div className="flex-1 flex flex-col justify-between">
+              {/* Donut Chart */}
+              <div className="h-[160px] w-full relative">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={donutChartData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={44}
+                      outerRadius={68}
+                      paddingAngle={4}
+                      dataKey="value"
+                      stroke="none"
+                    >
+                      {donutChartData.map((entry, index) => (
+                        <Cell key={`cell-cat-${index}`} fill={COLORS_EXTENDED[index % COLORS_EXTENDED.length]} />
+                      ))}
+                      <Label 
+                        value={`Rs ${monthSalesTotal >= 1000 ? (monthSalesTotal/1000).toFixed(1)+'k' : monthSalesTotal}`} 
+                        position="center" 
+                        fill="#f1f5f9" 
+                        fontSize={12} 
+                        fontWeight="black" 
+                      />
+                    </Pie>
+                    <Tooltip 
+                      content={({active, payload}) => {
+                        if (active && payload && payload.length) {
+                          return (
+                            <div className="bg-[#0b182f] border border-slate-700/80 p-2.5 rounded-xl shadow-xl font-mono text-xs">
+                              <p className="text-slate-300 font-semibold mb-1 font-sans">{payload[0].name}</p>
+                              <p className="font-black" style={{ color: payload[0].payload.fill }}>
+                                Rs {payload[0].value.toFixed(0)}
+                              </p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Custom Legend */}
+              <div className="space-y-1 max-h-[130px] overflow-y-auto no-scrollbar bg-slate-950/60 p-2 rounded-xl border border-slate-800/60 mt-1">
+                 {donutChartData.map((entry, idx) => (
+                   <div key={idx} className="flex items-center justify-between gap-2 p-1.5 rounded-lg bg-slate-900/40 text-[11px]">
+                     <div className="flex items-center gap-1.5 min-w-0">
+                       <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: COLORS_EXTENDED[idx % COLORS_EXTENDED.length] }}></div>
+                       <span className="text-slate-300 truncate">{entry.name}</span>
+                     </div>
+                     <span className="font-mono font-bold text-white shrink-0">Rs {entry.value.toFixed(0)}</span>
+                   </div>
+                 ))}
+              </div>
+            </div>
           </motion.div>
 
         </div>
@@ -1436,40 +1526,55 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
             </div>
           </motion.div>
 
-          {/* Combined Monthly Financials Chart */}
+          {/* Combined Monthly Financials & Sales/Bills Chart */}
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.3, delay: 0.1 }} className="bg-[#071326] border border-slate-800/80 rounded-2xl p-5 shadow-xl flex flex-col justify-between hover:border-slate-700/80 transition-all">
-            <div className="flex items-center justify-between mb-4 border-b border-slate-800/80 pb-3">
-              <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
-                Monthly Overview ({currentYear})
-              </h3>
-              <div className="flex gap-3 text-[10px] font-black uppercase font-mono">
-                <div className="flex items-center gap-1.5 text-blue-400"><div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div> POS</div>
-                <div className="flex items-center gap-1.5 text-teal-400"><div className="w-2.5 h-2.5 rounded-full bg-teal-500"></div> Repair</div>
-                <div className="flex items-center gap-1.5 text-rose-400"><div className="w-2.5 h-2.5 rounded-full bg-rose-500"></div> Exp</div>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-3 border-b border-slate-800/80 pb-3">
+              <div>
+                <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
+                  Monthly Overview ({currentYear})
+                </h3>
+                <div className="flex items-center gap-2 mt-1 text-[10px] font-mono text-slate-400">
+                  <span>Sales: <strong className="text-sky-400 font-bold">Rs {yearSalesTotal >= 1000 ? (yearSalesTotal/1000).toFixed(1)+'k' : yearSalesTotal}</strong></span>
+                  <span>•</span>
+                  <span>Bills: <strong className="text-amber-400 font-bold">{yearBillsTotal}</strong></span>
+                  <span>•</span>
+                  <span>Net: <strong className="text-emerald-400 font-bold">Rs {yearNetIncomeTotal >= 1000 ? (yearNetIncomeTotal/1000).toFixed(1)+'k' : yearNetIncomeTotal}</strong></span>
+                </div>
+              </div>
+
+              {/* Legends */}
+              <div className="flex flex-wrap items-center gap-2.5 text-[10px] font-black uppercase font-mono">
+                <div className="flex items-center gap-1 text-sky-400"><div className="w-2 h-2 rounded-full bg-sky-400"></div> Sales</div>
+                <div className="flex items-center gap-1 text-blue-400"><div className="w-2 h-2 rounded-full bg-blue-500"></div> POS</div>
+                <div className="flex items-center gap-1 text-teal-400"><div className="w-2 h-2 rounded-full bg-teal-500"></div> Repair</div>
+                <div className="flex items-center gap-1 text-rose-400"><div className="w-2 h-2 rounded-full bg-rose-500"></div> Exp</div>
+                <div className="flex items-center gap-1 text-amber-400"><div className="w-3 h-0.5 bg-amber-400"></div> Bills</div>
               </div>
             </div>
+
             <div className="flex-1 w-full min-h-[250px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={combinedMonthlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <ComposedChart data={combinedMonthlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <XAxis dataKey="month" stroke="#64748b" fontSize={10} tickMargin={8} axisLine={false} tickLine={false} />
-                  <YAxis stroke="#64748b" fontSize={10} tickFormatter={(val) => `Rs ${val >= 1000 ? (val/1000).toFixed(0)+'k' : val}`} axisLine={false} tickLine={false} />
+                  <YAxis yAxisId="left" stroke="#64748b" fontSize={10} tickFormatter={(val) => `Rs ${val >= 1000 ? (val/1000).toFixed(0)+'k' : val}`} axisLine={false} tickLine={false} />
+                  <YAxis yAxisId="right" orientation="right" stroke="#f59e0b" fontSize={10} tickFormatter={(val) => `${val}`} axisLine={false} tickLine={false} width={24} />
                   <Tooltip cursor={{fill: '#0f172a', opacity: 0.6}} content={<CustomTooltip />} />
-                  <Bar dataKey="posIncome" name="POS Income" fill="#3b82f6" radius={[2, 2, 0, 0]} stackId="a" />
-                  <Bar dataKey="repairProfit" name="Repair Profit" fill="#14b8a6" radius={[2, 2, 0, 0]} stackId="a" />
-                  <Bar dataKey="expenses" name="Expenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                </BarChart>
+                  <Bar yAxisId="left" dataKey="sales" name="Sales" fill="#38bdf8" fillOpacity={0.85} radius={[3, 3, 0, 0]} maxBarSize={14} />
+                  <Bar yAxisId="left" dataKey="posIncome" name="POS Income" fill="#3b82f6" radius={[2, 2, 0, 0]} stackId="a" maxBarSize={14} />
+                  <Bar yAxisId="left" dataKey="repairProfit" name="Repair Profit" fill="#14b8a6" radius={[2, 2, 0, 0]} stackId="a" maxBarSize={14} />
+                  <Bar yAxisId="left" dataKey="expenses" name="Expenses" fill="#ef4444" radius={[3, 3, 0, 0]} maxBarSize={14} />
+                  <Line yAxisId="right" type="monotone" dataKey="bills" name="Bills Count" stroke="#f59e0b" strokeWidth={2.5} dot={{ r: 3, fill: '#f59e0b', stroke: '#071326', strokeWidth: 1.5 }} />
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
           </motion.div>
 
         </div>
 
-        {/* ROW 5: CATEGORY BREAKDOWN COMPARISON & REVENUE DONUT */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          
-          {/* Income Breakdown Comparison (lg:col-span-8) */}
-          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.3 }} className="lg:col-span-8 bg-[#071326] border border-slate-800/80 rounded-2xl p-5 shadow-xl flex flex-col hover:border-slate-700/80 transition-all">
+        {/* ROW 5: CATEGORY BREAKDOWN COMPARISON (FULL WIDTH) */}
+        <div className="w-full mb-4">
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.3 }} className="w-full bg-[#071326] border border-slate-800/80 rounded-2xl p-5 shadow-xl flex flex-col hover:border-slate-700/80 transition-all">
             <div className="flex justify-between items-center mb-4 border-b border-slate-800/80 pb-3">
               <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest flex items-center gap-2">
                 <PieChartIcon className="w-4 h-4 text-indigo-400" /> Income Breakdown Comparison
@@ -1566,74 +1671,6 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
               </table>
             </div>
           </motion.div>
-
-          {/* Revenue by Category Donut (lg:col-span-4) */}
-          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.3, delay: 0.1 }} className="lg:col-span-4 bg-[#071326] border border-slate-800/80 rounded-2xl p-5 shadow-xl flex flex-col justify-between hover:border-slate-700/80 transition-all">
-            <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest mb-2 flex items-center justify-between border-b border-slate-800/80 pb-3">
-              <span className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-indigo-400"></span>
-                Revenue By Category
-              </span>
-              <PieChartIcon className="w-4 h-4 text-indigo-400" />
-            </h3>
-            
-            <div className="h-[210px] w-full relative">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={donutChartData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={55}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
-                    stroke="none"
-                  >
-                    {donutChartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS_EXTENDED[index % COLORS_EXTENDED.length]} />
-                    ))}
-                    <Label 
-                      value={`Rs ${monthSalesTotal >= 1000 ? (monthSalesTotal/1000).toFixed(1)+'k' : monthSalesTotal}`} 
-                      position="center" 
-                      fill="#f1f5f9" 
-                      fontSize={15} 
-                      fontWeight="black" 
-                    />
-                  </Pie>
-                  <Tooltip 
-                    content={({active, payload}) => {
-                      if (active && payload && payload.length) {
-                        return (
-                          <div className="bg-[#0b182f] border border-slate-700/80 p-3 rounded-xl shadow-xl font-mono">
-                            <p className="text-slate-300 text-xs font-semibold mb-1 font-sans">{payload[0].name}</p>
-                            <p className="font-black text-sm" style={{ color: payload[0].payload.fill }}>
-                              Rs {payload[0].value.toFixed(0)}
-                            </p>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Custom Legend */}
-            <div className="space-y-1.5 max-h-36 overflow-y-auto no-scrollbar bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/60 mt-2">
-               {donutChartData.map((entry, idx) => (
-                 <div key={idx} className="flex items-center justify-between gap-2 text-[10px]">
-                   <div className="flex items-center gap-2 min-w-0">
-                     <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: COLORS_EXTENDED[idx % COLORS_EXTENDED.length] }}></div>
-                     <span className="text-slate-300 truncate">{entry.name}</span>
-                   </div>
-                   <span className="font-mono font-bold text-white shrink-0">Rs {entry.value.toFixed(0)}</span>
-                 </div>
-               ))}
-            </div>
-          </motion.div>
-
         </div>
 
       </div> {/* Scrollable container end */}

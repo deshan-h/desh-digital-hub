@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { settingsService } from '../../services/supabaseService';
 import { supabase } from '../../config/supabase';
 import { uploadToCloudflare } from '../../services/cloudflareStorage';
@@ -31,7 +32,9 @@ import {
   ArrowRight,
   RotateCcw,
   Layers,
-  Palette
+  Palette,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 import Loader from '../../components/Loader';
 
@@ -80,6 +83,7 @@ export default function Settings({ isAdmin }) {
     linkText: 'View Details',
     active: true
   });
+  const [isNewBannerOpen, setIsNewBannerOpen] = useState(false);
   const [editingBanner, setEditingBanner] = useState(null);
   const [editUploading, setEditUploading] = useState(false);
   const [editImageInputMode, setEditImageInputMode] = useState('file');
@@ -180,6 +184,7 @@ export default function Settings({ isAdmin }) {
   });
 
   // Edit Service Modal State
+  const [isNewServiceOpen, setIsNewServiceOpen] = useState(false);
   const [editingService, setEditingService] = useState(null);
   const [editServiceImageMode, setEditServiceImageMode] = useState('file');
   const [editServiceUploading, setEditServiceUploading] = useState(false);
@@ -316,6 +321,7 @@ export default function Settings({ isAdmin }) {
         linkText: 'View Details',
         active: true
       });
+      setIsNewBannerOpen(false);
       notify.success('Banner added and published successfully!');
     }
   };
@@ -501,6 +507,7 @@ export default function Settings({ isAdmin }) {
       });
       setNewSubInput('');
       setServiceAiPrompt('');
+      setIsNewServiceOpen(false);
       notify.success('✨ New service category added and published!');
     }
   };
@@ -753,16 +760,50 @@ export default function Settings({ isAdmin }) {
         {activeTab === 'ad-posts' && (
           <div className="space-y-6 animate-in fade-in duration-200">
             
-            {/* Add New Flyer Card */}
-            <div className="bg-[#071326] border border-amber-500/30 rounded-2xl p-5 sm:p-6 shadow-xl space-y-5">
-              <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-amber-400" />
-                  <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-200">
-                    Add New Promotional Web Banner / Flyer
-                  </h3>
+            {/* Add New Flyer Card (Collapsible) */}
+            {!isNewBannerOpen ? (
+              <div className="bg-[#071326] border border-amber-500/30 hover:border-amber-500/50 rounded-2xl p-4 sm:p-5 shadow-xl flex items-center justify-between gap-4 transition-all">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                    <Sparkles className="w-5 h-5 text-amber-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-200 truncate flex items-center gap-2">
+                      <span>Add New Promotional Web Banner / Flyer</span>
+                    </h3>
+                    <p className="text-[11px] text-slate-400 hidden sm:block truncate">
+                      Create homepage slideshow banners, marketing flyers, and discount announcements
+                    </p>
+                  </div>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsNewBannerOpen(true)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl font-black text-xs bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 transition-all shadow-md shadow-amber-500/20 cursor-pointer shrink-0"
+                >
+                  <Plus className="w-4 h-4 text-slate-950 stroke-[3]" />
+                  <span>+ New Banner</span>
+                </button>
               </div>
+            ) : (
+              <div className="bg-[#071326] border border-amber-500/30 rounded-2xl p-5 sm:p-6 shadow-xl space-y-5 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-amber-400" />
+                    <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-200">
+                      Add New Promotional Web Banner / Flyer
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsNewBannerOpen(false)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    <ChevronUp className="w-3.5 h-3.5" />
+                    <span>Collapse</span>
+                  </button>
+                </div>
 
               {/* Input Controls */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -943,6 +984,7 @@ export default function Settings({ isAdmin }) {
 
               </div>
             </div>
+            )}
 
             {/* Current Active Banners List */}
             <div className="space-y-3">
@@ -1082,8 +1124,8 @@ export default function Settings({ isAdmin }) {
             </div>
 
             {/* Edit Banner Modal */}
-            {editingBanner && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
+            {editingBanner && createPortal(
+              <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
                 <div className="bg-[#071326] border border-sky-500/30 rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-[0_0_50px_rgba(14,165,233,0.15)] overflow-hidden slide-in-from-bottom-6">
                   {/* Modal Header */}
                   <div className="px-6 py-4 border-b border-sky-500/20 bg-gradient-to-r from-[#0a1e38] via-[#09182d] to-[#071326] flex justify-between items-center shrink-0">
@@ -1105,8 +1147,9 @@ export default function Settings({ isAdmin }) {
                     </button>
                   </div>
 
-                  {/* Modal Body */}
-                  <form onSubmit={handleSaveEditedBanner} className="p-6 overflow-y-auto space-y-4 custom-scrollbar text-xs">
+                  {/* Modal Form */}
+                  <form onSubmit={handleSaveEditedBanner} className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs">
+                    <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
                     {/* Image Upload / URL */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
@@ -1301,8 +1344,10 @@ export default function Settings({ isAdmin }) {
                       </div>
                     </div>
 
-                    {/* Modal Actions */}
-                    <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-800">
+                    </div>
+
+                    {/* Modal Fixed Footer Actions */}
+                    <div className="shrink-0 px-6 py-4 border-t border-slate-800 bg-[#071326] flex items-center justify-end gap-2.5">
                       <button
                         type="button"
                         onClick={() => setEditingBanner(null)}
@@ -1320,17 +1365,18 @@ export default function Settings({ isAdmin }) {
                     </div>
                   </form>
                 </div>
-              </div>
+              </div>,
+              document.body
             )}
 
             {/* ======================================================== */}
             {/* CLOUDFLARE WORKERS AI COPYWRITER MODAL                   */}
             {/* ======================================================== */}
-            {isAiModalOpen && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
-                <div className="bg-[#0b182f] border border-sky-500/30 rounded-2xl w-full max-w-xl max-h-[92vh] overflow-y-auto custom-scrollbar shadow-2xl p-5 sm:p-6 space-y-5">
+            {isAiModalOpen && createPortal(
+              <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
+                <div className="bg-[#0b182f] border border-sky-500/30 rounded-2xl w-full max-w-xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
                   {/* Header */}
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div className="px-5 sm:px-6 py-4 border-b border-slate-800 shrink-0 flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
                       <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-md shadow-sky-500/20">
                         <Sparkles className="w-4 h-4 text-white" />
@@ -1355,6 +1401,8 @@ export default function Settings({ isAdmin }) {
                       <X className="w-4 h-4" />
                     </button>
                   </div>
+
+                  <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 custom-scrollbar">
 
                   {/* Target indicator */}
                   <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-950/70 border border-slate-800 text-[11px]">
@@ -1536,8 +1584,10 @@ export default function Settings({ isAdmin }) {
                     </div>
                   )}
 
+                  </div>
+
                   {/* Footer */}
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-[11px] text-slate-500">
+                  <div className="shrink-0 flex items-center justify-between px-5 sm:px-6 py-3 border-t border-slate-800 text-[11px] text-slate-500 bg-[#0b182f]">
                     <span>Runs on Cloudflare Free Tier (10,000 free neurons/day)</span>
                     <button
                       type="button"
@@ -1548,7 +1598,8 @@ export default function Settings({ isAdmin }) {
                     </button>
                   </div>
                 </div>
-              </div>
+              </div>,
+              document.body
             )}
 
           </div>
@@ -1560,19 +1611,60 @@ export default function Settings({ isAdmin }) {
         {activeTab === 'services' && (
           <div className="space-y-6 animate-in fade-in duration-200">
             
-            {/* Add New Service Category Card */}
-            <div className="bg-[#071326] border border-sky-500/30 rounded-2xl p-5 sm:p-6 shadow-xl space-y-5">
-              <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-sky-400" />
-                  <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-200">
-                    Add New Public Service Category • නව සේවා ප්‍රවර්ගයක් එක්කිරීම
-                  </h3>
+            {/* Add New Service Category Card (Collapsible) */}
+            {!isNewServiceOpen ? (
+              <div className="bg-[#071326] border border-sky-500/30 hover:border-sky-500/50 rounded-2xl p-4 sm:p-5 shadow-xl flex items-center justify-between gap-4 transition-all">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400 shrink-0">
+                    <Sparkles className="w-5 h-5 text-sky-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-200 truncate flex items-center gap-2">
+                      <span>Add New Public Service Category • නව සේවා ප්‍රවර්ගයක් එක්කිරීම</span>
+                    </h3>
+                    <p className="text-[11px] text-slate-400 hidden sm:block truncate">
+                      Add services showcase category with Sinhala translation, icons & interactive sub-services
+                    </p>
+                  </div>
                 </div>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-sky-500/10 text-sky-300 border border-sky-500/30">
-                  {servicesList.length} Active Categories
-                </span>
+
+                <div className="flex items-center gap-2.5 shrink-0">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-sky-500/10 text-sky-300 border border-sky-500/30 hidden md:inline-block">
+                    {servicesList.length} Active
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsNewServiceOpen(true)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl font-black text-xs bg-gradient-to-r from-sky-500 via-teal-500 to-emerald-400 hover:from-sky-400 hover:to-emerald-300 text-slate-950 transition-all shadow-md shadow-sky-500/20 cursor-pointer shrink-0"
+                  >
+                    <Plus className="w-4 h-4 text-slate-950 stroke-[3]" />
+                    <span>+ New Category</span>
+                  </button>
+                </div>
               </div>
+            ) : (
+              <div className="bg-[#071326] border border-sky-500/30 rounded-2xl p-5 sm:p-6 shadow-xl space-y-5 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-sky-400" />
+                    <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-200">
+                      Add New Public Service Category • නව සේවා ප්‍රවර්ගයක් එක්කිරීම
+                    </h3>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-sky-500/10 text-sky-300 border border-sky-500/30 hidden sm:inline-block">
+                      {servicesList.length} Active Categories
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsNewServiceOpen(false)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-colors cursor-pointer"
+                    >
+                      <ChevronUp className="w-3.5 h-3.5" />
+                      <span>Collapse</span>
+                    </button>
+                  </div>
+                </div>
 
               <form onSubmit={handleAddServiceCategory} className="space-y-5">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -1875,6 +1967,7 @@ export default function Settings({ isAdmin }) {
                 </button>
               </form>
             </div>
+            )}
 
             {/* Active Service Categories Grid */}
             <div className="bg-[#071326] border border-slate-800/80 rounded-2xl p-5 sm:p-6 shadow-xl space-y-4">
@@ -2034,15 +2127,21 @@ export default function Settings({ isAdmin }) {
             {/* ======================================================== */}
             {/* EDIT SERVICE CATEGORY MODAL                              */}
             {/* ======================================================== */}
-            {editingService && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
-                <div className="bg-[#0b182f] border border-sky-500/30 rounded-2xl w-full max-w-2xl max-h-[92vh] overflow-y-auto custom-scrollbar shadow-2xl p-5 sm:p-6 space-y-4">
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                    <div className="flex items-center gap-2">
-                      <Edit className="w-4 h-4 text-sky-400" />
-                      <h3 className="text-sm font-black text-white uppercase tracking-wider">
-                        Edit Service Category • {editingService.title}
-                      </h3>
+            {editingService && createPortal(
+              <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
+                <div className="bg-[#071326] border border-sky-500/30 rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-[0_0_50px_rgba(14,165,233,0.15)] overflow-hidden slide-in-from-bottom-6">
+                  {/* Modal Header */}
+                  <div className="px-6 py-4 border-b border-sky-500/20 bg-gradient-to-r from-[#0a1e38] via-[#09182d] to-[#071326] flex justify-between items-center shrink-0">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-sky-500/20 border border-sky-400/40 flex items-center justify-center text-sky-400">
+                        <Edit className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-bold text-white uppercase tracking-wider">
+                          Edit Service Category • {editingService.title}
+                        </h3>
+                        <p className="text-xs text-slate-400">Update category details, Sinhala translation, icon and sub-services</p>
+                      </div>
                     </div>
                     <button
                       type="button"
@@ -2053,7 +2152,8 @@ export default function Settings({ isAdmin }) {
                     </button>
                   </div>
 
-                  <form onSubmit={handleUpdateEditingService} className="space-y-4">
+                  <form onSubmit={handleUpdateEditingService} className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs">
+                    <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4 custom-scrollbar">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
@@ -2324,7 +2424,10 @@ export default function Settings({ isAdmin }) {
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-800">
+                    </div>
+
+                    {/* Modal Fixed Footer */}
+                    <div className="shrink-0 px-6 py-4 border-t border-slate-800 bg-[#071326] flex items-center justify-end gap-2.5">
                       <button
                         type="button"
                         onClick={() => setEditingService(null)}
@@ -2342,7 +2445,8 @@ export default function Settings({ isAdmin }) {
                     </div>
                   </form>
                 </div>
-              </div>
+              </div>,
+              document.body
             )}
 
           </div>
