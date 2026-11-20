@@ -307,6 +307,7 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
     .map(name => ({ name, qty: itemCounts[name] }))
     .sort((a, b) => b.qty - a.qty)
     .slice(0, 5);
+  const totalFastMovingQty = fastMovingItems.reduce((sum, item) => sum + item.qty, 0);
 
   // -- REPAIR METRICS --
   const activeRepairs = repairs.filter(r => r.status === 'Pending' || r.status === 'In Progress');
@@ -380,7 +381,7 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
   else chartDays = thisMonthDays;
 
   const salesIncomeMap = {};
-  chartDays.forEach(d => salesIncomeMap[d] = { sales: 0, income: 0, expenses: 0 });
+  chartDays.forEach(d => salesIncomeMap[d] = { sales: 0, income: 0, expenses: 0, billCount: 0 });
 
   let sourceDataForChart = [];
   if (revenueTimeFilter === 'week') sourceDataForChart = weekSales;
@@ -399,6 +400,7 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
       if (salesIncomeMap[dateStr] !== undefined) {
         salesIncomeMap[dateStr].sales += Number(sale.amount || 0);
         salesIncomeMap[dateStr].income += getSaleIncome(sale);
+        salesIncomeMap[dateStr].billCount += 1;
       }
     }
   });
@@ -413,22 +415,29 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
     }
   });
 
+  const todayDateStr = today.toLocaleDateString('en-US', { month: 'short', day: '2-digit' });
   const salesIncomeChartData = chartDays.map(date => ({
     date: date.split(' ')[1], // show day number on x-axis
     fullDate: date,
     sales: salesIncomeMap[date].sales,
     income: salesIncomeMap[date].income,
-    expenses: salesIncomeMap[date].expenses
+    expenses: salesIncomeMap[date].expenses,
+    billCount: salesIncomeMap[date].billCount,
+    isToday: date === todayDateStr
   }));
 
-  // -- CHART: This Month's Revenue by Hour --
+  const totalBillsInPeriod = salesIncomeChartData.reduce((sum, d) => sum + d.billCount, 0);
+  const avgBillsPerDay = chartDays.length > 0 ? (totalBillsInPeriod / chartDays.length).toFixed(1) : '0';
+  const peakBillsDay = salesIncomeChartData.reduce((max, d) => d.billCount > max.billCount ? d : max, { billCount: 0, date: '-' });
+
+  // -- CHART: This Month's Revenue & Orders by Hour (Peak Hours Heatmap) --
   const monthHoursMap = {};
   for (let i = 8; i <= 20; i += 2) {
     const period = i >= 12 ? 'PM' : 'AM';
     const hour = i > 12 ? i - 12 : i;
-    monthHoursMap[`${hour}:00 ${period}`] = 0;
+    monthHoursMap[`${hour}:00 ${period}`] = { time: `${hour}:00 ${period}`, revenue: 0, orders: 0 };
   }
-  monthHoursMap['Later'] = 0;
+  monthHoursMap['Later'] = { time: 'Later', revenue: 0, orders: 0 };
 
   monthSales.forEach(sale => {
     if (sale.timestamp) {
@@ -444,16 +453,18 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
       else if (h >= 18 && h < 20) timeKey = '6:00 PM';
       else if (h >= 20 && h < 22) timeKey = '8:00 PM';
 
-      if (monthHoursMap[timeKey] !== undefined) {
-        monthHoursMap[timeKey] += Number(sale.amount || 0);
+      if (monthHoursMap[timeKey]) {
+        monthHoursMap[timeKey].revenue += Number(sale.amount || 0);
+        monthHoursMap[timeKey].orders += 1;
       }
     }
   });
 
-  const monthHoursData = Object.keys(monthHoursMap).map(time => ({
-    time,
-    revenue: monthHoursMap[time]
-  })).filter(d => d.time !== 'Later' || d.revenue > 0);
+  const monthHoursData = Object.values(monthHoursMap).filter(d => d.time !== 'Later' || d.revenue > 0);
+  const peakHourData = monthHoursData.length > 0 
+    ? monthHoursData.reduce((prev, curr) => curr.revenue > prev.revenue ? curr : prev, monthHoursData[0])
+    : null;
+  const maxHourRevenue = monthHoursData.reduce((max, h) => Math.max(max, h.revenue), 1);
 
   // -- Prepare Category Mapping --
   const itemToCategory = {};
@@ -773,17 +784,29 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       const isDate = payload[0].payload.fullDate;
+      const dataObj = payload[0].payload;
       return (
-        <div className="bg-[#0b182f]/95 backdrop-blur-md border border-slate-700/80 p-3 rounded-xl shadow-xl min-w-[130px]">
-          <p className="text-slate-300 text-xs font-bold mb-2 border-b border-slate-700/60 pb-1">{isDate || label}</p>
-          {payload.map((entry, index) => (
-            <div key={index} className="flex justify-between gap-4 mb-1">
-              <span className="text-slate-400 text-[11px] uppercase font-bold">{entry.name || 'Value'}:</span>
-              <span className="font-black text-[11px] font-mono" style={{ color: entry.color }}>
-                {entry.name === 'Orders' ? entry.value : `Rs ${entry.value?.toFixed(2) || '0.00'}`}
+        <div className="bg-[#0b182f] border border-slate-700/80 p-3 rounded-xl shadow-2xl min-w-[150px]">
+          <p className="text-slate-200 text-xs font-black mb-2 border-b border-slate-800 pb-1.5 flex items-center justify-between">
+            <span>{isDate || label}</span>
+            {dataObj.billCount !== undefined && (
+              <span className="text-[10px] text-cyan-400 font-mono font-bold">
+                {dataObj.billCount} {dataObj.billCount === 1 ? 'Bill' : 'Bills'}
               </span>
-            </div>
-          ))}
+            )}
+          </p>
+          <div className="space-y-1">
+            {payload.map((entry, index) => (
+              <div key={index} className="flex justify-between items-center gap-4 text-xs">
+                <span className="text-slate-400 font-medium">{entry.name}:</span>
+                <span className="font-black font-mono" style={{ color: entry.color }}>
+                  {entry.name?.includes('Order') || entry.name?.includes('Count') || entry.name?.includes('Bill') 
+                    ? entry.value 
+                    : `Rs ${Number(entry.value || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       );
     }
@@ -1042,637 +1065,576 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
 
         </div>
 
-        {/* FULL WIDTH: SALES VS INCOME COMPOSED CHART */}
-        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.4, delay: 0.1 }} className="bg-[#071326] border border-slate-800/80 rounded-2xl p-5 shadow-xl flex flex-col h-[390px] mb-4 hover:border-slate-700/80 transition-all">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
-            <div className="flex flex-col gap-2">
-              <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
-                <span>Sales vs Income</span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20">
-                  {revenueTimeFilter === 'week' ? 'This Week' : revenueTimeFilter === 'lastMonth' ? 'Last Month' : 'This Month'}
-                </span>
-              </h3>
-              <div className="flex bg-slate-950 p-0.5 rounded-xl border border-slate-800 w-fit">
-                <button 
-                  onClick={() => setRevenueTimeFilter('week')}
-                  className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer ${revenueTimeFilter === 'week' ? 'bg-sky-500 text-slate-950 font-black shadow-sm' : 'text-slate-400 hover:text-white'}`}
-                >
-                  This Week
-                </button>
-                <button 
-                  onClick={() => setRevenueTimeFilter('month')}
-                  className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer ${revenueTimeFilter === 'month' ? 'bg-sky-500 text-slate-950 font-black shadow-sm' : 'text-slate-400 hover:text-white'}`}
-                >
-                  This Month
-                </button>
-                <button 
-                  onClick={() => setRevenueTimeFilter('lastMonth')}
-                  className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer ${revenueTimeFilter === 'lastMonth' ? 'bg-sky-500 text-slate-950 font-black shadow-sm' : 'text-slate-400 hover:text-white'}`}
-                >
-                  Last Month
-                </button>
+        {/* ROW: SALES VS INCOME (LEFT) & DAILY BILL COUNT (RIGHT) */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
+          
+          {/* Sales vs Income Composed Chart (lg:col-span-8) */}
+          <motion.div initial={{ opacity: 0, y: 15 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.3 }} className="lg:col-span-8 bg-[#071326] border border-slate-800/80 rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col h-[390px] hover:border-slate-700/80 transition-all">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-cyan-400"></div>
+                  <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-wider">
+                    Sales vs Income Analysis
+                  </h3>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 font-bold">
+                    {revenueTimeFilter === 'week' ? 'This Week' : revenueTimeFilter === 'lastMonth' ? 'Last Month' : 'This Month'}
+                  </span>
+                </div>
+
+                {/* Week / Month / Last Month toggle */}
+                <div className="flex bg-slate-950 p-0.5 rounded-xl border border-slate-800 w-fit">
+                  <button 
+                    onClick={() => setRevenueTimeFilter('week')}
+                    className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer ${revenueTimeFilter === 'week' ? 'bg-sky-500 text-slate-950 font-black shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                  >
+                    Week
+                  </button>
+                  <button 
+                    onClick={() => setRevenueTimeFilter('month')}
+                    className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer ${revenueTimeFilter === 'month' ? 'bg-sky-500 text-slate-950 font-black shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                  >
+                    This Month
+                  </button>
+                  <button 
+                    onClick={() => setRevenueTimeFilter('lastMonth')}
+                    className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer ${revenueTimeFilter === 'lastMonth' ? 'bg-sky-500 text-slate-950 font-black shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                  >
+                    Last Month
+                  </button>
+                </div>
+              </div>
+
+              {/* Legends & Financial Totals */}
+              <div className="flex flex-wrap gap-2 sm:gap-3.5 bg-slate-950/80 p-2 sm:p-2.5 rounded-xl border border-slate-800/80 text-[10px] font-mono font-bold">
+                <div className="flex items-center gap-1.5 text-sky-400">
+                  <div className="w-2.5 h-2.5 rounded-sm bg-sky-400"></div>
+                  <span>Sales: Rs {(revenueTimeFilter === 'week' ? weekSalesTotal : revenueTimeFilter === 'lastMonth' ? lastMonthSalesTotal : monthSalesTotal).toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-emerald-400 border-l border-slate-800 pl-2 sm:pl-3.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-400"></div>
+                  <span>Income: Rs {(revenueTimeFilter === 'week' ? weekIncomeTotal : revenueTimeFilter === 'lastMonth' ? lastMonthIncomeTotal : monthIncomeTotal).toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-rose-400 border-l border-slate-800 pl-2 sm:pl-3.5">
+                  <div className="w-2.5 h-1 border-t-2 border-dashed border-rose-400"></div>
+                  <span>Exp: Rs {(revenueTimeFilter === 'week' ? weekExpensesTotal : revenueTimeFilter === 'lastMonth' ? lastMonthExpensesTotal : monthExpensesTotal).toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
+                </div>
               </div>
             </div>
-            <div className="flex gap-4 md:gap-6 bg-slate-950/70 p-2.5 rounded-xl border border-slate-800/80">
+
+            {/* Clear, Unified Composed Chart */}
+            <div className="flex-1 min-h-0 w-full mt-1">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={salesIncomeChartData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorSalesClear" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.85}/>
+                      <stop offset="95%" stopColor="#0284c7" stopOpacity={0.25}/>
+                    </linearGradient>
+                    <linearGradient id="colorIncomeAreaClear" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.0}/>
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="date" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(val) => `Rs ${val >= 1000 ? (val/1000).toFixed(0)+'k' : val}`} />
+                  <Tooltip content={<CustomTooltip />} cursor={{ fill: '#0f172a', opacity: 0.5 }} />
+                  {/* Sales Bar */}
+                  <Bar dataKey="sales" name="Sales" fill="url(#colorSalesClear)" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                  {/* Income Area & Line on the exact same scale */}
+                  <Area type="monotone" dataKey="income" name="Net Income" fill="url(#colorIncomeAreaClear)" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3, fill: '#10b981', strokeWidth: 1.5, stroke: '#071326' }} activeDot={{ r: 5 }} />
+                  {/* Expenses Dashed Line */}
+                  <Line type="monotone" dataKey="expenses" name="Expenses" stroke="#f43f5e" strokeWidth={2} strokeDasharray="4 4" dot={false} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          </motion.div>
+
+          {/* Right: Daily Bill Count Chart (lg:col-span-4) */}
+          <motion.div initial={{ opacity: 0, y: 15 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.3, delay: 0.1 }} className="lg:col-span-4 bg-[#071326] border border-slate-800/80 rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col h-[390px] hover:border-slate-700/80 transition-all">
+            <div className="flex items-center justify-between mb-3 border-b border-slate-800/80 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-cyan-500/10 rounded-xl border border-cyan-500/20 text-cyan-400">
+                  <ShoppingBag className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-wider">
+                    Daily Bill Count
+                  </h3>
+                  <p className="text-[10px] text-slate-400 font-medium">Daily transaction volume</p>
+                </div>
+              </div>
               <div className="text-right">
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Total Sales</p>
-                <p className="text-xs sm:text-sm font-black text-slate-200 font-mono">Rs {(revenueTimeFilter === 'week' ? weekSalesTotal : revenueTimeFilter === 'lastMonth' ? lastMonthSalesTotal : monthSalesTotal).toFixed(0)}</p>
-              </div>
-              <div className="text-right border-l border-slate-800 pl-4 md:pl-6">
-                <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">Total Income</p>
-                <p className="text-xs sm:text-sm font-black text-emerald-400 font-mono">Rs {(revenueTimeFilter === 'week' ? weekIncomeTotal : revenueTimeFilter === 'lastMonth' ? lastMonthIncomeTotal : monthIncomeTotal).toFixed(0)}</p>
-              </div>
-              <div className="text-right border-l border-slate-800 pl-4 md:pl-6">
-                <p className="text-[10px] text-rose-400 font-bold uppercase tracking-wider">Total Expenses</p>
-                <p className="text-xs sm:text-sm font-black text-rose-400 font-mono">Rs {(revenueTimeFilter === 'week' ? weekExpensesTotal : revenueTimeFilter === 'lastMonth' ? lastMonthExpensesTotal : monthExpensesTotal).toFixed(0)}</p>
+                <span className="text-[10px] font-bold text-slate-400 block uppercase">Total Bills</span>
+                <span className="text-sm font-black text-cyan-400 font-mono">{totalBillsInPeriod} Bills</span>
               </div>
             </div>
-          </div>
-          <div className="flex-1 min-h-0 w-full mt-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={salesIncomeChartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.9}/>
-                    <stop offset="95%" stopColor="#38bdf8" stopOpacity={0.15}/>
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="date" stroke="#475569" fontSize={10} tickLine={false} axisLine={false} />
-                <YAxis yAxisId="left" stroke="#475569" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(val) => `Rs ${val}`} />
-                <YAxis yAxisId="right" orientation="right" stroke="#475569" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(val) => `Rs ${val}`} />
-                <Tooltip content={<CustomTooltip />} cursor={{ fill: '#1e293b', opacity: 0.4 }} />
-                <Bar yAxisId="left" dataKey="sales" name="Sales" fill="url(#colorSales)" radius={[4, 4, 0, 0]} maxBarSize={45} />
-                <Line yAxisId="right" type="monotone" dataKey="income" name="Income" stroke="#10b981" strokeWidth={3} dot={{ r: 3, fill: '#10b981', strokeWidth: 2, stroke: '#020617' }} activeDot={{ r: 6, strokeWidth: 0 }} />
-                <Line yAxisId="left" type="monotone" dataKey="expenses" name="Expenses" stroke="#ef4444" strokeWidth={2} strokeDasharray="5 5" dot={false} />
-                <ReferenceLine y={1000} yAxisId="left" stroke="#f59e0b" strokeWidth={1} strokeDasharray="4 4" label={{ position: 'insideTopLeft', value: 'Daily Target (Rs 1,000)', fill: '#f59e0b', fontSize: 10, fontWeight: 'bold' }} />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.div>
 
-      {/* CHARTS */}
-      {/* ROW 3: Calendar, Top Customers, Fast Moving Items */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-        {/* Income Calendar */}
-        <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-5%" }} transition={{ duration: 0.5, delay: 0.1 }} className="bg-[#071326] border border-slate-800/80 rounded-2xl p-5 shadow-xl flex flex-col h-[380px] hover:border-slate-700/80 transition-all">
-          <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest mb-4 flex items-center justify-between">
-            <span className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              Income Calendar
-            </span>
-            <Clock className="w-4 h-4 text-emerald-400" />
-          </h3>
-          <div className="flex-1 overflow-hidden flex flex-col">
-            <div className="grid grid-cols-7 gap-1 mb-2">
-              {['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map(d => (
-                <div key={d} className="text-center text-[9px] font-black text-slate-500 uppercase tracking-widest">{d}</div>
-              ))}
+            {/* Daily Bars */}
+            <div className="flex-1 min-h-0 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={salesIncomeChartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorDailyBills" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.9}/>
+                      <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.25}/>
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="date" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} allowDecimals={false} />
+                  <Tooltip 
+                    cursor={{ fill: '#0f172a', opacity: 0.5 }}
+                    content={({ active, payload, label }) => {
+                      if (active && payload && payload.length) {
+                        const d = payload[0].payload;
+                        return (
+                          <div className="bg-[#0b182f] border border-slate-700/80 p-2.5 rounded-xl shadow-xl text-xs font-mono">
+                            <p className="text-slate-300 font-bold mb-1 font-sans">{d.fullDate}</p>
+                            <p className="text-cyan-400 font-black">{d.billCount} {d.billCount === 1 ? 'Bill' : 'Bills'}</p>
+                            <p className="text-[10px] text-emerald-400 font-bold mt-1 pt-1 border-t border-slate-800">
+                              Sales: Rs {Number(d.sales || 0).toLocaleString()}
+                            </p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar dataKey="billCount" name="Bills" radius={[4, 4, 0, 0]} maxBarSize={22}>
+                    {salesIncomeChartData.map((entry, index) => (
+                      <Cell 
+                        key={`cell-bill-${index}`} 
+                        fill={entry.isToday ? '#10b981' : 'url(#colorDailyBills)'} 
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             </div>
-            <div className="grid grid-cols-7 gap-1 flex-1">
-              {calendarDays.map((d, i) => {
-                if (!d.isCurrentMonth) {
-                  return <div key={i} className="rounded-lg bg-slate-950/30 border border-slate-800/40 opacity-25 flex flex-col items-center justify-start p-1"><span className="text-[10px] text-slate-500">{d.day}</span></div>;
-                }
-                const hasIncome = d.income > 0;
-                const hasExpense = d.expenses > 0;
-                const isHigh = d.income > 1000;
-                
-                let boxClass = 'bg-slate-950/50 border border-slate-800/60';
-                let textClass = 'text-slate-400';
-                
-                if (d.isToday) {
-                  boxClass = 'bg-sky-500/15 border border-sky-400/60 shadow-[0_0_12px_rgba(56,189,248,0.2)]';
-                  textClass = 'text-sky-300 font-bold';
-                } else if (isHigh) {
-                  boxClass = 'bg-amber-500/10 border border-amber-500/40';
-                  textClass = 'text-amber-400 font-bold';
-                } else if (hasIncome) {
-                  boxClass = 'bg-cyan-500/10 border border-cyan-500/30';
-                  textClass = 'text-cyan-300 font-bold';
-                }
 
-                return (
-                  <div key={i} className={`rounded-lg flex flex-col items-center justify-between p-1 transition-colors hover:bg-slate-800/60 ${boxClass}`}>
-                    <span className={`text-[10px] font-semibold ${d.isToday ? 'bg-sky-500/30 text-sky-200 px-1 rounded font-black' : 'text-slate-300'}`}>{d.day}</span>
-                    <div className="flex flex-col items-center justify-end w-full h-full gap-0.5 mt-1 pb-0.5 font-mono">
-                      {hasIncome && <span className={`text-[9px] leading-tight text-center ${textClass}`}>{d.income.toFixed(0)}</span>}
-                      {hasExpense && <span className="text-[8px] leading-tight text-center text-rose-400 font-bold">-{d.expenses.toFixed(0)}</span>}
+            {/* Quick Metrics Footer */}
+            <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-slate-800/80 text-[10px] font-mono">
+              <div className="bg-slate-950/70 p-2 rounded-xl border border-slate-800/60 flex items-center justify-between">
+                <span className="text-slate-400">Avg / Day:</span>
+                <span className="font-bold text-white">{avgBillsPerDay} Bills</span>
+              </div>
+              <div className="bg-slate-950/70 p-2 rounded-xl border border-slate-800/60 flex items-center justify-between">
+                <span className="text-slate-400">Peak Day:</span>
+                <span className="font-bold text-cyan-400">Day {peakBillsDay.date} ({peakBillsDay.billCount})</span>
+              </div>
+            </div>
+          </motion.div>
+
+        </div>
+
+        {/* ROW 3: TOP SPENDERS & FAST-MOVING ITEMS (PIE CHART) */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+          
+          {/* Top Spenders */}
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.3 }} className="bg-[#071326] border border-slate-800/80 rounded-2xl p-5 shadow-xl flex flex-col h-[360px] hover:border-slate-700/80 transition-all">
+            <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest mb-4 flex items-center justify-between border-b border-slate-800/80 pb-3">
+              <span className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                Top Spenders (This Month)
+              </span>
+              <Users className="w-4 h-4 text-emerald-400" />
+            </h3>
+            <div className="flex-1 overflow-y-auto pr-1 space-y-2 no-scrollbar">
+              {top5Customers.length === 0 ? (
+                <p className="text-slate-500 text-xs text-center mt-6">No customer data yet</p>
+              ) : (
+                top5Customers.map((cust, i) => (
+                  <div key={i} className="flex gap-3 items-center p-2.5 rounded-xl bg-slate-950/60 hover:bg-slate-800/40 transition-all border border-slate-800/80 hover:border-slate-700">
+                    <div className="w-8 h-8 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center font-black text-xs shrink-0 shadow-[0_0_10px_rgba(16,185,129,0.15)] font-mono">
+                      #{i + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-slate-200 truncate">{cust.name}</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1 font-mono">
+                        <ShoppingCart className="w-3 h-3 text-emerald-400/70" /> {cust.orderCount} Orders
+                      </p>
+                    </div>
+                    <div className="text-xs font-black text-emerald-400 whitespace-nowrap bg-emerald-500/10 px-2.5 py-1.5 rounded-lg border border-emerald-500/20 font-mono">
+                      Rs {cust.totalSpend.toFixed(0)}
                     </div>
                   </div>
-                );
-              })}
+                ))
+              )}
             </div>
-          </div>
-        </motion.div>
+          </motion.div>
 
-        {/* Premium Top 5 Customers */}
-        <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-5%" }} transition={{ duration: 0.5, delay: 0.2 }} className="bg-[#071326] border border-slate-800/80 rounded-2xl p-5 shadow-xl flex flex-col h-[380px] hover:border-slate-700/80 transition-all">
-          <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest mb-4 flex items-center justify-between">
-            <span className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-              Top Spenders
-            </span>
-            <Users className="w-4 h-4 text-emerald-400" />
-          </h3>
-          <div className="flex-1 overflow-y-auto pr-1 space-y-2 no-scrollbar">
-            {top5Customers.length === 0 ? (
-               <p className="text-slate-500 text-xs text-center mt-6">No customer data yet</p>
-            ) : (
-               top5Customers.map((cust, i) => (
-                 <div key={i} className="flex gap-3 items-center p-2.5 rounded-xl bg-slate-950/60 hover:bg-slate-800/40 transition-all border border-slate-800/80 hover:border-slate-700">
-                   <div className="w-8 h-8 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center font-black text-xs shrink-0 shadow-[0_0_10px_rgba(16,185,129,0.15)] font-mono">
-                     #{i + 1}
-                   </div>
-                   <div className="flex-1 min-w-0">
-                     <p className="text-sm font-bold text-slate-200 truncate">{cust.name}</p>
-                     <p className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
-                       <ShoppingCart className="w-3 h-3 text-emerald-400/70" /> {cust.orderCount} Orders
-                     </p>
-                   </div>
-                   <div className="text-xs font-black text-emerald-400 whitespace-nowrap bg-emerald-500/10 px-2.5 py-1.5 rounded-lg border border-emerald-500/20 font-mono">
-                     Rs {cust.totalSpend.toFixed(0)}
-                   </div>
-                 </div>
-               ))
-            )}
-          </div>
-        </motion.div>
+          {/* Fast-Moving Items (Pie / Donut Chart) */}
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.3, delay: 0.1 }} className="bg-[#071326] border border-slate-800/80 rounded-2xl p-5 shadow-xl flex flex-col h-[360px] hover:border-slate-700/80 transition-all">
+            <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest mb-2 flex items-center justify-between border-b border-slate-800/80 pb-3">
+              <span className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                Fast-Moving Items (Top Sold)
+              </span>
+              <Zap className="w-4 h-4 text-amber-400" />
+            </h3>
 
-        {/* Fast-Moving Items */}
-        <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-5%" }} transition={{ duration: 0.5, delay: 0.3 }} className="bg-[#071326] border border-slate-800/80 rounded-2xl p-5 shadow-xl flex flex-col h-[380px] hover:border-slate-700/80 transition-all">
-          <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest mb-4 flex items-center justify-between">
-            <span className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-              Fast-Moving Items
-            </span>
-            <Zap className="w-4 h-4 text-amber-400" />
-          </h3>
-          <div className="flex-1 overflow-y-auto pr-1 space-y-2 no-scrollbar">
             {fastMovingItems.length === 0 ? (
-               <p className="text-slate-500 text-xs text-center mt-6">No items sold yet</p>
+              <p className="text-slate-500 text-xs text-center mt-12">No sales logged for this month</p>
             ) : (
-               fastMovingItems.map((item, i) => (
-                 <div key={i} className="flex gap-3 items-center p-2.5 rounded-xl bg-slate-950/60 hover:bg-slate-800/40 transition-all border border-slate-800/80 hover:border-slate-700">
-                   <div className="w-8 h-8 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center font-black text-xs shrink-0 shadow-[0_0_10px_rgba(245,158,11,0.15)] font-mono">
-                     {item.qty}
-                   </div>
-                   <div className="flex-1 min-w-0">
-                     <p className="text-sm font-bold text-slate-200 truncate">{item.name}</p>
-                   </div>
-                   <div className="text-[10px] uppercase font-black text-amber-400 whitespace-nowrap bg-amber-500/10 px-2.5 py-1 rounded-md border border-amber-500/20">
-                     Top Sold
-                   </div>
-                 </div>
-               ))
-            )}
-          </div>
-        </motion.div>
-      </div>
+              <div className="flex-1 flex flex-col sm:flex-row items-center justify-between gap-4">
+                {/* Donut Chart */}
+                <div className="h-[180px] w-full sm:w-[48%] relative">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={fastMovingItems}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={48}
+                        outerRadius={72}
+                        paddingAngle={4}
+                        dataKey="qty"
+                        nameKey="name"
+                        stroke="none"
+                      >
+                        {fastMovingItems.map((entry, index) => (
+                          <Cell key={`cell-fast-${index}`} fill={COLORS_EXTENDED[index % COLORS_EXTENDED.length]} />
+                        ))}
+                        <Label 
+                          value={`${totalFastMovingQty} Sold`} 
+                          position="center" 
+                          fill="#f1f5f9" 
+                          fontSize={13} 
+                          fontWeight="black" 
+                        />
+                      </Pie>
+                      <Tooltip 
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0];
+                            const share = totalFastMovingQty > 0 ? ((data.value / totalFastMovingQty) * 100).toFixed(1) : 0;
+                            return (
+                              <div className="bg-[#0b182f] border border-slate-700/80 p-2.5 rounded-xl shadow-xl font-mono text-xs">
+                                <p className="text-slate-200 font-bold mb-1 font-sans">{data.name}</p>
+                                <p className="font-black" style={{ color: data.payload.fill }}>
+                                  {data.value} Units ({share}%)
+                                </p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
 
-      {/* WIDGET: MONTHLY ORDERS COUNTS */}
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: "-5%" }}
-        transition={{ duration: 0.5, delay: 0.1 }}
-        className="bg-[#071326] border border-slate-800/80 rounded-2xl p-6 shadow-xl mb-4 flex flex-col hover:border-slate-700/80 transition-all"
-      >
-        {/* Header with Title, Quick Stats, and View Mode Toggle */}
-        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-6 pb-4 border-b border-slate-800/80">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-cyan-500/10 rounded-xl border border-cyan-500/20 text-cyan-400">
-              <ShoppingBag className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-sm md:text-base font-bold text-slate-100 uppercase tracking-widest flex items-center gap-2">
-                Monthly Orders Counts
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono">
-                  {currentYear}
-                </span>
-              </h3>
-              <p className="text-xs text-slate-400 mt-0.5 font-medium">
-                Order volume & transaction counts across months
-              </p>
-            </div>
-          </div>
-
-          {/* Metric Badges & View Toggle */}
-          <div className="flex flex-wrap items-center gap-2.5 w-full xl:w-auto">
-            {/* This Month */}
-            <div className="bg-slate-950/80 border border-slate-800/80 rounded-xl px-3.5 py-2 shadow-inner flex items-center gap-2.5">
-              <div>
-                <span className="text-[9px] text-slate-400 font-black uppercase tracking-wider block">This Month</span>
-                <span className="text-base font-black text-cyan-400 font-mono">{thisMonthOrderCount} <span className="text-[11px] font-normal text-slate-500">orders</span></span>
+                {/* Legend List */}
+                <div className="w-full sm:w-[52%] space-y-1.5 max-h-[190px] overflow-y-auto no-scrollbar pr-1">
+                  {fastMovingItems.map((item, idx) => {
+                    const color = COLORS_EXTENDED[idx % COLORS_EXTENDED.length];
+                    const share = totalFastMovingQty > 0 ? ((item.qty / totalFastMovingQty) * 100).toFixed(0) : 0;
+                    return (
+                      <div key={idx} className="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-950/60 border border-slate-800/70 text-xs">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }}></div>
+                          <span className="text-slate-300 font-medium truncate">{item.name}</span>
+                        </div>
+                        <span className="font-black font-mono text-amber-400 shrink-0">
+                          {item.qty} <span className="text-[10px] text-slate-500 font-normal">({share}%)</span>
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-              {lastMonthOrderCount > 0 && (
-                <div className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${orderGrowth >= 0 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
-                  {orderGrowth >= 0 ? '+' : ''}{orderGrowth.toFixed(1)}%
+            )}
+          </motion.div>
+
+        </div>
+
+        {/* ROW 4: PEAK HOURS HEATMAP & MONTHLY FINANCIALS OVERVIEW */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+          
+          {/* Peak Hours Heatmap (Attractive Design) */}
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.3 }} className="bg-[#071326] border border-slate-800/80 rounded-2xl p-5 shadow-xl flex flex-col justify-between hover:border-slate-700/80 transition-all">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-3 border-b border-slate-800/80 pb-3">
+              <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+                Peak Hours Heatmap (This Month)
+              </h3>
+              {peakHourData && peakHourData.revenue > 0 && (
+                <div className="px-2.5 py-1 rounded-lg bg-rose-500/15 border border-rose-500/30 text-[10px] font-mono font-black text-rose-400 flex items-center gap-1.5 shadow-sm">
+                  <span>🔥 Rush Hour:</span>
+                  <span className="text-white">{peakHourData.time}</span>
+                  <span className="text-rose-300">(Rs {peakHourData.revenue.toLocaleString()})</span>
                 </div>
               )}
             </div>
 
-            {/* Last Month */}
-            <div className="bg-slate-950/80 border border-slate-800/80 rounded-xl px-3.5 py-2 shadow-inner">
-              <span className="text-[9px] text-slate-400 font-black uppercase tracking-wider block">Last Month</span>
-              <span className="text-base font-black text-slate-300 font-mono">{lastMonthOrderCount} <span className="text-[11px] font-normal text-slate-500">orders</span></span>
-            </div>
-
-            {/* Daily Average */}
-            <div className="bg-slate-950/80 border border-slate-800/80 rounded-xl px-3.5 py-2 shadow-inner">
-              <span className="text-[9px] text-slate-400 font-black uppercase tracking-wider block">Avg / Day</span>
-              <span className="text-base font-black text-emerald-400 font-mono">{avgOrdersPerDay} <span className="text-[11px] font-normal text-slate-500">/day</span></span>
-            </div>
-
-            {/* Year Total */}
-            <div className="bg-slate-950/80 border border-slate-800/80 rounded-xl px-3.5 py-2 shadow-inner">
-              <span className="text-[9px] text-slate-400 font-black uppercase tracking-wider block">Year Total</span>
-              <span className="text-base font-black text-purple-400 font-mono">{yearOrdersCount} <span className="text-[11px] font-normal text-slate-500">orders</span></span>
-            </div>
-
-            {/* Toggle Button */}
-            <div className="flex bg-slate-950 border border-slate-800/90 p-1 rounded-xl ml-auto xl:ml-0">
-              <button
-                type="button"
-                onClick={() => setOrdersViewMode('monthly')}
-                className={`px-3 py-1 text-[11px] font-bold uppercase tracking-wider rounded-lg transition-all ${ordersViewMode === 'monthly' ? 'bg-cyan-500 text-slate-950 shadow-md font-black' : 'text-slate-400 hover:text-white'}`}
-              >
-                Monthly
-              </button>
-              <button
-                type="button"
-                onClick={() => setOrdersViewMode('daily')}
-                className={`px-3 py-1 text-[11px] font-bold uppercase tracking-wider rounded-lg transition-all ${ordersViewMode === 'daily' ? 'bg-cyan-500 text-slate-950 shadow-md font-black' : 'text-slate-400 hover:text-white'}`}
-              >
-                Daily ({monthsList[currentMonth]})
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Chart View */}
-        <div className="h-[270px] w-full">
-          {ordersViewMode === 'monthly' ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthlyOrdersData} margin={{ top: 15, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorMonthlyOrders" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.9}/>
-                    <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.25}/>
-                  </linearGradient>
-                  <linearGradient id="colorActiveCurrentMonth" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.95}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.35}/>
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="month" stroke="#475569" fontSize={11} tickMargin={10} axisLine={false} tickLine={false} />
-                <YAxis stroke="#475569" fontSize={11} axisLine={false} tickLine={false} allowDecimals={false} />
-                <Tooltip 
-                  cursor={{ fill: '#0f172a', opacity: 0.6 }} 
-                  content={({ active, payload, label }) => {
-                    if (active && payload && payload.length) {
-                      const data = payload[0].payload;
-                      return (
-                        <div className="bg-[#0b182f] border border-slate-700/80 p-3.5 rounded-xl shadow-2xl min-w-[180px]">
-                          <p className="text-slate-100 font-bold mb-2 pb-1.5 border-b border-slate-800 flex items-center justify-between">
-                            <span>{label} {currentYear}</span>
-                            <span className="text-xs text-cyan-400 font-black font-mono">{data.orders} Orders</span>
-                          </p>
-                          <div className="space-y-1 text-xs">
-                            <div className="flex justify-between">
-                              <span className="text-slate-400">POS Sales:</span>
-                              <span className="text-white font-semibold font-mono">{data.posOrders}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-slate-400">Repairs:</span>
-                              <span className="text-teal-400 font-semibold font-mono">{data.repairOrders}</span>
-                            </div>
-                            <div className="flex justify-between pt-1 border-t border-slate-800">
-                              <span className="text-slate-400">Revenue:</span>
-                              <span className="text-emerald-400 font-bold font-mono">Rs {data.revenue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
-                            </div>
+            {/* Hourly Heatmap Bar Chart */}
+            <div className="h-[190px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthHoursData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorPeakHeat" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.95}/>
+                      <stop offset="95%" stopColor="#e11d48" stopOpacity={0.25}/>
+                    </linearGradient>
+                    <linearGradient id="colorRushBar" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#fb7185" stopOpacity={1}/>
+                      <stop offset="95%" stopColor="#be123c" stopOpacity={0.7}/>
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="time" stroke="#64748b" fontSize={10} tickMargin={8} axisLine={false} tickLine={false} />
+                  <YAxis stroke="#64748b" fontSize={10} tickFormatter={(val) => `Rs ${val >= 1000 ? (val/1000).toFixed(0)+'k' : val}`} axisLine={false} tickLine={false} />
+                  <Tooltip 
+                    cursor={{ fill: '#0f172a', opacity: 0.6 }} 
+                    content={({ active, payload, label }) => {
+                      if (active && payload && payload.length) {
+                        const d = payload[0].payload;
+                        return (
+                          <div className="bg-[#0b182f] border border-slate-700/80 p-2.5 rounded-xl shadow-xl font-mono text-xs">
+                            <p className="text-slate-300 font-bold mb-1 font-sans">{label}</p>
+                            <p className="text-rose-400 font-black">Revenue: Rs {d.revenue.toLocaleString()}</p>
+                            <p className="text-slate-400 font-semibold mt-0.5">Orders: {d.orders || 0}</p>
                           </div>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }} 
-                />
-                <Bar dataKey="orders" name="Orders Count" radius={[6, 6, 0, 0]} maxBarSize={45}>
-                  {monthlyOrdersData.map((entry, index) => (
-                    <Cell 
-                      key={`cell-${index}`} 
-                      fill={index === currentMonth ? 'url(#colorActiveCurrentMonth)' : 'url(#colorMonthlyOrders)'} 
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dailyOrdersData} margin={{ top: 15, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorDailyOrdersBar" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.9}/>
-                    <stop offset="95%" stopColor="#38bdf8" stopOpacity={0.25}/>
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="day" stroke="#475569" fontSize={10} tickMargin={10} axisLine={false} tickLine={false} />
-                <YAxis stroke="#475569" fontSize={10} axisLine={false} tickLine={false} allowDecimals={false} />
-                <Tooltip 
-                  cursor={{ fill: '#0f172a', opacity: 0.6 }} 
-                  content={({ active, payload, label }) => {
-                    if (active && payload && payload.length) {
-                      return (
-                        <div className="bg-[#0b182f] border border-slate-700/80 p-3 rounded-xl shadow-2xl text-xs">
-                          <p className="text-slate-300 font-semibold mb-1">Day {label} ({monthsList[currentMonth]})</p>
-                          <p className="text-cyan-400 font-black text-sm font-mono">{payload[0].value} Orders</p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }} 
-                />
-                <Bar dataKey="orders" name="Daily Orders" fill="url(#colorDailyOrdersBar)" radius={[4, 4, 0, 0]} maxBarSize={20}>
-                  {dailyOrdersData.map((entry, index) => (
-                    <Cell 
-                      key={`cell-day-${index}`} 
-                      fill={entry.day === today.getDate().toString() ? '#10b981' : 'url(#colorDailyOrdersBar)'} 
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-      </motion.div>
-
-      {/* ROW 4: Peak Hours Heatmap & Monthly Overview */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-        {/* Peak Hours (Bar Chart) */}
-        <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-5%" }} transition={{ duration: 0.5, delay: 0.1 }} className="bg-[#071326] border border-slate-800/80 rounded-2xl p-6 shadow-xl flex flex-col h-[360px] hover:border-slate-700/80 transition-all">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
-              Peak Hours Heatmap (This Month)
-            </h3>
-          </div>
-          <div className="flex-1 w-full mt-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthHoursData} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorPeak" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.9}/>
-                    <stop offset="95%" stopColor="#f43f5e" stopOpacity={0.3}/>
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="time" stroke="#475569" fontSize={10} tickMargin={10} axisLine={false} tickLine={false} />
-                <YAxis stroke="#475569" fontSize={10} tickFormatter={(val) => `Rs${val}`} axisLine={false} tickLine={false} />
-                <Tooltip cursor={{fill: '#0f172a', opacity: 0.6}} content={<CustomTooltip />} />
-                <Bar dataKey="revenue" name="Revenue" fill="url(#colorPeak)" radius={[4, 4, 0, 0]} maxBarSize={40}>
-                  {
-                    monthHoursData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={maxTodayData && entry.time === maxTodayData.time ? '#e11d48' : 'url(#colorPeak)'} />
-                    ))
-                  }
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.div>
-
-        {/* Combined Monthly Financials Chart */}
-        <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-5%" }} transition={{ duration: 0.5, delay: 0.2 }} className="bg-[#071326] border border-slate-800/80 rounded-2xl p-6 shadow-xl flex flex-col h-[360px] hover:border-slate-700/80 transition-all">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
-              Monthly Overview ({currentYear})
-            </h3>
-            <div className="flex gap-4 text-[10px] font-black uppercase font-mono">
-              <div className="flex items-center gap-1.5 text-blue-400"><div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div> POS</div>
-              <div className="flex items-center gap-1.5 text-teal-400"><div className="w-2.5 h-2.5 rounded-full bg-teal-500"></div> Repair</div>
-              <div className="flex items-center gap-1.5 text-rose-400"><div className="w-2.5 h-2.5 rounded-full bg-rose-500"></div> Exp</div>
-            </div>
-          </div>
-          <div className="flex-1 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={combinedMonthlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <XAxis dataKey="month" stroke="#475569" fontSize={10} tickMargin={10} axisLine={false} tickLine={false} />
-                <YAxis stroke="#475569" fontSize={10} tickFormatter={(val) => `Rs${val}`} axisLine={false} tickLine={false} />
-                <Tooltip cursor={{fill: '#0f172a', opacity: 0.6}} content={<CustomTooltip />} />
-                <Bar dataKey="posIncome" name="POS Income" fill="#3b82f6" radius={[2, 2, 0, 0]} stackId="a" />
-                <Bar dataKey="repairProfit" name="Repair Profit" fill="#14b8a6" radius={[2, 2, 0, 0]} stackId="a" />
-                <Bar dataKey="expenses" name="Expenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.div>
-      </div>
-
-      {/* Advanced Income by Category (This Month vs Last Month) */}
-      <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-5%" }} transition={{ duration: 0.5, delay: 0.1 }} className="bg-[#071326] border border-slate-800/80 rounded-2xl p-6 shadow-xl flex flex-col hover:border-slate-700/80 transition-all mb-4">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest flex items-center gap-2">
-            <PieChartIcon className="w-5 h-5 text-indigo-400" /> Income Breakdown Comparison
-          </h3>
-          <div className="flex gap-4 text-xs font-semibold">
-            <div className="flex items-center gap-1.5 text-emerald-400"><div className="w-3 h-3 rounded-sm bg-emerald-500"></div> This Month</div>
-            <div className="flex items-center gap-1.5 text-slate-400"><div className="w-3 h-3 rounded-sm bg-slate-500"></div> Last Month</div>
-          </div>
-        </div>
-        
-        <div className="h-[400px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart layout="vertical" data={categoryComparisonData} margin={{ top: 10, right: 30, left: 40, bottom: 0 }} barSize={12}>
-              <XAxis type="number" stroke="#475569" fontSize={11} tickFormatter={(val) => `Rs${val}`} axisLine={false} tickLine={false} />
-              <YAxis type="category" dataKey="name" stroke="#cbd5e1" fontSize={12} fontWeight="bold" axisLine={false} tickLine={false} width={120} />
-              <Tooltip cursor={{fill: '#0f172a'}} content={<BarCustomTooltip />} />
-              {uniqueServices.map((serviceName, idx) => {
-                const color = COLORS_EXTENDED[idx % COLORS_EXTENDED.length];
-                return (
-                  <React.Fragment key={idx}>
-                    <Bar dataKey={`${serviceName}_thisMonth`} stackId="thisMonth" name={`${serviceName} (This Month)`} fill={color} />
-                    <Bar dataKey={`${serviceName}_lastMonth`} stackId="lastMonth" name={`${serviceName} (Last Month)`} fill={color} fillOpacity={0.4} />
-                  </React.Fragment>
-                );
-              })}
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="mt-8 overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-slate-800 text-xs font-bold text-slate-400 uppercase tracking-wider">
-                <th className="pb-3 pl-2">Category</th>
-                <th className="pb-3 text-right">This Month</th>
-                <th className="pb-3 text-right">Last Month</th>
-                <th className="pb-3 text-right pr-2">Growth</th>
-              </tr>
-            </thead>
-            <tbody className="text-sm">
-              {categoryComparisonData.map((cat, idx) => {
-                const growth = cat.lastMonth > 0 ? ((cat.thisMonth - cat.lastMonth) / cat.lastMonth) * 100 : (cat.thisMonth > 0 ? 100 : 0);
-                const isPositive = growth > 0;
-                const isExpanded = expandedCats[cat.name];
-                
-                return (
-                  <React.Fragment key={idx}>
-                    <tr className="border-b border-slate-800/60 hover:bg-slate-800/30 transition-colors cursor-pointer" onClick={() => toggleCat(cat.name)}>
-                      <td className="py-3 pl-2 font-semibold text-slate-200 flex items-center gap-2">
-                        {isExpanded ? <ChevronDown className="w-4 h-4 text-cyan-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
-                        {cat.name}
-                      </td>
-                      <td className="py-3 text-right text-emerald-400 font-bold font-mono">Rs {cat.thisMonth.toFixed(0)}</td>
-                      <td className="py-3 text-right text-slate-400 font-semibold font-mono">Rs {cat.lastMonth.toFixed(0)}</td>
-                      <td className="py-3 text-right pr-2 font-mono">
-                        {growth !== 0 ? (
-                          <span className={`inline-flex items-center gap-1 font-bold ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
-                            {isPositive ? '+' : ''}{growth.toFixed(1)}%
-                          </span>
-                        ) : (
-                          <span className="text-slate-500 font-bold">-</span>
-                        )}
-                      </td>
-                    </tr>
-                    {isExpanded && cat.itemsList && cat.itemsList.map((item, itemIdx) => {
-                       const itemGrowth = item.lastMonth > 0 ? ((item.thisMonth - item.lastMonth) / item.lastMonth) * 100 : (item.thisMonth > 0 ? 100 : 0);
-                       const isItemPos = itemGrowth > 0;
-                       return (
-                         <tr key={`${idx}-${itemIdx}`} className="bg-slate-950/60 border-b border-slate-800/40 text-xs">
-                           <td className="py-2 pl-10 font-medium text-slate-300 border-l-2 border-cyan-500/60">{item.name}</td>
-                           <td className="py-2 text-right text-emerald-400/90 font-mono">Rs {item.thisMonth.toFixed(0)}</td>
-                           <td className="py-2 text-right text-slate-400 font-mono">Rs {item.lastMonth.toFixed(0)}</td>
-                           <td className="py-2 text-right pr-2 font-mono">
-                              {itemGrowth !== 0 ? (
-                                <span className={isItemPos ? 'text-emerald-400' : 'text-rose-400'}>
-                                  {isItemPos ? '+' : ''}{itemGrowth.toFixed(1)}%
-                                </span>
-                              ) : (
-                                <span className="text-slate-600">-</span>
-                              )}
-                           </td>
-                         </tr>
-                       );
-                    })}
-                  </React.Fragment>
-                );
-              })}
-              {categoryComparisonData.length === 0 && (
-                <tr>
-                  <td colSpan="4" className="text-center text-slate-500 py-6 text-sm">No comparison data available</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </motion.div>
-
-      {/* ROW 2: Alerts & Pipeline (Moved to Bottom) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Customer Balances */}
-        <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-5%" }} transition={{ duration: 0.5, delay: 0.1 }} className="bg-[#071326] border border-slate-800/80 rounded-2xl p-5 shadow-xl flex flex-col h-[340px] hover:border-slate-700/80 transition-all">
-          <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest mb-4 flex items-center justify-between">
-            <span className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-              Customer Balances
-            </span>
-            <AlertTriangle className="w-4 h-4 text-amber-400" />
-          </h3>
-          <div className="flex-1 overflow-y-auto pr-1 space-y-2 no-scrollbar">
-            {activeCustomerBalances.length === 0 ? (
-               <p className="text-slate-500 text-xs text-center mt-6 flex flex-col items-center gap-2">
-                 <ShieldAlert className="w-8 h-8 text-emerald-500/50" />
-                 All clear! No active dues or advances.
-               </p>
-            ) : (
-               activeCustomerBalances.map((customer, i) => {
-                 const isAdvance = customer.balance < 0;
-                 const amt = Math.abs(customer.balance);
-                 const ageDays = customer.oldestPending ? Math.floor((today - customer.oldestPending) / (1000 * 60 * 60 * 24)) : 0;
-                 
-                 return (
-                   <div key={i} className={`flex gap-3 items-center p-2.5 rounded-xl transition-all border ${isAdvance ? 'bg-emerald-950/30 hover:bg-emerald-950/50 border-emerald-500/20' : customer.riskLevel === 'High' ? 'bg-rose-950/30 hover:bg-rose-900/40 border-rose-500/30' : 'bg-amber-950/20 hover:bg-amber-900/30 border-amber-500/20'}`}>
-                     <div className={`w-8 h-8 rounded-full border flex items-center justify-center font-black text-xs shrink-0 ${isAdvance ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : customer.riskLevel === 'High' ? 'bg-rose-500/10 border-rose-500/30 text-rose-400 shadow-[0_0_10px_rgba(244,63,94,0.2)]' : 'bg-amber-500/10 border-amber-500/30 text-amber-400'}`}>
-                       <UserX className="w-4 h-4" />
-                     </div>
-                     <div className="flex-1 min-w-0">
-                       <p className="text-sm font-bold text-slate-200 truncate">{customer.name}</p>
-                       <p className={`text-[11px] mt-0.5 flex items-center gap-1 ${isAdvance ? 'text-emerald-400/80' : customer.riskLevel === 'High' ? 'text-rose-400/80' : 'text-amber-400/80'}`}>
-                         <Clock className="w-3 h-3" /> {isAdvance ? 'Advance Payment' : `${ageDays} Days Overdue`}
-                       </p>
-                     </div>
-                     <div className={`text-xs font-black whitespace-nowrap px-2.5 py-1.5 rounded-lg border font-mono ${isAdvance ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' : customer.riskLevel === 'High' ? 'text-rose-400 bg-rose-500/10 border-rose-500/20' : 'text-amber-400 bg-amber-500/10 border-amber-500/20'}`}>
-                       Rs {amt.toFixed(0)}
-                     </div>
-                   </div>
-                 );
-               })
-            )}
-          </div>
-        </motion.div>
-
-        {/* Revenue by Category Donut */}
-        <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-5%" }} transition={{ duration: 0.5, delay: 0.2 }} className="bg-[#071326] border border-slate-800/80 rounded-2xl p-5 shadow-xl flex flex-col h-[340px] hover:border-slate-700/80 transition-all">
-          <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest mb-2 flex items-center justify-between">
-            <span className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-indigo-400"></span>
-              Revenue By Category
-            </span>
-            <PieChartIcon className="w-4 h-4 text-indigo-400" />
-          </h3>
-          <div className="flex-1 min-h-[160px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={donutChartData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={75}
-                  paddingAngle={5}
-                  dataKey="value"
-                  stroke="none"
-                >
-                  {donutChartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS_EXTENDED[index % COLORS_EXTENDED.length]} />
-                  ))}
-                  <Label 
-                    value={`Rs ${monthSalesTotal >= 1000 ? (monthSalesTotal/1000).toFixed(1)+'k' : monthSalesTotal}`} 
-                    position="center" 
-                    fill="#f1f5f9" 
-                    fontSize={15} 
-                    fontWeight="black" 
+                        );
+                      }
+                      return null;
+                    }}
                   />
-                </Pie>
-                <Tooltip 
-                  content={({active, payload}) => {
-                    if (active && payload && payload.length) {
-                      return (
-                        <div className="bg-[#0b182f] border border-slate-700/80 p-3 rounded-xl shadow-xl font-mono">
-                          <p className="text-slate-300 text-xs font-semibold mb-1 font-sans">{payload[0].name}</p>
-                          <p className="font-black text-sm" style={{ color: payload[0].payload.fill }}>
-                            Rs {payload[0].value.toFixed(0)}
-                          </p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          {/* Custom Legend */}
-          <div className="grid grid-cols-2 gap-2 mt-2 max-h-16 overflow-y-auto no-scrollbar bg-slate-950/60 p-2 rounded-xl border border-slate-800/60">
-             {donutChartData.map((entry, idx) => (
-               <div key={idx} className="flex items-center gap-2 text-[10px]">
-                 <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: COLORS_EXTENDED[idx % COLORS_EXTENDED.length] }}></div>
-                 <span className="text-slate-300 truncate">{entry.name}</span>
-               </div>
-             ))}
-          </div>
-        </motion.div>
-      </div>
+                  <Bar dataKey="revenue" name="Revenue" radius={[4, 4, 0, 0]} maxBarSize={36}>
+                    {monthHoursData.map((entry, index) => (
+                      <Cell 
+                        key={`cell-hour-${index}`} 
+                        fill={peakHourData && entry.time === peakHourData.time ? 'url(#colorRushBar)' : 'url(#colorPeakHeat)'} 
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Traffic Heat Intensity Ribbon */}
+            <div className="mt-3 pt-3 border-t border-slate-800/80">
+              <div className="text-[10px] text-slate-400 font-mono mb-1.5 flex justify-between items-center">
+                <span>Hourly Traffic Density</span>
+                <span className="text-[9px] text-slate-500 font-bold">Low ➔ Rush Hour</span>
+              </div>
+              <div className="grid grid-cols-7 gap-1">
+                {monthHoursData.map((h, i) => {
+                  const ratio = maxHourRevenue > 0 ? (h.revenue / maxHourRevenue) : 0;
+                  let heatClass = 'bg-slate-900 text-slate-500 border-slate-800';
+                  if (ratio > 0.75) heatClass = 'bg-rose-500/20 text-rose-300 border-rose-500/40 shadow-[0_0_8px_rgba(244,63,94,0.2)] font-bold';
+                  else if (ratio > 0.4) heatClass = 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+                  else if (ratio > 0.15) heatClass = 'bg-sky-500/15 text-sky-300 border-sky-500/30';
+
+                  return (
+                    <div key={i} className={`p-1.5 rounded-lg border text-center transition-all ${heatClass}`}>
+                      <p className="text-[9px] font-mono leading-tight">{h.time.split(' ')[0]}</p>
+                      <p className="text-[8px] font-black mt-0.5">{ratio > 0 ? `${(ratio * 100).toFixed(0)}%` : '0%'}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Combined Monthly Financials Chart */}
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.3, delay: 0.1 }} className="bg-[#071326] border border-slate-800/80 rounded-2xl p-5 shadow-xl flex flex-col justify-between hover:border-slate-700/80 transition-all">
+            <div className="flex items-center justify-between mb-4 border-b border-slate-800/80 pb-3">
+              <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
+                Monthly Overview ({currentYear})
+              </h3>
+              <div className="flex gap-3 text-[10px] font-black uppercase font-mono">
+                <div className="flex items-center gap-1.5 text-blue-400"><div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div> POS</div>
+                <div className="flex items-center gap-1.5 text-teal-400"><div className="w-2.5 h-2.5 rounded-full bg-teal-500"></div> Repair</div>
+                <div className="flex items-center gap-1.5 text-rose-400"><div className="w-2.5 h-2.5 rounded-full bg-rose-500"></div> Exp</div>
+              </div>
+            </div>
+            <div className="flex-1 w-full min-h-[250px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={combinedMonthlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <XAxis dataKey="month" stroke="#64748b" fontSize={10} tickMargin={8} axisLine={false} tickLine={false} />
+                  <YAxis stroke="#64748b" fontSize={10} tickFormatter={(val) => `Rs ${val >= 1000 ? (val/1000).toFixed(0)+'k' : val}`} axisLine={false} tickLine={false} />
+                  <Tooltip cursor={{fill: '#0f172a', opacity: 0.6}} content={<CustomTooltip />} />
+                  <Bar dataKey="posIncome" name="POS Income" fill="#3b82f6" radius={[2, 2, 0, 0]} stackId="a" />
+                  <Bar dataKey="repairProfit" name="Repair Profit" fill="#14b8a6" radius={[2, 2, 0, 0]} stackId="a" />
+                  <Bar dataKey="expenses" name="Expenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </motion.div>
+
+        </div>
+
+        {/* ROW 5: CATEGORY BREAKDOWN COMPARISON & REVENUE DONUT */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          
+          {/* Income Breakdown Comparison (lg:col-span-8) */}
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.3 }} className="lg:col-span-8 bg-[#071326] border border-slate-800/80 rounded-2xl p-5 shadow-xl flex flex-col hover:border-slate-700/80 transition-all">
+            <div className="flex justify-between items-center mb-4 border-b border-slate-800/80 pb-3">
+              <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest flex items-center gap-2">
+                <PieChartIcon className="w-4 h-4 text-indigo-400" /> Income Breakdown Comparison
+              </h3>
+              <div className="flex gap-4 text-xs font-semibold">
+                <div className="flex items-center gap-1.5 text-emerald-400 font-mono text-[11px]"><div className="w-2.5 h-2.5 rounded-sm bg-emerald-500"></div> This Month</div>
+                <div className="flex items-center gap-1.5 text-slate-400 font-mono text-[11px]"><div className="w-2.5 h-2.5 rounded-sm bg-slate-500"></div> Last Month</div>
+              </div>
+            </div>
+            
+            <div className="h-[340px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart layout="vertical" data={categoryComparisonData} margin={{ top: 10, right: 30, left: 30, bottom: 0 }} barSize={12}>
+                  <XAxis type="number" stroke="#64748b" fontSize={10} tickFormatter={(val) => `Rs ${val}`} axisLine={false} tickLine={false} />
+                  <YAxis type="category" dataKey="name" stroke="#cbd5e1" fontSize={11} fontWeight="bold" axisLine={false} tickLine={false} width={110} />
+                  <Tooltip cursor={{fill: '#0f172a'}} content={<BarCustomTooltip />} />
+                  {uniqueServices.map((serviceName, idx) => {
+                    const color = COLORS_EXTENDED[idx % COLORS_EXTENDED.length];
+                    return (
+                      <React.Fragment key={idx}>
+                        <Bar dataKey={`${serviceName}_thisMonth`} stackId="thisMonth" name={`${serviceName} (This Month)`} fill={color} />
+                        <Bar dataKey={`${serviceName}_lastMonth`} stackId="lastMonth" name={`${serviceName} (Last Month)`} fill={color} fillOpacity={0.4} />
+                      </React.Fragment>
+                    );
+                  })}
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="mt-6 overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-800 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    <th className="pb-2.5 pl-2">Category</th>
+                    <th className="pb-2.5 text-right">This Month</th>
+                    <th className="pb-2.5 text-right">Last Month</th>
+                    <th className="pb-2.5 text-right pr-2">Growth</th>
+                  </tr>
+                </thead>
+                <tbody className="text-sm">
+                  {categoryComparisonData.map((cat, idx) => {
+                    const growth = cat.lastMonth > 0 ? ((cat.thisMonth - cat.lastMonth) / cat.lastMonth) * 100 : (cat.thisMonth > 0 ? 100 : 0);
+                    const isPositive = growth > 0;
+                    const isExpanded = expandedCats[cat.name];
+                    
+                    return (
+                      <React.Fragment key={idx}>
+                        <tr className="border-b border-slate-800/60 hover:bg-slate-800/30 transition-colors cursor-pointer" onClick={() => toggleCat(cat.name)}>
+                          <td className="py-2.5 pl-2 font-semibold text-slate-200 flex items-center gap-2">
+                            {isExpanded ? <ChevronDown className="w-4 h-4 text-cyan-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+                            {cat.name}
+                          </td>
+                          <td className="py-2.5 text-right text-emerald-400 font-bold font-mono">Rs {cat.thisMonth.toFixed(0)}</td>
+                          <td className="py-2.5 text-right text-slate-400 font-semibold font-mono">Rs {cat.lastMonth.toFixed(0)}</td>
+                          <td className="py-2.5 text-right pr-2 font-mono">
+                            {growth !== 0 ? (
+                              <span className={`inline-flex items-center gap-1 font-bold ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                {isPositive ? '+' : ''}{growth.toFixed(1)}%
+                              </span>
+                            ) : (
+                              <span className="text-slate-500 font-bold">-</span>
+                            )}
+                          </td>
+                        </tr>
+                        {isExpanded && cat.itemsList && cat.itemsList.map((item, itemIdx) => {
+                           const itemGrowth = item.lastMonth > 0 ? ((item.thisMonth - item.lastMonth) / item.lastMonth) * 100 : (item.thisMonth > 0 ? 100 : 0);
+                           const isItemPos = itemGrowth > 0;
+                           return (
+                             <tr key={`${idx}-${itemIdx}`} className="bg-slate-950/60 border-b border-slate-800/40 text-xs">
+                               <td className="py-2 pl-10 font-medium text-slate-300 border-l-2 border-cyan-500/60">{item.name}</td>
+                               <td className="py-2 text-right text-emerald-400/90 font-mono">Rs {item.thisMonth.toFixed(0)}</td>
+                               <td className="py-2 text-right text-slate-400 font-mono">Rs {item.lastMonth.toFixed(0)}</td>
+                               <td className="py-2 text-right pr-2 font-mono">
+                                  {itemGrowth !== 0 ? (
+                                    <span className={isItemPos ? 'text-emerald-400' : 'text-rose-400'}>
+                                      {isItemPos ? '+' : ''}{itemGrowth.toFixed(1)}%
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-600">-</span>
+                                  )}
+                               </td>
+                             </tr>
+                           );
+                        })}
+                      </React.Fragment>
+                    );
+                  })}
+                  {categoryComparisonData.length === 0 && (
+                    <tr>
+                      <td colSpan="4" className="text-center text-slate-500 py-6 text-sm">No comparison data available</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+
+          {/* Revenue by Category Donut (lg:col-span-4) */}
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.3, delay: 0.1 }} className="lg:col-span-4 bg-[#071326] border border-slate-800/80 rounded-2xl p-5 shadow-xl flex flex-col justify-between hover:border-slate-700/80 transition-all">
+            <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest mb-2 flex items-center justify-between border-b border-slate-800/80 pb-3">
+              <span className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-indigo-400"></span>
+                Revenue By Category
+              </span>
+              <PieChartIcon className="w-4 h-4 text-indigo-400" />
+            </h3>
+            
+            <div className="h-[210px] w-full relative">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={donutChartData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={55}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                    stroke="none"
+                  >
+                    {donutChartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS_EXTENDED[index % COLORS_EXTENDED.length]} />
+                    ))}
+                    <Label 
+                      value={`Rs ${monthSalesTotal >= 1000 ? (monthSalesTotal/1000).toFixed(1)+'k' : monthSalesTotal}`} 
+                      position="center" 
+                      fill="#f1f5f9" 
+                      fontSize={15} 
+                      fontWeight="black" 
+                    />
+                  </Pie>
+                  <Tooltip 
+                    content={({active, payload}) => {
+                      if (active && payload && payload.length) {
+                        return (
+                          <div className="bg-[#0b182f] border border-slate-700/80 p-3 rounded-xl shadow-xl font-mono">
+                            <p className="text-slate-300 text-xs font-semibold mb-1 font-sans">{payload[0].name}</p>
+                            <p className="font-black text-sm" style={{ color: payload[0].payload.fill }}>
+                              Rs {payload[0].value.toFixed(0)}
+                            </p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Custom Legend */}
+            <div className="space-y-1.5 max-h-36 overflow-y-auto no-scrollbar bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/60 mt-2">
+               {donutChartData.map((entry, idx) => (
+                 <div key={idx} className="flex items-center justify-between gap-2 text-[10px]">
+                   <div className="flex items-center gap-2 min-w-0">
+                     <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: COLORS_EXTENDED[idx % COLORS_EXTENDED.length] }}></div>
+                     <span className="text-slate-300 truncate">{entry.name}</span>
+                   </div>
+                   <span className="font-mono font-bold text-white shrink-0">Rs {entry.value.toFixed(0)}</span>
+                 </div>
+               ))}
+            </div>
+          </motion.div>
+
+        </div>
 
       </div> {/* Scrollable container end */}
     </div>
