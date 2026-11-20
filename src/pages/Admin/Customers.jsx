@@ -1,6 +1,31 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { customerService, duesService, salesService } from '../../services/supabaseService';
-import { Search, Plus, Trash2, CheckCircle, Clock, User, Phone, MapPin, DollarSign, RotateCcw, ChevronDown, ChevronUp, Filter, Edit, X, RefreshCw, Star, HelpCircle, Users } from 'lucide-react';
+import { 
+  Search, 
+  Plus, 
+  Trash2, 
+  CheckCircle, 
+  Clock, 
+  User, 
+  Phone, 
+  MapPin, 
+  DollarSign, 
+  RotateCcw, 
+  ChevronDown, 
+  ChevronUp, 
+  Filter, 
+  Edit, 
+  X, 
+  RefreshCw, 
+  Star, 
+  HelpCircle, 
+  Users,
+  ChevronLeft,
+  ChevronRight,
+  Sparkles,
+  Eye,
+  AlertCircle
+} from 'lucide-react';
 import { notify } from '../../utils/toast';
 import DeleteConfirmModal from '../../components/DeleteConfirmModal';
 import { AddCustomerForm, CustomerHistoryModal, CustomerPhoneModal } from './CustomersComponents';
@@ -15,26 +40,30 @@ export default function Customers({ isAdmin }) {
   const [records, setRecords] = useState([]);
   const [directoryRecords, setDirectoryRecords] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showSettledCustomers, setShowSettledCustomers] = useState(false);
+  
+  // Navigation & Sub-Tab: 'dues' (Customer Balances) or 'all' (Customer Directory)
+  const [activeCustomersTab, setActiveCustomersTab] = useState('dues');
+
+  // Search & Filter States
   const [searchCustomer, setSearchCustomer] = useState('');
   const [searchArea, setSearchArea] = useState('');
   const [searchPhone, setSearchPhone] = useState('');
-  const [activeCustomersTab, setActiveCustomersTab] = useState('dues'); // 'dues' or 'all'
+  const [duesStatusFilter, setDuesStatusFilter] = useState('ALL'); // 'ALL', 'PENDING', 'ADVANCE', 'SETTLED'
+  const [sortBy, setSortBy] = useState('due-desc'); // 'due-desc', 'advance-desc', 'name-asc', 'fav-desc'
+
   const [isAddFormOpen, setIsAddFormOpen] = useState(false);
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedCustomerForModal, setSelectedCustomerForModal] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 20;
 
   // Inline edit state for Area / Phone
   const [editingRecordId, setEditingRecordId] = useState(null);
-  const [editingField, setEditingField] = useState(''); // 'area' or 'phone'
+  const [editingField, setEditingField] = useState('');
   const [editingValue, setEditingValue] = useState('');
 
   // Partial Payment State
   const [payingRecordId, setPayingRecordId] = useState(null);
   const [payingAmount, setPayingAmount] = useState('');
-
 
   // Form State
   const [name, setName] = useState('');
@@ -58,7 +87,7 @@ export default function Customers({ isAdmin }) {
   // Reset pagination when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchCustomer, searchArea, searchPhone, activeCustomersTab]);
+  }, [searchCustomer, searchArea, searchPhone, activeCustomersTab, duesStatusFilter]);
 
   useEffect(() => {
     fetchRecords();
@@ -67,10 +96,10 @@ export default function Customers({ isAdmin }) {
   const fetchRecords = async () => {
     try {
       const dues = await duesService.getCustomerDues();
-      setRecords(dues);
+      setRecords(dues || []);
 
       const dirData = await customerService.getCustomers();
-      setDirectoryRecords(dirData);
+      setDirectoryRecords(dirData || []);
     } catch (error) {
       console.error("Error fetching records:", error);
       notify.error("Failed to load customer records.");
@@ -81,7 +110,7 @@ export default function Customers({ isAdmin }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name) {
+    if (!name.trim()) {
       notify.error("Customer Name is required.");
       return;
     }
@@ -90,7 +119,6 @@ export default function Customers({ isAdmin }) {
     try {
       const custId = await customerService.findOrCreateCustomerByName(name.trim(), phone.trim(), area.trim());
 
-      // If an amount is provided, add it to customer_dues
       if (amount && Number(amount) > 0) {
         await duesService.createDue({
           customerId: custId,
@@ -110,6 +138,7 @@ export default function Customers({ isAdmin }) {
       setAmount('');
       setStatus('Pending');
       setIsPosArrears(false);
+      setIsAddFormOpen(false);
       fetchRecords();
     } catch (error) {
       console.error("Error adding record:", error);
@@ -123,24 +152,17 @@ export default function Customers({ isAdmin }) {
     try {
       if (record.status === 'Pending') {
         const newStatus = 'Paid';
-        
         let saleRefId = null;
-        let consumedPaymentAmount = 0;
         
-        // Find existing payments for this customer
         const customerPayments = group ? group.records.filter(r => r.type === 'Payment') : [];
         const totalPaymentsAmount = customerPayments.reduce((sum, r) => sum + r.amount, 0);
 
-        // The actual amount paid today is the bill amount MINUS any prepaid balance (payments)
         let amountToConsume = Math.min(record.amount, totalPaymentsAmount);
         const actualCashReceived = record.amount - amountToConsume;
-        consumedPaymentAmount = amountToConsume;
 
-        // Consume the payments from the database
         if (amountToConsume > 0) {
           for (const payment of customerPayments) {
             if (amountToConsume <= 0) break;
-            
             if (payment.amount <= amountToConsume) {
               await duesService.deleteDue(payment.id);
               amountToConsume -= payment.amount;
@@ -153,7 +175,6 @@ export default function Customers({ isAdmin }) {
           }
         }
         
-        // Add to daily_sales only if it's a POS Arrears and actual cash was received
         if (record.isPosArrears !== false && actualCashReceived > 0) {
           const sale = await salesService.createSale({
             amount: actualCashReceived,
@@ -176,16 +197,14 @@ export default function Customers({ isAdmin }) {
         if (actualCashReceived > 0) {
           notify.success(`Marked as Paid. Rs ${actualCashReceived.toFixed(2)} added to Sales.`);
         } else {
-          notify.success(`Marked as Paid. Fully covered by existing payments.`);
+          notify.success(`Marked as Paid. Covered by existing payments.`);
         }
       } else {
         const newStatus = 'Pending';
-        
         if (record.linkedSaleId) {
           await salesService.deleteSale(record.linkedSaleId);
         }
 
-        // Restore consumed payments
         if (record.consumedPaymentAmount && record.consumedPaymentAmount > 0) {
           await duesService.createDue({
             customerId: record.customerId,
@@ -210,112 +229,6 @@ export default function Customers({ isAdmin }) {
     } catch (error) {
       console.error("Error updating status:", error);
       notify.error("Failed to update status.");
-    }
-  };
-
-  const handlePartialPayment = async (record, enteredAmount, group) => {
-    try {
-      const paymentAmount = Number(enteredAmount);
-      if (!paymentAmount || paymentAmount <= 0) {
-        setPayingRecordId(null);
-        return;
-      }
-      
-      if (paymentAmount >= record.amount) {
-        await toggleStatus(record, group);
-      } else {
-        // Partial payment
-        if (record.isPosArrears !== false) {
-          await salesService.createSale({
-            amount: paymentAmount,
-            discount: 0,
-            description: `Partial Payment: ${record.name}`,
-            cartItems: [{ name: 'Account Settlement (Partial)', price: paymentAmount, cost: 0, qty: 1 }],
-            userId: 'system',
-            customerName: record.name,
-            isCredit: false,
-            isAccountSettlement: true
-          });
-        }
-        
-        await duesService.createDue({
-          customerId: record.customerId,
-          customerName: record.name,
-          phone: record.phone || '',
-          area: record.area || '',
-          amount: paymentAmount,
-          status: 'Paid',
-          type: 'Payment',
-          description: 'Partial Payment'
-        });
-        
-        notify.success(`Partial payment of Rs ${paymentAmount.toFixed(2)} recorded.`);
-        fetchRecords();
-      }
-      
-      setPayingRecordId(null);
-      setPayingAmount('');
-    } catch (error) {
-      console.error("Error in partial payment:", error);
-      notify.error("Failed to process partial payment.");
-    }
-  };
-
-  const handleDelete = (id) => {
-    if (!isAdmin) return;
-    setDeleteRecordId(id);
-  };
-
-  const confirmDelete = async () => {
-    if (!deleteRecordId) return;
-    try {
-      await duesService.deleteDue(deleteRecordId);
-      notify.success("Record deleted.");
-      fetchRecords();
-    } catch (error) {
-      console.error("Error deleting record:", error);
-      notify.error("Failed to delete record.");
-    } finally {
-      setDeleteRecordId(null);
-    }
-  };
-
-  const confirmDeleteGroup = async () => {
-    if (!deleteGroupData) return;
-    try {
-      for (const record of deleteGroupData.records) {
-        if (record.id) {
-          await duesService.deleteDue(record.id);
-        }
-      }
-      notify.success("All dues for this customer deleted.");
-      fetchRecords();
-    } catch (error) {
-      console.error("Error deleting group:", error);
-      notify.error("Failed to delete dues.");
-    } finally {
-      setDeleteGroupData(null);
-    }
-  };
-
-  const confirmDeleteCustomerDirectory = async () => {
-    if (!deleteCustomerData) return;
-    try {
-      if (deleteCustomerData.directoryId) {
-        await customerService.deleteCustomer(deleteCustomerData.directoryId);
-      }
-      for (const record of deleteCustomerData.records) {
-        if (record.id) {
-          await duesService.deleteDue(record.id);
-        }
-      }
-      notify.success("Customer deleted successfully.");
-      fetchRecords();
-    } catch (error) {
-      console.error("Error deleting customer:", error);
-      notify.error("Failed to delete customer.");
-    } finally {
-      setDeleteCustomerData(null);
     }
   };
 
@@ -361,8 +274,47 @@ export default function Customers({ isAdmin }) {
     }
   };
 
+  const confirmDeleteGroup = async () => {
+    if (!deleteGroupData) return;
+    try {
+      for (const record of deleteGroupData.records) {
+        if (record.id) {
+          await duesService.deleteDue(record.id);
+        }
+      }
+      notify.success("All dues for this customer deleted.");
+      fetchRecords();
+    } catch (error) {
+      console.error("Error deleting group:", error);
+      notify.error("Failed to delete dues.");
+    } finally {
+      setDeleteGroupData(null);
+    }
+  };
+
+  const confirmDeleteCustomerDirectory = async () => {
+    if (!deleteCustomerData) return;
+    try {
+      if (deleteCustomerData.directoryId) {
+        await customerService.deleteCustomer(deleteCustomerData.directoryId);
+      }
+      for (const record of deleteCustomerData.records) {
+        if (record.id) {
+          await duesService.deleteDue(record.id);
+        }
+      }
+      notify.success("Customer deleted successfully.");
+      fetchRecords();
+    } catch (error) {
+      console.error("Error deleting customer:", error);
+      notify.error("Failed to delete customer.");
+    } finally {
+      setDeleteCustomerData(null);
+    }
+  };
+
   const toggleFavorite = async (group, e) => {
-    e.stopPropagation();
+    if (e) e.stopPropagation();
     try {
       let targetId = group.directoryId;
       const isNowFavorite = !group.mostVisited;
@@ -381,28 +333,6 @@ export default function Customers({ isAdmin }) {
           mostVisited: isNowFavorite
         });
         notify.success(isNowFavorite ? 'Added to favorites' : 'Removed from favorites');
-      }
-
-      // Update local storage immediately for POS modal
-      let favs = JSON.parse(localStorage.getItem('favoriteCustomers') || '[]');
-      if (isNowFavorite && !favs.includes(group.name)) {
-        favs.push(group.name);
-      } else if (!isNowFavorite) {
-        favs = favs.filter(n => n !== group.name);
-      }
-      localStorage.setItem('favoriteCustomers', JSON.stringify(favs));
-
-      // Also update customersList in local storage to keep global state in sync
-      const savedCustomers = localStorage.getItem('customersList');
-      if (savedCustomers) {
-        let list = JSON.parse(savedCustomers);
-        const idx = list.findIndex(c => c.id === targetId);
-        if (idx !== -1) {
-          list[idx].mostVisited = isNowFavorite;
-        } else {
-          list.push({ id: targetId, name: group.name, phone: group.phone, area: group.area, mostVisited: isNowFavorite });
-        }
-        localStorage.setItem('customersList', JSON.stringify(list));
       }
 
       fetchRecords();
@@ -448,114 +378,102 @@ export default function Customers({ isAdmin }) {
       return;
     }
 
+    setIsSavingPhone(true);
     try {
-      setIsSavingPhone(true);
-
-      let custId = phoneModalCustomer.directoryId;
-      if (custId) {
-        await customerService.updateCustomer(custId, { phone: trimmedPhone });
-      } else {
-        const foundId = await customerService.findOrCreateCustomerByName(phoneModalCustomer.name, trimmedPhone, phoneModalCustomer.area || '');
-        custId = foundId;
+      if (phoneModalCustomer.directoryId) {
+        await customerService.updateCustomer(phoneModalCustomer.directoryId, { phone: trimmedPhone });
       }
-
-      phoneModalCustomer.phone = trimmedPhone;
-      if (selectedCustomerForModal && selectedCustomerForModal.nameKey === phoneModalCustomer.nameKey) {
-        setSelectedCustomerForModal(prev => prev ? { ...prev, phone: trimmedPhone } : null);
+      for (const r of phoneModalCustomer.records) {
+        if (r.id) {
+          await duesService.updateDue(r.id, { phone: trimmedPhone });
+        }
       }
-
-      notify.success('Phone number saved! Opening WhatsApp...');
-
-      const customerToNotify = { ...phoneModalCustomer, phone: trimmedPhone };
+      notify.success('Phone number saved successfully.');
+      openWhatsAppMessage(phoneModalCustomer.name, trimmedPhone, phoneModalCustomer.totalPending);
       setPhoneModalCustomer(null);
       setPhoneModalInput('');
-
       fetchRecords();
-      openWhatsAppMessage(customerToNotify.name, trimmedPhone, customerToNotify.totalPending);
-    } catch (error) {
-      console.error('Error saving phone number:', error);
-      notify.error('Failed to save phone number.');
+    } catch (err) {
+      console.error(err);
+      notify.error('Failed to update phone number.');
     } finally {
       setIsSavingPhone(false);
     }
   };
 
-  const allGrouped = React.useMemo(() => {
+  // Group Records logic
+  const allGrouped = useMemo(() => {
     const acc = {};
     
-    // Process directory records first
-    directoryRecords.forEach(record => {
-      const nameKey = record.name?.trim().toLowerCase() || 'unknown';
-      if (!acc[nameKey]) {
-        acc[nameKey] = {
-          directoryId: record.id,
-          nameKey,
-          name: record.name,
-          phone: record.phone,
-          area: record.area,
-          mostVisited: record.mostVisited || false,
-          totalPending: 0,
-          totalPaid: 0,
-          records: [], // dues records
-          hasPending: false
-        };
-      } else {
-        if (!acc[nameKey].directoryId) acc[nameKey].directoryId = record.id;
-        if (!acc[nameKey].phone && record.phone) acc[nameKey].phone = record.phone;
-        if (!acc[nameKey].area && record.area) acc[nameKey].area = record.area;
-        if (!acc[nameKey].mostVisited && record.mostVisited) acc[nameKey].mostVisited = record.mostVisited;
-      }
+    (directoryRecords || []).forEach(dir => {
+      const key = dir.name?.trim().toLowerCase() || 'unnamed';
+      acc[key] = {
+        nameKey: key,
+        name: dir.name,
+        phone: dir.phone || '',
+        area: dir.area || '',
+        mostVisited: !!dir.mostVisited,
+        records: [],
+        totalPending: 0,
+        advanceBalance: 0,
+        hasPending: false,
+        hasAdvance: false,
+        hasPosArrears: false,
+        directoryId: dir.id,
+        isOnlyDirectory: true
+      };
     });
-
-    // Process dues records
-    records.forEach(record => {
-      const nameKey = record.name?.trim().toLowerCase() || 'unknown';
-      if (!acc[nameKey]) {
-        acc[nameKey] = {
-          nameKey,
+    
+    (records || []).forEach(record => {
+      const key = record.name?.trim().toLowerCase() || 'unnamed';
+      if (!acc[key]) {
+        acc[key] = {
+          nameKey: key,
           name: record.name,
-          phone: record.phone,
-          area: record.area,
+          phone: record.phone || '',
+          area: record.area || '',
+          mostVisited: false,
+          records: [],
           totalPending: 0,
           advanceBalance: 0,
-          totalPaid: 0,
-          records: [],
           hasPending: false,
           hasAdvance: false,
           hasPosArrears: false,
-          hasNonPosArrears: false
+          directoryId: null,
+          isOnlyDirectory: false
         };
       }
-      acc[nameKey].records.push(record);
-      if (record.type === 'Payment') {
-        acc[nameKey].totalPending -= record.amount;
-        acc[nameKey].totalPaid += record.amount;
-      } else if (record.status === 'Pending') {
-        acc[nameKey].totalPending += record.amount;
-        if (record.isPosArrears !== false) {
-          acc[nameKey].hasPosArrears = true;
-        } else {
-          acc[nameKey].hasNonPosArrears = true;
-        }
-      } else {
-        acc[nameKey].totalPaid += record.amount;
-      }
-      if (!acc[nameKey].phone && record.phone) acc[nameKey].phone = record.phone;
-      if (!acc[nameKey].area && record.area) acc[nameKey].area = record.area;
+      acc[key].isOnlyDirectory = false;
+      acc[key].records.push(record);
+      if (record.isPosArrears) acc[key].hasPosArrears = true;
+      if (!acc[key].phone && record.phone) acc[key].phone = record.phone;
+      if (!acc[key].area && record.area) acc[key].area = record.area;
     });
 
     Object.values(acc).forEach(group => {
-      if (group.totalPending > 0.01) {
+      let pendingTotal = 0;
+      let paymentTotal = 0;
+      
+      group.records.forEach(r => {
+        if (r.type === 'Payment') {
+          paymentTotal += Number(r.amount || 0);
+        } else if (r.status === 'Pending') {
+          pendingTotal += Number(r.amount || 0);
+        }
+      });
+      
+      const netBalance = pendingTotal - paymentTotal;
+      if (netBalance > 0) {
+        group.totalPending = netBalance;
+        group.advanceBalance = 0;
         group.hasPending = true;
         group.hasAdvance = false;
-        group.advanceBalance = 0;
-      } else if (group.totalPending < -0.01) {
+      } else if (netBalance < 0) {
+        group.totalPending = 0;
+        group.advanceBalance = Math.abs(netBalance);
         group.hasPending = false;
         group.hasAdvance = true;
-        group.advanceBalance = Math.abs(group.totalPending);
       } else {
-        group.hasPending = false;
-        group.hasAdvance = false;
         group.totalPending = 0;
         group.advanceBalance = 0;
       }
@@ -564,555 +482,625 @@ export default function Customers({ isAdmin }) {
     return Object.values(acc);
   }, [records, directoryRecords]);
 
-  const filteredGroups = React.useMemo(() => {
-    const searchCustomerLower = searchCustomer.toLowerCase();
-    const searchAreaLower = searchArea.toLowerCase();
-    const searchPhoneLower = searchPhone.toLowerCase();
+  // Extract unique areas
+  const uniqueAreas = useMemo(() => {
+    const areas = new Set();
+    allGrouped.forEach(g => {
+      if (g.area && g.area.trim()) areas.add(g.area.trim());
+    });
+    return Array.from(areas).sort();
+  }, [allGrouped]);
+
+  // Filter & Sort
+  const filteredGroups = useMemo(() => {
+    const qName = searchCustomer.toLowerCase().trim();
+    const qArea = searchArea.toLowerCase().trim();
+    const qPhone = searchPhone.trim();
     
-    const filtered = allGrouped.filter(group => {
-      const matchCustomer = (group.name?.toLowerCase() || '').includes(searchCustomerLower);
-      const matchArea = (group.area?.toLowerCase() || '').includes(searchAreaLower);
-      const matchPhone = (group.phone || '').includes(searchPhoneLower);
-      
-      return matchCustomer && matchArea && matchPhone;
+    let list = allGrouped.filter(g => {
+      if (qName && !(g.name || '').toLowerCase().includes(qName)) return false;
+      if (qArea && !(g.area || '').toLowerCase().includes(qArea)) return false;
+      if (qPhone && !(g.phone || '').includes(qPhone)) return false;
+
+      if (activeCustomersTab === 'dues') {
+        if (duesStatusFilter === 'PENDING' && !g.hasPending) return false;
+        if (duesStatusFilter === 'ADVANCE' && !g.hasAdvance) return false;
+        if (duesStatusFilter === 'SETTLED' && (g.hasPending || g.hasAdvance)) return false;
+        if (duesStatusFilter === 'ALL' && (!g.hasPending && !g.hasAdvance)) return false;
+      }
+
+      return true;
     });
 
-    return filtered.sort((a, b) => {
-      if (a.hasPending && !b.hasPending) return -1;
-      if (!a.hasPending && b.hasPending) return 1;
-      if (a.hasPending && b.hasPending) return b.totalPending - a.totalPending;
-      if (a.hasAdvance && !b.hasAdvance) return -1;
-      if (!a.hasAdvance && b.hasAdvance) return 1;
-      if (a.hasAdvance && b.hasAdvance) return b.advanceBalance - a.advanceBalance;
-      return (a.name || '').localeCompare(b.name || '');
+    // Sorting
+    list.sort((a, b) => {
+      if (sortBy === 'due-desc') return b.totalPending - a.totalPending;
+      if (sortBy === 'advance-desc') return b.advanceBalance - a.advanceBalance;
+      if (sortBy === 'fav-desc') return (b.mostVisited ? 1 : 0) - (a.mostVisited ? 1 : 0);
+      if (sortBy === 'name-asc') return (a.name || '').localeCompare(b.name || '');
+      return 0;
     });
-  }, [allGrouped, searchCustomer, searchArea, searchPhone]);
 
-  const displayGroups = React.useMemo(() => {
-    if (activeCustomersTab === 'dues') {
-      return filteredGroups.filter(g => g.hasPending || g.hasAdvance);
-    }
-    return filteredGroups;
-  }, [filteredGroups, activeCustomersTab]);
+    return list;
+  }, [allGrouped, searchCustomer, searchArea, searchPhone, activeCustomersTab, duesStatusFilter, sortBy]);
 
-  const renderGroup = (group) => {
-    return (
-      <div key={group.nameKey} className={`bg-slate-950/40 border-b border-white/5 transition-all flex flex-col hover:bg-slate-900/50`}>
-        {/* Table Row */}
-        <div className="grid grid-cols-12 gap-4 px-4 py-2.5 items-center">
-          {activeCustomersTab === 'all' ? (
-            <>
-              {/* Col 0: Most Visited Star (col-span-1) */}
-              <div className="col-span-1 flex justify-center items-center">
-                <button 
-                  onClick={(e) => toggleFavorite(group, e)}
-                  className="p-1.5 rounded-lg hover:bg-slate-800 transition-colors"
-                  title={group.mostVisited ? 'Remove from favorites' : 'Add to favorites'}
-                >
-                  <Star className={`w-4 h-4 transition-colors ${group.mostVisited ? 'text-yellow-500 fill-yellow-500' : 'text-slate-600 hover:text-yellow-500/50'}`} />
-                </button>
-              </div>
+  // Total Outstanding Dues
+  const totalPendingDues = useMemo(() => {
+    return allGrouped.reduce((sum, g) => sum + (g.totalPending || 0), 0);
+  }, [allGrouped]);
 
-              {/* Col 1: Customer Name (col-span-4 lg:col-span-3) */}
-              <div className="col-span-4 lg:col-span-3 flex items-center gap-3">
-                <h3 className="text-slate-200 font-bold text-[14px] truncate">{group.name}</h3>
-              </div>
+  const totalAdvanceDues = useMemo(() => {
+    return allGrouped.reduce((sum, g) => sum + (g.advanceBalance || 0), 0);
+  }, [allGrouped]);
 
-              {/* Col 2: Area (col-span-3) */}
-              <div className="col-span-4 lg:col-span-3 flex items-center text-slate-400 text-[13px] truncate" onClick={() => {
-                  setEditingRecordId(group.nameKey);
-                  setEditingField('area');
-                  setEditingValue(group.area || '');
-                }}>
-                {editingRecordId === group.nameKey && editingField === 'area' ? (
-                  <div className="flex items-center gap-1 bg-slate-900/50 rounded px-1">
-                    <input
-                      type="text"
-                      value={editingValue}
-                      onChange={e => setEditingValue(e.target.value)}
-                      className="bg-transparent text-slate-200 border-none focus:outline-none w-20"
-                    />
-                    <CheckCircle
-                      className="w-4 h-4 text-emerald-400 hover:text-emerald-300 cursor-pointer"
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        try {
-                          const custId = group.directoryId || await customerService.findOrCreateCustomerByName(group.name, group.phone, editingValue);
-                          if (custId) {
-                            await customerService.updateCustomer(custId, { area: editingValue });
-                          }
-                          notify.success('Area updated');
-                          fetchRecords();
-                        } catch (err) {
-                          console.error(err);
-                          notify.error('Failed to update area');
-                        }
-                        setEditingRecordId(null);
-                        setEditingField('');
-                      }}
-                    />
-                    <X
-                      className="w-4 h-4 text-slate-400 hover:text-slate-200 cursor-pointer"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingRecordId(null);
-                        setEditingField('');
-                        setEditingValue('');
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <>
-                    <Edit className="w-3 h-3 mr-1 text-cyan-400" />
-                    {group.area ? group.area : '-'}
-                  </>
-                )}
-              </div>
-
-              {/* Col 3: Phone (col-span-2) */}
-              <div className="hidden lg:flex lg:col-span-2 items-center text-slate-400 text-[13px] truncate" onClick={() => {
-                  setEditingRecordId(group.nameKey);
-                  setEditingField('phone');
-                  setEditingValue(group.phone || '');
-                }}>
-                {editingRecordId === group.nameKey && editingField === 'phone' ? (
-                  <div className="flex items-center gap-1 bg-slate-900/50 rounded px-1">
-                    <input
-                      type="text"
-                      value={editingValue}
-                      onChange={e => setEditingValue(e.target.value)}
-                      className="bg-transparent text-slate-200 border-none focus:outline-none w-24"
-                    />
-                    <CheckCircle
-                      className="w-4 h-4 text-emerald-400 hover:text-emerald-300 cursor-pointer"
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        try {
-                          const custId = group.directoryId || await customerService.findOrCreateCustomerByName(group.name, editingValue, group.area);
-                          if (custId) {
-                            await customerService.updateCustomer(custId, { phone: editingValue });
-                          }
-                          notify.success('Phone updated');
-                          fetchRecords();
-                        } catch (err) {
-                          console.error(err);
-                          notify.error('Failed to update phone');
-                        }
-                        setEditingRecordId(null);
-                        setEditingField('');
-                      }}
-                    />
-                    <X
-                      className="w-4 h-4 text-slate-400 hover:text-slate-200 cursor-pointer"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingRecordId(null);
-                        setEditingField('');
-                        setEditingValue('');
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <>
-                    <Edit className="w-3 h-3 mr-1 text-cyan-400" />
-                    {group.phone ? group.phone : '-'}
-                  </>
-                )}
-              </div>
-
-              {/* Col 4: Action (col-span-3) */}
-              <div className="col-span-3 flex items-center justify-end gap-2">
-                {group.hasPending && (
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); handleWhatsAppReminder(group); }}
-                    className="p-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 transition-colors shadow-sm"
-                    title="Send WhatsApp Due Reminder"
-                  >
-                    <WhatsAppIcon className="w-4 h-4" />
-                  </button>
-                )}
-                <button 
-                  onClick={(e) => { e.stopPropagation(); setDeleteCustomerData(group); }}
-                  className="p-1.5 rounded-lg border border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors shadow-sm"
-                  title="Delete Customer"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              {/* Col 1: Customer Name */}
-              <div className="col-span-3 flex items-center gap-3">
-                <h3 className="text-slate-200 font-bold text-[14px] truncate">{group.name}</h3>
-              </div>
-
-              {/* Col X: Phone */}
-              <div className="hidden lg:flex col-span-2 items-center text-slate-400 text-[13px] truncate">
-                <Phone className="w-3 h-3 mr-1 text-cyan-400" />
-                {group.phone ? group.phone : '-'}
-              </div>
-
-              {/* Col Type: Arrears Type */}
-              <div className="col-span-2 flex items-center">
-                {group.hasPending ? (
-                  group.hasPosArrears && group.hasNonPosArrears ? (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-400">Mixed</span>
-                  ) : group.hasPosArrears ? (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-400">POS Sale</span>
-                  ) : (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-400">Other</span>
-                  )
-                ) : (
-                  <span className="text-slate-600">-</span>
-                )}
-              </div>
-
-              {/* Col 4: Is Due */}
-              <div className="col-span-2 flex items-center justify-end">
-                <button 
-                  onClick={() => setSelectedCustomerForModal(group)}
-                  className={`px-3 py-1.5 rounded-lg border transition-all text-xs font-bold whitespace-nowrap shadow-sm hover:shadow-md ${
-                    group.hasPending 
-                      ? 'bg-orange-500/10 border-orange-500/30 text-orange-400 hover:bg-orange-500/20' 
-                      : group.hasAdvance
-                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
-                        : group.records.length > 0 
-                          ? 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-700'
-                          : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-700'
-                  }`}
-                >
-                  {group.hasPending ? `Due: Rs ${group.totalPending.toFixed(0)}` : group.hasAdvance ? `Advance: Rs ${group.advanceBalance.toFixed(0)}` : group.records.length > 0 ? 'Settled' : 'No History'}
-                </button>
-              </div>
-
-              {/* Col 5: Actions */}
-              <div className="col-span-3 flex items-center justify-end gap-2 pr-2">
-                {payingRecordId === group.nameKey ? (
-                  <div className="flex items-center gap-1 bg-slate-900/80 border border-slate-700 rounded-lg overflow-hidden">
-                    <input 
-                      type="number" 
-                      value={payingAmount}
-                      onChange={(e) => setPayingAmount(e.target.value)}
-                      placeholder="Amount"
-                      className="w-16 bg-transparent px-2 py-1.5 text-xs text-white focus:outline-none"
-                      autoFocus
-                    />
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); handleGroupPayment(group); }}
-                      className="p-1.5 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40 transition-colors"
-                      title="Confirm Payment"
-                    >
-                      <CheckCircle className="w-4 h-4" />
-                    </button>
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); setPayingRecordId(null); setPayingAmount(''); }}
-                      className="p-1.5 bg-slate-800 text-slate-400 hover:text-white transition-colors"
-                      title="Cancel"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    {group.hasPending && (
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); handleWhatsAppReminder(group); }}
-                        className="p-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 transition-colors shadow-sm"
-                        title="Send WhatsApp Due Reminder"
-                      >
-                        <WhatsAppIcon className="w-4 h-4" />
-                      </button>
-                    )}
-                    {!group.hasAdvance && (
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); setPayingRecordId(group.nameKey); setPayingAmount(group.totalPending > 0 ? group.totalPending : ''); }}
-                        className="px-3 py-1.5 rounded-lg border border-blue-500/30 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 text-xs font-bold transition-colors shadow-sm"
-                      >
-                        Pay
-                      </button>
-                    )}
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); setDeleteGroupData(group); }}
-                      className="p-1.5 rounded-lg border border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors shadow-sm"
-                      title="Clear All Dues"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </>
-                )}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    );
+  // Reset Filters
+  const handleResetFilters = () => {
+    setSearchCustomer('');
+    setSearchArea('');
+    setSearchPhone('');
+    setDuesStatusFilter('ALL');
+    setSortBy('due-desc');
+    notify.info('Filters reset to default');
   };
 
-
-
-  const totalPending = records.reduce((sum, r) => {
-    if (r.type === 'Payment') return sum - r.amount;
-    if (r.status === 'Pending') return sum + r.amount;
-    return sum;
-  }, 0);
-
   return (
-    <div className="p-4 space-y-4 w-full relative z-10 h-full flex flex-col">
-      <div className="absolute inset-0 bg-gradient-to-br from-cyan-900/10 via-transparent to-red-900/10 pointer-events-none -z-10 rounded-3xl"></div>
+    <div className="w-full h-full flex flex-col space-y-2 overflow-hidden text-slate-100">
       
-      {/* Header & Stats */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 shrink-0 px-2 md:px-4">
-        <div className="flex items-center gap-3 mb-2">
-          <h1 className="text-xl font-black text-slate-100 uppercase tracking-widest flex items-center gap-3">
-            <Users className="w-8 h-8 text-purple-400" /> CUSTOMERS
-          </h1>
-          <div className="relative group cursor-help mt-1">
-            <HelpCircle className="w-5 h-5 text-slate-500 hover:text-slate-300 transition-colors" />
-            <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 w-max max-w-xs px-3 py-2 bg-slate-800/95 backdrop-blur text-slate-200 text-sm font-medium rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all shadow-xl border border-slate-700 z-50">
-              Manage customer dues and pending payments
-            </div>
-          </div>
-        </div>
+      {/* Top Header Control Strip */}
+      <div className="relative z-20 bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-2 sm:p-2.5 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-2.5 shrink-0">
         
-        <div className="flex items-center gap-2 w-full md:w-auto">
-          <button 
-            onClick={() => setIsAddFormOpen(!isAddFormOpen)}
-            className={`w-10 h-10 shrink-0 flex items-center justify-center rounded-lg border transition-all shadow-sm ${
-              isAddFormOpen 
-                ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' 
-                : 'bg-cyan-500/10 border-cyan-500/20 text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-500/40'
+        {/* Left: Tab Switcher (Outstanding Dues vs All Customers) */}
+        <div className="flex items-center gap-1.5 bg-[#090d16] p-0.5 rounded-xl border border-slate-800/90 w-full sm:w-auto">
+          <button
+            onClick={() => setActiveCustomersTab('dues')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              activeCustomersTab === 'dues'
+                ? 'bg-rose-500 text-slate-950 font-black shadow-sm'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
             }`}
-            title={isAddFormOpen ? 'Close Form' : 'Add New Record'}
           >
-            {isAddFormOpen ? <ChevronUp className="w-4 h-4" /> : <Plus className="w-5 h-5" />}
+            <DollarSign className="w-3.5 h-3.5" />
+            <span>Outstanding Dues</span>
+            <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded font-black ${
+              activeCustomersTab === 'dues' ? 'bg-slate-950/30 text-slate-950' : 'bg-slate-800 text-rose-400'
+            }`}>
+              {allGrouped.filter(g => g.hasPending).length}
+            </span>
           </button>
+
+          <button
+            onClick={() => setActiveCustomersTab('all')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              activeCustomersTab === 'all'
+                ? 'bg-sky-500 text-slate-950 font-black shadow-sm'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>Customer Directory</span>
+            <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded font-black ${
+              activeCustomersTab === 'all' ? 'bg-slate-950/30 text-slate-950' : 'bg-slate-800 text-sky-400'
+            }`}>
+              {allGrouped.length}
+            </span>
+          </button>
+        </div>
+
+        {/* Center: Search Box */}
+        <div className="relative w-full sm:w-72">
+          <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder="Search customer name, phone..."
+            value={searchCustomer}
+            onChange={(e) => setSearchCustomer(e.target.value)}
+            className="w-full bg-[#090d16] border border-slate-800 focus:border-sky-500/80 rounded-xl pl-8.5 pr-7 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none transition-all shadow-inner"
+          />
+          {searchCustomer && (
+            <button
+              onClick={() => setSearchCustomer('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* Right: Metrics & Action Buttons */}
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
           
-          <button 
+          {/* Total Pending Dues Badge */}
+          {activeCustomersTab === 'dues' && (
+            <div className="flex items-center gap-1.5 px-3 py-1 bg-rose-500/10 border border-rose-500/25 rounded-xl shadow-inner text-xs">
+              <span className="text-[10px] text-rose-400 font-black uppercase">Total Dues:</span>
+              <span className="font-mono font-black text-rose-400">
+                Rs. {totalPendingDues.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+          )}
+
+          <button
             onClick={fetchRecords}
-            className="w-10 h-10 shrink-0 flex items-center justify-center rounded-lg bg-slate-800/40 border border-slate-700/60 text-slate-400 hover:bg-slate-700 hover:text-slate-200 hover:border-slate-600 transition-all shadow-sm"
+            className="p-1.5 bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl border border-slate-700/80 transition-all cursor-pointer shadow-sm"
             title="Refresh Table"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className="w-3.5 h-3.5" />
           </button>
 
-          <button 
-            onClick={() => setIsFilterOpen(!isFilterOpen)}
-            className={`w-10 h-10 shrink-0 flex items-center justify-center rounded-lg border transition-all shadow-sm relative ${isFilterOpen ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400' : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:bg-slate-700 hover:text-slate-200 hover:border-slate-600'}`}
-            title="Filters"
+          <button
+            onClick={() => setIsAddFormOpen(!isAddFormOpen)}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-sky-500 to-teal-500 hover:from-sky-400 hover:to-teal-400 text-slate-950 text-xs font-black shadow-md shadow-sky-500/20 transition-all cursor-pointer"
           >
-            <Filter className="w-4 h-4" />
-            {(searchCustomer || searchArea || searchPhone) && (
-              <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-cyan-500"></span>
-            )}
+            {isAddFormOpen ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5 stroke-[3]" />}
+            <span>{isAddFormOpen ? 'Close' : activeCustomersTab === 'all' ? 'Add Customer' : 'Add Due'}</span>
           </button>
-
-          {/* Compact Total Pending Widget */}
-          <div className="h-10 justify-center bg-slate-900/80 backdrop-blur-xl border border-red-500/20 px-3 rounded-lg flex items-center gap-2 shadow-sm relative overflow-hidden group">
-            <div className="absolute -right-4 -top-4 w-12 h-12 bg-red-500/10 rounded-full blur-lg group-hover:bg-red-500/20 transition-all"></div>
-            <div className="p-1 bg-red-500/10 rounded md:hidden lg:block">
-              <DollarSign className="w-3.5 h-3.5 text-red-400" />
-            </div>
-            <div className="flex flex-col relative z-10">
-              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-0.5">Total Pending</span>
-              <span className="text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-orange-400 leading-none tracking-tight">Rs {totalPending.toFixed(2)}</span>
-            </div>
-          </div>
         </div>
+
       </div>
 
-      <div className="flex flex-col gap-4 flex-1 min-h-0">
+      {/* Main Split Layout: Left Filter Drawer + Right Content */}
+      <div className="flex-1 flex flex-col md:flex-row gap-3 min-h-0 overflow-hidden">
         
-        {/* Top Panel: Form */}
-        {isAddFormOpen && (
-        <div className="shrink-0 relative z-20">
-          <AddCustomerForm 
-            name={name} setName={setName}
-            phone={phone} setPhone={setPhone}
-            area={area} setArea={setArea}
-            amount={amount} setAmount={setAmount}
-            status={status} setStatus={setStatus}
-            isPosArrears={isPosArrears} setIsPosArrears={setIsPosArrears}
-            isSubmitting={isSubmitting} handleSubmit={handleSubmit}
-            activeCustomersTab={activeCustomersTab} directoryRecords={directoryRecords}
-          />
-        </div>
-        )}
+        {/* Left: Advanced Filters Drawer */}
+        <div className="w-full md:w-64 shrink-0 bg-[#071326]/90 backdrop-blur-md border border-slate-800/80 rounded-2xl p-3.5 flex flex-col gap-3 shadow-xl overflow-y-auto custom-scrollbar">
+          
+          {/* Header: Title & Reset */}
+          <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-sky-400" />
+              <span className="text-xs font-black uppercase tracking-wider text-slate-200">Customer Filter</span>
+            </div>
+            <button
+              onClick={handleResetFilters}
+              className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
+              title="Reset all filters"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+          </div>
 
-        {/* Bottom Area: List */}
-        <div className="flex-1 h-full min-h-0">
-          <div className="h-full flex flex-col min-h-0 bg-gradient-to-b from-slate-900/60 to-slate-950/60 backdrop-blur-xl border border-white/5 rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.3)] relative">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/5 rounded-full blur-[80px] pointer-events-none"></div>
+          {/* Area Filter */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Area / Location</label>
+            <div className="relative">
+              <select
+                value={searchArea}
+                onChange={(e) => setSearchArea(e.target.value)}
+                className="w-full appearance-none bg-[#090d16] border border-slate-800 focus:border-sky-500/80 rounded-xl px-3 py-1.5 text-xs text-slate-200 font-medium focus:outline-none cursor-pointer pr-8 shadow-inner"
+              >
+                <option value="">All Areas</option>
+                {uniqueAreas.map(area => (
+                  <option key={area} value={area}>{area}</option>
+                ))}
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          </div>
 
-            {/* Collapsible Filters */}
-            {isFilterOpen && (
-              <div className="bg-slate-900/50 border border-white/10 rounded-2xl p-4 mb-6 grid grid-cols-1 md:grid-cols-4 gap-4 items-center animate-in slide-in-from-top-2 fade-in duration-200 relative z-10">
-                <div className="relative w-full">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                  <input
-                    type="text"
-                    placeholder="Customer Name"
-                    value={searchCustomer}
-                    onChange={(e) => setSearchCustomer(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700/50 rounded-xl px-9 py-2.5 text-slate-200 focus:outline-none focus:border-cyan-500/50 text-sm"
-                  />
-                </div>
-                <div className="relative w-full">
-                  <MapPin className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                  <input
-                    type="text"
-                    placeholder="Area"
-                    value={searchArea}
-                    onChange={(e) => setSearchArea(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700/50 rounded-xl px-9 py-2.5 text-slate-200 focus:outline-none focus:border-cyan-500/50 text-sm"
-                  />
-                </div>
-                <div className="relative w-full">
-                  <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                  <input
-                    type="text"
-                    placeholder="Phone"
-                    value={searchPhone}
-                    onChange={(e) => setSearchPhone(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700/50 rounded-xl px-9 py-2.5 text-slate-200 focus:outline-none focus:border-cyan-500/50 text-sm"
-                  />
-                </div>
+          {/* Phone Search */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Filter Phone</label>
+            <div className="relative">
+              <Phone className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Phone digits..."
+                value={searchPhone}
+                onChange={(e) => setSearchPhone(e.target.value)}
+                className="w-full bg-[#090d16] border border-slate-800 focus:border-sky-500/80 rounded-xl pl-8.5 pr-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none font-mono shadow-inner"
+              />
+            </div>
+          </div>
+
+          {/* Sort By */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Sort By</label>
+            <div className="relative">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="w-full appearance-none bg-[#090d16] border border-slate-800 focus:border-sky-500/80 rounded-xl px-3 py-1.5 text-xs text-slate-200 font-medium focus:outline-none cursor-pointer pr-8 shadow-inner"
+              >
+                <option value="due-desc">Highest Due (Rs ↓)</option>
+                <option value="advance-desc">Advance Balance (Rs ↓)</option>
+                <option value="fav-desc">Favorites / Frequent First</option>
+                <option value="name-asc">Customer Name (A-Z)</option>
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          </div>
+
+          {/* Dues Status Filter (for dues tab) */}
+          {activeCustomersTab === 'dues' && (
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Balance Status</label>
+              <div className="relative">
+                <select
+                  value={duesStatusFilter}
+                  onChange={(e) => setDuesStatusFilter(e.target.value)}
+                  className="w-full appearance-none bg-[#090d16] border border-slate-800 focus:border-sky-500/80 rounded-xl px-3 py-1.5 text-xs text-slate-200 font-medium focus:outline-none cursor-pointer pr-8 shadow-inner"
+                >
+                  <option value="ALL">All Active Balances</option>
+                  <option value="PENDING">Pending Dues Only</option>
+                  <option value="ADVANCE">Advance Balances Only</option>
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Tabs */}
-            <div className="flex gap-4 mb-4 relative z-10 border-b border-white/5 pb-2">
-              <button 
-                onClick={() => setActiveCustomersTab('dues')}
-                className={`pb-2 px-2 font-bold text-sm transition-all border-b-2 ${activeCustomersTab === 'dues' ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
-              >
-                Dues & Advances
-              </button>
-              <button 
-                onClick={() => setActiveCustomersTab('all')}
-                className={`pb-2 px-2 font-bold text-sm transition-all border-b-2 ${activeCustomersTab === 'all' ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
-              >
-                All Customers
-              </button>
+          {/* Filter Status Badge */}
+          <div className="mt-auto pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
+            <span className="text-slate-400 uppercase font-black tracking-wider text-[10px]">Filtered Clients</span>
+            <span className="font-mono font-black text-sky-400 bg-sky-500/10 border border-sky-500/20 px-2.5 py-0.5 rounded-full">
+              {filteredGroups.length}
+            </span>
+          </div>
+
+        </div>
+
+        {/* Right: Main Content Area */}
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden space-y-2">
+          
+          {/* Add Customer / Due Form Card */}
+          {isAddFormOpen && (
+            <div className="shrink-0 animate-in fade-in duration-200">
+              <AddCustomerForm
+                name={name} setName={setName}
+                phone={phone} setPhone={setPhone}
+                area={area} setArea={setArea}
+                amount={amount} setAmount={setAmount}
+                status={status} setStatus={setStatus}
+                isPosArrears={isPosArrears} setIsPosArrears={setIsPosArrears}
+                isSubmitting={isSubmitting} handleSubmit={handleSubmit}
+                activeCustomersTab={activeCustomersTab} directoryRecords={directoryRecords}
+              />
+            </div>
+          )}
+
+          {/* Table Container */}
+          <div className="flex-1 bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl shadow-xl overflow-hidden flex flex-col min-h-0">
+            <div className="overflow-x-auto overflow-y-auto flex-1 custom-scrollbar">
+              <table className="w-full text-xs text-left border-collapse">
+                <thead className="sticky top-0 z-10 bg-[#071326] border-b border-slate-800 text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                  <tr>
+                    <th className="py-2.5 px-3 text-center w-10">★</th>
+                    <th className="py-2.5 px-3.5">Customer Name</th>
+                    <th className="py-2.5 px-3.5 w-36">Phone Number</th>
+                    <th className="py-2.5 px-3.5 w-36 hidden sm:table-cell">Area / Town</th>
+                    <th className="py-2.5 px-3.5 text-right w-40">
+                      {activeCustomersTab === 'all' ? 'Account Balance' : 'Outstanding Balance'}
+                    </th>
+                    <th className="py-2.5 px-3.5 text-center w-36">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 font-sans">
+                  {filteredGroups.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-16 text-center">
+                        <div className="flex flex-col items-center justify-center gap-2.5 text-slate-500">
+                          <Users className="w-10 h-10 stroke-[1.5] text-slate-600" />
+                          <p className="text-sm font-bold text-slate-400">No customer records found</p>
+                          <p className="text-xs text-slate-500">Try adjusting your search or filters.</p>
+                          <button
+                            onClick={handleResetFilters}
+                            className="mt-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-sky-400 rounded-xl text-xs font-bold border border-slate-700 transition-all cursor-pointer"
+                          >
+                            Reset Filters
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredGroups.map((group) => {
+                      const isPaying = payingRecordId === group.nameKey;
+
+                      return (
+                        <tr
+                          key={group.nameKey}
+                          className="hover:bg-slate-800/40 transition-colors group cursor-pointer"
+                          onClick={() => setSelectedCustomerForModal(group)}
+                        >
+                          {/* Favorite Star */}
+                          <td 
+                            className="py-2.5 px-3 text-center align-middle"
+                            onClick={(e) => toggleFavorite(group, e)}
+                          >
+                            <Star className={`w-4 h-4 transition-colors cursor-pointer inline-block ${
+                              group.mostVisited 
+                                ? 'text-amber-400 fill-amber-400' 
+                                : 'text-slate-600 hover:text-amber-400/50'
+                            }`} />
+                          </td>
+
+                          {/* Customer Name */}
+                          <td className="py-2.5 px-3.5 align-middle">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xs text-slate-300 shrink-0">
+                                {(group.name || 'C').substring(0, 2).toUpperCase()}
+                              </div>
+                              <span className="font-bold text-slate-100 text-xs truncate max-w-[180px]">
+                                {group.name}
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* Phone */}
+                          <td 
+                            className="py-2.5 px-3.5 align-middle font-mono text-slate-300"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {editingRecordId === group.nameKey && editingField === 'phone' ? (
+                              <div className="flex items-center gap-1 bg-slate-900 rounded-lg p-0.5 border border-sky-500">
+                                <input
+                                  type="text"
+                                  value={editingValue}
+                                  onChange={e => setEditingValue(e.target.value)}
+                                  className="bg-transparent text-slate-200 text-xs px-1 w-24 outline-none font-mono"
+                                />
+                                <CheckCircle
+                                  className="w-4 h-4 text-emerald-400 hover:text-emerald-300 cursor-pointer"
+                                  onClick={async () => {
+                                    try {
+                                      const custId = group.directoryId || await customerService.findOrCreateCustomerByName(group.name, editingValue, group.area);
+                                      if (group.directoryId) {
+                                        await customerService.updateCustomer(custId, { phone: editingValue });
+                                      }
+                                      for (const r of group.records) {
+                                        if (r.id) await duesService.updateDue(r.id, { phone: editingValue });
+                                      }
+                                      setEditingRecordId(null);
+                                      fetchRecords();
+                                      notify.success("Phone updated!");
+                                    } catch (err) {
+                                      notify.error("Failed to update phone");
+                                    }
+                                  }}
+                                />
+                                <X className="w-4 h-4 text-slate-400 hover:text-white cursor-pointer" onClick={() => setEditingRecordId(null)} />
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5 group/phone">
+                                <span className="text-xs">{group.phone || <span className="text-slate-500 italic">No phone</span>}</span>
+                                <button
+                                  onClick={() => {
+                                    setEditingRecordId(group.nameKey);
+                                    setEditingField('phone');
+                                    setEditingValue(group.phone || '');
+                                  }}
+                                  className="opacity-0 group-hover/phone:opacity-100 text-slate-500 hover:text-sky-300 p-0.5"
+                                  title="Edit phone"
+                                >
+                                  <Edit className="w-3 h-3" />
+                                </button>
+                              </div>
+                            )}
+                          </td>
+
+                          {/* Area */}
+                          <td 
+                            className="py-2.5 px-3.5 align-middle hidden sm:table-cell"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {editingRecordId === group.nameKey && editingField === 'area' ? (
+                              <div className="flex items-center gap-1 bg-slate-900 rounded-lg p-0.5 border border-sky-500">
+                                <input
+                                  type="text"
+                                  value={editingValue}
+                                  onChange={e => setEditingValue(e.target.value)}
+                                  className="bg-transparent text-slate-200 text-xs px-1 w-24 outline-none"
+                                />
+                                <CheckCircle
+                                  className="w-4 h-4 text-emerald-400 hover:text-emerald-300 cursor-pointer"
+                                  onClick={async () => {
+                                    try {
+                                      const custId = group.directoryId || await customerService.findOrCreateCustomerByName(group.name, group.phone, editingValue);
+                                      if (group.directoryId) {
+                                        await customerService.updateCustomer(custId, { area: editingValue });
+                                      }
+                                      for (const r of group.records) {
+                                        if (r.id) await duesService.updateDue(r.id, { area: editingValue });
+                                      }
+                                      setEditingRecordId(null);
+                                      fetchRecords();
+                                      notify.success("Area updated!");
+                                    } catch (err) {
+                                      notify.error("Failed to update area");
+                                    }
+                                  }}
+                                />
+                                <X className="w-4 h-4 text-slate-400 hover:text-white cursor-pointer" onClick={() => setEditingRecordId(null)} />
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5 group/area">
+                                <span className="text-xs text-slate-400">{group.area || <span className="text-slate-600 italic">None</span>}</span>
+                                <button
+                                  onClick={() => {
+                                    setEditingRecordId(group.nameKey);
+                                    setEditingField('area');
+                                    setEditingValue(group.area || '');
+                                  }}
+                                  className="opacity-0 group-hover/area:opacity-100 text-slate-500 hover:text-sky-300 p-0.5"
+                                  title="Edit area"
+                                >
+                                  <Edit className="w-3 h-3" />
+                                </button>
+                              </div>
+                            )}
+                          </td>
+
+                          {/* Balance / Status */}
+                          <td className="py-2.5 px-3.5 text-right whitespace-nowrap align-middle">
+                            {group.hasPending ? (
+                              <span className="font-mono font-black text-rose-400 bg-rose-500/10 border border-rose-500/25 px-2 py-0.5 rounded-lg text-xs">
+                                -Rs. {group.totalPending.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            ) : group.hasAdvance ? (
+                              <span className="font-mono font-black text-sky-400 bg-sky-500/10 border border-sky-500/25 px-2 py-0.5 rounded-lg text-xs">
+                                +Rs. {group.advanceBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            ) : (
+                              <span className="font-mono text-slate-500 text-xs">
+                                Settled
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Actions */}
+                          <td 
+                            className="py-2.5 px-3.5 text-center whitespace-nowrap align-middle"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div className="flex items-center justify-center gap-1.5">
+                              
+                              {/* Partial Payment input row or button */}
+                              {isPaying ? (
+                                <div className="flex items-center gap-1 bg-[#071326] p-1 rounded-xl border border-sky-500 shadow-md">
+                                  <input
+                                    type="number"
+                                    placeholder="Amount"
+                                    value={payingAmount}
+                                    onChange={(e) => setPayingAmount(e.target.value)}
+                                    className="bg-transparent text-xs text-emerald-400 font-mono font-bold w-16 px-1 outline-none text-right"
+                                    autoFocus
+                                  />
+                                  <button
+                                    onClick={() => handleGroupPayment(group)}
+                                    className="p-1 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40 rounded"
+                                    title="Confirm Payment"
+                                  >
+                                    <CheckCircle className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => { setPayingRecordId(null); setPayingAmount(''); }}
+                                    className="p-1 text-slate-400 hover:text-white"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <>
+                                  {/* WhatsApp Reminder */}
+                                  {group.hasPending && (
+                                    <button
+                                      onClick={() => handleWhatsAppReminder(group)}
+                                      className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition-colors shadow-sm"
+                                      title="Send WhatsApp Reminder"
+                                    >
+                                      <WhatsAppIcon className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+
+                                  {/* Quick Pay Button */}
+                                  {!group.hasAdvance && (
+                                    <button
+                                      onClick={() => {
+                                        setPayingRecordId(group.nameKey);
+                                        setPayingAmount(group.totalPending > 0 ? group.totalPending : '');
+                                      }}
+                                      className="px-2.5 py-1 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 text-xs font-bold transition-colors"
+                                    >
+                                      Pay
+                                    </button>
+                                  )}
+
+                                  {/* Order History Eye button */}
+                                  <button
+                                    onClick={() => setSelectedCustomerForModal(group)}
+                                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 border border-slate-700 transition-colors"
+                                    title="View Customer Records"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                  </button>
+
+                                  {/* Clear/Delete */}
+                                  <button
+                                    onClick={() => {
+                                      if (activeCustomersTab === 'all') {
+                                        setDeleteCustomerData(group);
+                                      } else {
+                                        setDeleteGroupData(group);
+                                      }
+                                    }}
+                                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 border border-slate-700 transition-colors"
+                                    title={activeCustomersTab === 'all' ? "Delete Customer" : "Clear Dues"}
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </>
+                              )}
+
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
             </div>
 
-            {loading ? (
-              <div className="flex-1 flex justify-center items-center">
-                <div className="w-8 h-8 border-2 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin"></div>
+            {/* Table Footer */}
+            <div className="px-4 py-2 bg-[#071326] border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400 shrink-0">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse"></span>
+                <span>Active Tab: <strong className="text-sky-300">{activeCustomersTab === 'dues' ? 'Outstanding Dues' : 'Directory'}</strong></span>
               </div>
-            ) : displayGroups.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-slate-500 py-12">
-                <User className="w-12 h-12 mb-3 opacity-20" />
-                <p>No customers found.</p>
+              <div className="font-mono text-slate-400">
+                Showing {filteredGroups.length} customer profiles
               </div>
-            ) : (
-              <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar bg-slate-900/40 rounded-2xl border border-white/5">
-                {/* Table Header */}
-                <div className="hidden lg:grid grid-cols-12 gap-4 px-4 py-4 border-b border-white/10 text-xs font-bold text-slate-400 uppercase tracking-wider bg-slate-950/80 sticky top-0 z-10 items-center">
-                  {activeCustomersTab === 'all' ? (
-                    <>
-                      <div className="col-span-1 flex justify-center text-yellow-500"><Star className="w-4 h-4 fill-yellow-500/20" /></div>
-                      <div className="col-span-3">Customer</div>
-                      <div className="col-span-3">Area</div>
-                      <div className="col-span-2">Phone</div>
-                      <div className="col-span-3 text-right">Action</div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="col-span-3">Customer</div>
-                      <div className="col-span-2">Phone</div>
-                      <div className="col-span-2">Type</div>
-                      <div className="col-span-2 text-right">Due Status</div>
-                      <div className="col-span-3 text-right">Action</div>
-                    </>
-                  )}
-                </div>
-
-                <div className="divide-y divide-white/5">
-                  {displayGroups.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map(renderGroup)}
-                </div>
-
-                {displayGroups.length > ITEMS_PER_PAGE && (
-                  <div className="flex items-center justify-between px-4 py-4 border-t border-white/5 bg-slate-950/50 mt-auto">
-                    <span className="text-xs text-slate-500 font-semibold">
-                      Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, displayGroups.length)} of {displayGroups.length}
-                    </span>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                        disabled={currentPage === 1}
-                        className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/50 text-slate-300 text-xs font-bold disabled:opacity-50 hover:bg-slate-700 transition-colors"
-                      >
-                        Previous
-                      </button>
-                      <button
-                        onClick={() => setCurrentPage(p => Math.min(Math.ceil(displayGroups.length / ITEMS_PER_PAGE), p + 1))}
-                        disabled={currentPage === Math.ceil(displayGroups.length / ITEMS_PER_PAGE)}
-                        className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/50 text-slate-300 text-xs font-bold disabled:opacity-50 hover:bg-slate-700 transition-colors"
-                      >
-                        Next
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+            </div>
 
           </div>
+
         </div>
 
       </div>
-      
-      <DeleteConfirmModal 
-        isOpen={!!deleteRecordId} 
-        onClose={() => setDeleteRecordId(null)} 
-        onConfirm={confirmDelete}
-        title="Delete Record?"
-        message="Are you sure you want to delete this customer record? This action cannot be undone."
-      />
 
+      {/* Modals */}
+      {selectedCustomerForModal && (
+        <CustomerHistoryModal
+          selectedCustomerForModal={selectedCustomerForModal}
+          setSelectedCustomerForModal={setSelectedCustomerForModal}
+          toggleStatus={toggleStatus}
+          handlePartialPayment={handleGroupPayment}
+          handleDelete={handleDelete}
+          isAdmin={isAdmin}
+          WhatsAppIcon={WhatsAppIcon}
+          handleWhatsAppReminder={handleWhatsAppReminder}
+        />
+      )}
+
+      {phoneModalCustomer && (
+        <CustomerPhoneModal
+          phoneModalCustomer={phoneModalCustomer}
+          setPhoneModalCustomer={setPhoneModalCustomer}
+          phoneModalInput={phoneModalInput}
+          setPhoneModalInput={setPhoneModalInput}
+          isSavingPhone={isSavingPhone}
+          savePhoneAndSendReminder={savePhoneAndSendReminder}
+          WhatsAppIcon={WhatsAppIcon}
+        />
+      )}
+
+      {/* Clear Group Dues Confirmation Modal */}
       <DeleteConfirmModal 
         isOpen={!!deleteGroupData} 
         onClose={() => setDeleteGroupData(null)} 
         onConfirm={confirmDeleteGroup}
-        title="Clear All Dues?"
-        message="Are you sure you want to delete all dues for this customer? This action cannot be undone."
+        title="Clear All Dues for Customer?"
+        message={`Are you sure you want to delete all dues for ${deleteGroupData?.name}? This action cannot be undone.`}
       />
 
-      {/* History Modal */}
-      {selectedCustomerForModal && (
-        <CustomerHistoryModal 
-          customer={selectedCustomerForModal}
-          onClose={() => setSelectedCustomerForModal(null)}
-          isAdmin={isAdmin}
-          payingRecordId={payingRecordId}
-          setPayingRecordId={setPayingRecordId}
-          payingAmount={payingAmount}
-          setPayingAmount={setPayingAmount}
-          handlePartialPayment={handlePartialPayment}
-          toggleStatus={toggleStatus}
-          handleDelete={handleDelete}
-          onSendWhatsAppReminder={handleWhatsAppReminder}
-        />
-      )}
-      <DeleteConfirmModal
-        isOpen={!!deleteCustomerData}
-        onClose={() => setDeleteCustomerData(null)}
+      {/* Delete Customer from Directory Confirmation Modal */}
+      <DeleteConfirmModal 
+        isOpen={!!deleteCustomerData} 
+        onClose={() => setDeleteCustomerData(null)} 
         onConfirm={confirmDeleteCustomerDirectory}
-        title="Delete Customer?"
-        message={`Are you sure you want to permanently delete "${deleteCustomerData?.name}"? All their history and records will also be deleted. This cannot be undone.`}
+        title="Delete Customer from Directory?"
+        message={`Are you sure you want to completely delete ${deleteCustomerData?.name} and all their records?`}
       />
 
-      {/* WhatsApp Phone Input Modal */}
-      <CustomerPhoneModal
-        isOpen={!!phoneModalCustomer}
-        customer={phoneModalCustomer}
-        phoneInput={phoneModalInput}
-        setPhoneInput={setPhoneModalInput}
-        onClose={() => { setPhoneModalCustomer(null); setPhoneModalInput(''); }}
-        onSaveAndSend={savePhoneAndSendReminder}
-        isSaving={isSavingPhone}
-      />
     </div>
   );
 }

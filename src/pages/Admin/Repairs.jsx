@@ -26,7 +26,7 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  DollarSign,
+  CreditCard,
   Phone,
   ShieldCheck,
   Tag,
@@ -39,7 +39,8 @@ import DeleteConfirmModal from '../../components/DeleteConfirmModal';
 import { RepairJobModal, RepairBillModal } from './RepairsComponents';
 import { generateRepairInvoiceHtml } from '../../utils/invoiceTemplate';
 
-export default function Repairs({ user, fetchSales }) {
+export default function Repairs({ user, fetchSales, isAdmin: propIsAdmin }) {
+  const isAdmin = propIsAdmin ?? (user?.email === 'admin@desh.lk' || user?.email?.toLowerCase().includes('admin'));
   const [repairs, setRepairs] = useState([]);
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -63,7 +64,7 @@ export default function Repairs({ user, fetchSales }) {
   const [editDeviceType, setEditDeviceType] = useState('PC');
   const [editSerial, setEditSerial] = useState('');
   const [editIssue, setEditIssue] = useState('');
-  const [editCalcItems, setEditCalcItems] = useState([{ desc: '', amount: '' }]);
+  const [editCalcItems, setEditCalcItems] = useState([{ desc: '', amount: '', buyingPrice: '' }]);
   const [showCalc, setShowCalc] = useState(false);
 
   const fetchData = async () => {
@@ -81,17 +82,37 @@ export default function Repairs({ user, fetchSales }) {
           ? r.parts_used
           : { parts: r.parts_used || [] };
 
+        const cost = Number(r.cost || 0);
+        const estCost = Number(r.estimated_cost ?? r.cost ?? 0);
+        const finalTotal = Number(extra.finalTotal || r.cost || 0);
+
+        const pSelling = (extra.parts || []).reduce((sum, p) => sum + Number(p.sellingPrice || 0), 0);
+        const cSelling = (extra.calcItems || []).reduce((sum, i) => sum + Number(i.amount || 0), 0);
+        const totalSelling = (pSelling + cSelling) > 0 ? (pSelling + cSelling) : finalTotal;
+        const pCost = (extra.parts || []).reduce((sum, p) => sum + Number(p.buyingPrice ?? p.cost ?? p.buyCost ?? 0), 0);
+        const cCost = (extra.calcItems || []).reduce((sum, i) => sum + Number(i.buyingPrice ?? i.cost ?? i.buyCost ?? 0), 0);
+        const disc = Number(extra.discount || 0);
+        const dynamicProfit = Math.max(0, totalSelling - (pCost + cCost) - disc);
+
+        const profit = extra.profit !== undefined && extra.profit !== null && Number(extra.profit) > 0
+          ? Number(extra.profit)
+          : dynamicProfit;
+
         return {
           id: r.id,
           customerId: r.customer_id,
           customerName: r.customer_name || 'Repair Customer',
           whatsapp: r.phone || '',
-          deviceType: r.device_model || 'PC',
+          deviceType: extra.deviceType || r.device_model || 'PC',
           issue: r.issue || '',
           status: r.status || 'Pending',
           isPaid: Boolean(r.is_paid),
           createdAt: r.created_at,
           timestamp: r.created_at,
+          cost,
+          estCost,
+          finalTotal,
+          profit,
           discount: Number(extra.discount) || 0,
           advancePayment: Number(extra.advancePayment) || 0,
           finalPayment: Number(extra.finalPayment) || 0,
@@ -100,8 +121,6 @@ export default function Repairs({ user, fetchSales }) {
           salutation: extra.salutation || 'Mr.',
           calcItems: extra.calcItems || [],
           parts: extra.parts || [],
-          profit: extra.profit,
-          finalTotal: extra.finalTotal,
           ...extra
         };
       });
@@ -161,7 +180,15 @@ export default function Repairs({ user, fetchSales }) {
       setDiscount(Number(repair.discount) || 0);
       setEditAdvancePayment(repair.advancePayment || 0);
       setEditFinalPayment(repair.finalPayment || 0);
-      setEditCalcItems(repair.calcItems && repair.calcItems.length > 0 ? repair.calcItems : [{ desc: '', amount: '' }]);
+      setEditCalcItems(
+        repair.calcItems && repair.calcItems.length > 0
+          ? repair.calcItems.map(i => ({
+              desc: i.desc || '',
+              amount: i.amount ?? '',
+              buyingPrice: i.buyingPrice ?? i.cost ?? i.buyCost ?? ''
+            }))
+          : [{ desc: '', amount: '', buyingPrice: '' }]
+      );
     } else {
       setEditSalutation('Mr.');
       setEditCustomerName('');
@@ -174,7 +201,7 @@ export default function Repairs({ user, fetchSales }) {
       setDiscount(0);
       setEditAdvancePayment(0);
       setEditFinalPayment(0);
-      setEditCalcItems([{ desc: '', amount: '' }]);
+      setEditCalcItems([{ desc: '', amount: '', buyingPrice: '' }]);
     }
     setShowCalc(false);
     setIsJobModalOpen(true);
@@ -213,20 +240,25 @@ export default function Repairs({ user, fetchSales }) {
         customerId = await customerService.findOrCreateCustomerByName(jobData.customerName, jobData.whatsapp);
       }
 
+      const partsSellingTotal = ((selectedRepair?.parts) || []).reduce((sum, p) => sum + Number(p.sellingPrice || 0), 0);
+      const calcItemsSellingTotal = editCalcItems.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+      const partsCostTotal = ((selectedRepair?.parts) || []).reduce((sum, p) => sum + Number(p.buyingPrice ?? p.cost ?? p.buyCost ?? 0), 0);
+      const calcItemsCostTotal = editCalcItems.reduce((sum, item) => sum + Number(item.buyingPrice ?? item.cost ?? item.buyCost ?? 0), 0);
+      
+      const totalJobSelling = partsSellingTotal + calcItemsSellingTotal;
+      const totalBuyingCost = partsCostTotal + calcItemsCostTotal;
+      const discountVal = Number(jobData.discount || 0);
+      const totalJobAmount = Math.max(0, totalJobSelling - discountVal);
+      // Profit = Selling price of parts & services minus item costs minus discount
+      const calculatedProfit = Math.max(0, totalJobSelling - totalBuyingCost - discountVal);
+
+      jobData.finalTotal = totalJobAmount;
+      jobData.profit = calculatedProfit;
+
       if (selectedRepair) {
         jobData.status = modalStatus;
 
         if (modalStatus === 'Paid' && selectedRepair.status !== 'Paid') {
-          const partsTotal = (selectedRepair.parts || []).reduce((sum, p) => sum + p.sellingPrice, 0);
-          const calcItemsTotal = editCalcItems.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-          const calcCostTotal = editCalcItems.reduce((sum, item) => sum + Number(item.buyingPrice || 0), 0);
-          
-          const buyingTotal = (selectedRepair.parts || []).reduce((sum, p) => sum + p.buyingPrice, 0) + calcCostTotal;
-          const totalJobAmount = partsTotal + calcItemsTotal - Number(discount);
-          
-          jobData.finalTotal = totalJobAmount;
-          jobData.profit = totalJobAmount - buyingTotal;
-
           let description = `Repair Payment: ${jobData.customerName} - ${jobData.deviceType} `;
           if ((selectedRepair.parts || []).length > 0) {
             description += `| Parts: ${(selectedRepair.parts || []).map(p => p.name).join(', ')} `;
@@ -240,7 +272,7 @@ export default function Repairs({ user, fetchSales }) {
 
           await salesService.createSale({
             amount: totalJobAmount,
-            discount: Number(jobData.discount || 0),
+            discount: discountVal,
             description,
             customerName: jobData.customerName || 'Repair Customer',
             customerPhone: jobData.whatsapp || '',
@@ -262,11 +294,11 @@ export default function Repairs({ user, fetchSales }) {
             warrantyDays: jobData.warrantyDays,
             advancePayment: jobData.advancePayment,
             finalPayment: jobData.finalPayment,
-            discount: Number(jobData.discount) || 0,
+            discount: discountVal,
             serial: jobData.serial,
             deviceType: jobData.deviceType,
             salutation: editSalutation,
-            profit: jobData.profit,
+            profit: calculatedProfit,
             finalTotal: jobData.finalTotal
           }
         };
@@ -276,13 +308,12 @@ export default function Repairs({ user, fetchSales }) {
         jobData.status = 'Pending';
         jobData.parts = [];
         jobData.laborCharge = 0;
-        jobData.finalTotal = 0;
 
         const repairPayload = {
           customer_id: customerId,
           device_model: jobData.deviceType || 'PC',
           issue: jobData.issue || '',
-          cost: 0,
+          cost: Number(jobData.finalTotal || jobData.estCost || 0),
           estimated_cost: Number(jobData.estCost || 0),
           status: 'Pending',
           is_paid: false,
@@ -292,10 +323,12 @@ export default function Repairs({ user, fetchSales }) {
             warrantyDays: jobData.warrantyDays,
             advancePayment: jobData.advancePayment,
             finalPayment: jobData.finalPayment,
-            discount: Number(jobData.discount) || 0,
+            discount: discountVal,
             serial: jobData.serial,
             deviceType: jobData.deviceType,
-            salutation: editSalutation
+            salutation: editSalutation,
+            profit: calculatedProfit,
+            finalTotal: jobData.finalTotal
           }
         };
         
@@ -351,19 +384,22 @@ export default function Repairs({ user, fetchSales }) {
     try {
       const isPaid = newStatus === 'Paid';
 
+      // Compute accurate profit and amounts (selling price - buying cost - discount)
+      const pTotal = (job.parts || []).reduce((sum, p) => sum + Number(p.sellingPrice || 0), 0);
+      const cTotal = (job.calcItems || []).reduce((sum, item) => sum + Number(item.amount || 0), 0);
+      const calcCostTotal = (job.calcItems || []).reduce((sum, item) => sum + Number(item.buyingPrice ?? item.cost ?? item.buyCost ?? 0), 0);
+      const partsBuyingTotal = (job.parts || []).reduce((sum, p) => sum + Number(p.buyingPrice ?? p.cost ?? p.buyCost ?? 0), 0);
+      const buyingTotal = partsBuyingTotal + calcCostTotal;
+      const discountAmt = Number(job.discount || 0);
+
+      const totalJobSelling = (pTotal + cTotal) > 0 
+        ? (pTotal + cTotal) 
+        : Number(job.finalTotal || job.estCost || 0);
+      const calculatedProfit = Math.max(0, totalJobSelling - buyingTotal - discountAmt);
+      let totalJobAmount = Math.max(0, totalJobSelling - discountAmt);
+
       // If marking as Paid and wasn't Paid before, record sale
       if (newStatus === 'Paid' && job.status !== 'Paid') {
-        const pTotal = (job.parts || []).reduce((sum, p) => sum + Number(p.sellingPrice || 0), 0);
-        const cTotal = (job.calcItems || []).reduce((sum, item) => sum + Number(item.amount || 0), 0);
-        const calcCostTotal = (job.calcItems || []).reduce((sum, item) => sum + Number(item.buyingPrice || 0), 0);
-        const buyingTotal = (job.parts || []).reduce((sum, p) => sum + Number(p.buyingPrice || 0), 0) + calcCostTotal;
-        const discountAmt = Number(job.discount || 0);
-
-        let totalJobAmount = (pTotal + cTotal) > 0 
-          ? (pTotal + cTotal - discountAmt) 
-          : (Number(job.finalTotal || job.estCost || 0) - discountAmt);
-        if (totalJobAmount < 0) totalJobAmount = 0;
-
         let description = `Repair Payment: ${job.customerName || 'Customer'} - ${job.deviceType || 'PC'} `;
         if ((job.parts || []).length > 0) {
           description += `| Parts: ${job.parts.map(p => p.name).join(', ')} `;
@@ -388,11 +424,24 @@ export default function Repairs({ user, fetchSales }) {
       }
 
       // Update in Supabase
+      const existingPartsUsed = (job.parts_used && typeof job.parts_used === 'object' && !Array.isArray(job.parts_used))
+        ? job.parts_used
+        : {};
+      const updatedPartsUsed = {
+        ...existingPartsUsed,
+        parts: job.parts || [],
+        calcItems: job.calcItems || [],
+        discount: discountAmt,
+        profit: calculatedProfit,
+        finalTotal: totalJobAmount
+      };
+
       const { error } = await supabase
         .from('repairs')
         .update({
           status: newStatus,
-          is_paid: isPaid
+          is_paid: isPaid,
+          parts_used: updatedPartsUsed
         })
         .eq('id', job.id);
 
@@ -403,7 +452,7 @@ export default function Repairs({ user, fetchSales }) {
       }
 
       // Optimistically update local state
-      setRepairs(prev => prev.map(r => r.id === job.id ? { ...r, status: newStatus, isPaid } : r));
+      setRepairs(prev => prev.map(r => r.id === job.id ? { ...r, status: newStatus, isPaid, profit: calculatedProfit, finalTotal: totalJobAmount } : r));
       if (fetchSales) fetchSales();
       notify.success(`Status updated to ${newStatus}`);
     } catch (err) {
@@ -440,10 +489,10 @@ export default function Repairs({ user, fetchSales }) {
 
   const handleQuickAdd = (service) => {
     let newItems = [...editCalcItems];
-    if (newItems.length === 1 && newItems[0].desc === '' && !newItems[0].amount) {
-      newItems = [{ desc: service.name, amount: service.price }];
+    if (newItems.length === 1 && newItems[0].desc === '' && !newItems[0].amount && !newItems[0].buyingPrice) {
+      newItems = [{ desc: service.name, amount: service.price, buyingPrice: '' }];
     } else {
-      newItems.push({ desc: service.name, amount: service.price });
+      newItems.push({ desc: service.name, amount: service.price, buyingPrice: '' });
     }
     setEditCalcItems(newItems);
   };
@@ -627,7 +676,7 @@ export default function Repairs({ user, fetchSales }) {
         {/* Active Balance Due */}
         <div className="col-span-2 sm:col-span-1 bg-slate-900/60 border border-rose-500/20 rounded-xl p-2 sm:p-2.5 backdrop-blur-md shadow-sm flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 shrink-0">
-            <DollarSign className="w-4 h-4" />
+            <CreditCard className="w-4 h-4" />
           </div>
           <div className="min-w-0">
             <span className="text-[9px] font-bold text-rose-300/80 uppercase tracking-wider block truncate">Balance Due</span>
@@ -645,25 +694,21 @@ export default function Repairs({ user, fetchSales }) {
             <thead>
               <tr className="bg-[#09182d] text-slate-400 text-[10px] uppercase font-bold tracking-wider border-b border-slate-800/90">
                 <th className="px-4 py-3.5 font-bold">Job ID</th>
-                <th className="px-4 py-3.5 font-bold">Date</th>
                 <th className="px-4 py-3.5 font-bold">Customer Profile</th>
                 <th className="px-4 py-3.5 font-bold">Device & Model</th>
                 <th className="px-4 py-3.5 font-bold">Diagnosed Issue</th>
-                <th className="px-4 py-3.5 font-bold text-right">Est. Cost</th>
+                <th className="px-4 py-3.5 font-bold text-right">Est. Cost / Disc.</th>
                 <th className="px-4 py-3.5 font-bold text-right">Advance Paid</th>
-                <th className="px-4 py-3.5 font-bold text-right">Discount</th>
                 <th className="px-4 py-3.5 font-bold text-right">Balance Due</th>
                 <th className="px-4 py-3.5 font-bold text-center">Status</th>
-                {user?.email === 'admin@desh.lk' && (
-                  <th className="px-4 py-3.5 font-bold text-right text-sky-400">Profit</th>
-                )}
+                <th className="px-4 py-3.5 font-bold text-right text-sky-400">Grand Total</th>
                 <th className="px-4 py-3.5 font-bold text-center">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/40 text-xs">
               {loading ? (
                 <tr>
-                  <td colSpan={user?.email === 'admin@desh.lk' ? 12 : 11} className="px-6 py-12 text-center text-slate-400">
+                  <td colSpan={10} className="px-6 py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <RefreshCw className="w-6 h-6 animate-spin text-sky-400" />
                       <span className="text-xs font-semibold">Loading repair jobs database...</span>
@@ -672,7 +717,7 @@ export default function Repairs({ user, fetchSales }) {
                 </tr>
               ) : filteredRepairs.length === 0 ? (
                 <tr>
-                  <td colSpan={user?.email === 'admin@desh.lk' ? 12 : 11} className="px-6 py-12 text-center text-slate-500">
+                  <td colSpan={10} className="px-6 py-12 text-center text-slate-500">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <Wrench className="w-8 h-8 text-slate-600 stroke-[1.5]" />
                       <span className="text-sm font-bold text-slate-400">No repair jobs matching criteria.</span>
@@ -687,6 +732,12 @@ export default function Repairs({ user, fetchSales }) {
                   const calcTotal = (job.calcItems || []).reduce((sum, i) => sum + Number(i.amount || 0), 0);
                   const jobTotal = (partsTotal + calcTotal) > 0 ? (partsTotal + calcTotal) : Number(job.finalTotal || job.estCost || 0);
                   const estCost = Number(job.estCost || 0);
+
+                  // Calculate buying cost
+                  const partsCost = (job.parts || []).reduce((sum, p) => sum + Number(p.buyingPrice ?? p.cost ?? p.buyCost ?? 0), 0);
+                  const calcCost = (job.calcItems || []).reduce((sum, i) => sum + Number(i.buyingPrice ?? i.cost ?? i.buyCost ?? 0), 0);
+                  const totalBuyCost = partsCost + calcCost;
+
                   const advance = Number(job.advancePayment || 0);
                   const disc = Number(job.discount || 0);
                   const bal = Math.max(0, jobTotal - advance - disc);
@@ -696,25 +747,18 @@ export default function Repairs({ user, fetchSales }) {
                       
                       {/* Job ID */}
                       <td className="px-4 py-3.5 whitespace-nowrap align-middle">
-                        <button 
-                          onClick={() => viewBill(job)}
-                          className="font-mono font-bold text-sky-400 hover:text-sky-300 hover:underline flex items-center gap-1 cursor-pointer"
-                          title="Click to view estimate/bill summary"
-                        >
-                          <span>#{job.id.slice(0, 6).toUpperCase()}</span>
-                        </button>
+                        <span className="font-mono font-bold text-sky-400 select-all">
+                          #{job.id.slice(0, 6).toUpperCase()}
+                        </span>
                       </td>
 
-                      {/* Date */}
-                      <td className="px-4 py-3.5 text-slate-400 whitespace-nowrap align-middle font-mono text-[11px]">
-                        {job.createdAt ? format(parseTimestamp(job.createdAt), 'MMM dd, p') : '...'}
-                      </td>
-
-                      {/* Customer Profile + WhatsApp Direct */}
+                      {/* Customer Profile + Phone + Date (Combined) */}
                       <td className="px-4 py-3.5 align-middle">
-                        <div className="flex items-center gap-2">
-                          <div>
-                            <div className="font-bold text-slate-100">{job.customerName}</div>
+                        <div className="flex flex-col">
+                          <div className="font-bold text-slate-100 flex items-center gap-1.5">
+                            <span>{job.customerName}</span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5">
                             {job.whatsapp ? (
                               <button
                                 onClick={(e) => openWhatsAppChat(e, job.whatsapp, job.customerName, job.id)}
@@ -727,6 +771,10 @@ export default function Repairs({ user, fetchSales }) {
                             ) : (
                               <span className="text-[10px] text-slate-500">No phone</span>
                             )}
+                            <span className="text-slate-600 text-[10px]">•</span>
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              {job.createdAt ? format(parseTimestamp(job.createdAt), 'MMM dd, p') : '...'}
+                            </span>
                           </div>
                         </div>
                       </td>
@@ -755,19 +803,21 @@ export default function Repairs({ user, fetchSales }) {
                         </p>
                       </td>
 
-                      {/* Est. Cost */}
-                      <td className="px-4 py-3.5 text-right whitespace-nowrap align-middle font-mono font-bold text-sky-300">
-                        {jobTotal > 0 ? `Rs ${jobTotal.toFixed(2)}` : (estCost > 0 ? `Rs ${estCost.toFixed(2)}` : '-')}
+                      {/* Est. Cost & Discount (Combined) */}
+                      <td className="px-4 py-3.5 text-right whitespace-nowrap align-middle font-mono">
+                        <div className="font-bold text-sky-300">
+                          {jobTotal > 0 ? `Rs ${jobTotal.toFixed(2)}` : (estCost > 0 ? `Rs ${estCost.toFixed(2)}` : '-')}
+                        </div>
+                        {disc > 0 && (
+                          <div className="text-[10px] font-semibold text-rose-400">
+                            Disc: -Rs {disc.toFixed(2)}
+                          </div>
+                        )}
                       </td>
 
                       {/* Advance Paid */}
                       <td className="px-4 py-3.5 text-right whitespace-nowrap align-middle font-mono font-bold text-emerald-400">
                         {advance > 0 ? `Rs ${advance.toFixed(2)}` : '-'}
-                      </td>
-
-                      {/* Discount */}
-                      <td className="px-4 py-3.5 text-right whitespace-nowrap align-middle font-mono font-bold text-rose-400">
-                        {disc > 0 ? `Rs ${disc.toFixed(2)}` : '-'}
                       </td>
 
                       {/* Balance Due */}
@@ -777,7 +827,7 @@ export default function Repairs({ user, fetchSales }) {
                             <CheckCircle2 className="w-3.5 h-3.5" /> Cleared
                           </span>
                         ) : bal > 0 ? (
-                          <span className="text-amber-400">Rs ${bal.toFixed(2)}</span>
+                          <span className="text-amber-400">Rs {bal.toFixed(2)}</span>
                         ) : jobTotal > 0 ? (
                           <span className="text-slate-400 text-xs font-semibold">Rs 0.00</span>
                         ) : (
@@ -813,22 +863,10 @@ export default function Repairs({ user, fetchSales }) {
                         </div>
                       </td>
 
-                      {/* Profit (Admin Only) */}
-                      {user?.email === 'admin@desh.lk' && (
-                        <td className="px-4 py-3.5 text-right whitespace-nowrap align-middle font-mono font-bold text-sky-400">
-                          {(() => {
-                            if (job.profit !== undefined) return `Rs ${job.profit.toFixed(2)}`;
-                            const pTotal = (job.parts || []).reduce((sum, p) => sum + p.sellingPrice, 0);
-                            const cTotal = (job.calcItems || []).reduce((sum, i) => sum + Number(i.amount || 0), 0);
-                            const pCost = (job.parts || []).reduce((sum, p) => sum + p.buyingPrice, 0);
-                            const cCost = (job.calcItems || []).reduce((sum, i) => sum + Number(i.buyingPrice || 0), 0);
-                            let estimatedRevenue = (pTotal + cTotal) > 0 ? (pTotal + cTotal) : (job.estCost || 0);
-                            let totalCost = pCost + cCost;
-                            let profit = Math.max(0, estimatedRevenue - totalCost - Number(job.discount || 0));
-                            return `Rs ${profit.toFixed(2)}`;
-                          })()}
-                        </td>
-                      )}
+                      {/* Grand Total */}
+                      <td className="px-4 py-3.5 text-right whitespace-nowrap align-middle font-mono font-black text-sky-400">
+                        Rs {Math.max(0, jobTotal - disc).toFixed(2)}
+                      </td>
 
                       {/* Actions */}
                       <td className="px-4 py-3.5 text-center whitespace-nowrap align-middle">
@@ -837,10 +875,28 @@ export default function Repairs({ user, fetchSales }) {
                             <button
                               onClick={() => printFinalBill(job)}
                               className="p-1.5 rounded-lg bg-slate-800 hover:bg-sky-500/20 text-slate-300 hover:text-sky-300 border border-slate-700/80 transition-all cursor-pointer"
-                              title="Print Final Bill"
+                              title="Print Repair Invoice"
                             >
                               <Printer className="w-3.5 h-3.5" />
                             </button>
+                          ) : job.status === 'Completed' ? (
+                            <>
+                              <button
+                                onClick={() => openJobModal(job)}
+                                className="p-1.5 rounded-lg bg-slate-800 hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-300 border border-slate-700/80 transition-all cursor-pointer"
+                                title="Edit / Update Job Diagnostics"
+                              >
+                                <Edit className="w-3.5 h-3.5" />
+                              </button>
+
+                              <button
+                                onClick={() => printFinalBill(job)}
+                                className="p-1.5 rounded-lg bg-slate-800 hover:bg-sky-500/20 text-slate-300 hover:text-sky-300 border border-slate-700/80 transition-all cursor-pointer"
+                                title="Print Repair Invoice"
+                              >
+                                <Printer className="w-3.5 h-3.5" />
+                              </button>
+                            </>
                           ) : (
                             <>
                               <button
@@ -861,7 +917,7 @@ export default function Repairs({ user, fetchSales }) {
                             </>
                           )}
 
-                          {user?.email === 'admin@desh.lk' && (
+                          {(isAdmin || user?.email === 'admin@desh.lk') && (
                             <button
                               onClick={() => handleDeleteJob(job.id)}
                               className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-700/80 transition-all cursor-pointer"
@@ -917,6 +973,7 @@ export default function Repairs({ user, fetchSales }) {
         calcItemsTotal={calcItemsTotal}
         currentFinalTotal={currentFinalTotal}
         user={user}
+        isAdmin={isAdmin}
         printEstimate={printEstimate}
         printFinalBill={printFinalBill}
         hasPendingBalanceToComplete={hasPendingBalanceToComplete}

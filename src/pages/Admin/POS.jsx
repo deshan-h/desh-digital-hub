@@ -754,7 +754,7 @@ export default function POS({
           </div>
 
           {/* Customer Details Box (Placed Under POS Items Box) */}
-          <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-2.5 sm:p-3 shadow-xl space-y-2 shrink-0">
+          <div className="relative z-30 bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-2.5 sm:p-3 shadow-xl space-y-2 shrink-0">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300">
                 Customer Details <span className="text-rose-400">*</span>

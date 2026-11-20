@@ -130,6 +130,11 @@ export default function Admin() {
         fetchCustomerDues();
         fetchCustomersList();
 
+        // Clean up previous listeners if already attached
+        if (inquiriesUnsubscribe) inquiriesUnsubscribe();
+        if (categoriesUnsubscribe) categoriesUnsubscribe();
+        if (pendingUnsubscribe) pendingUnsubscribe();
+
         // Attach inquiries listener
         inquiriesUnsubscribe = inquiryService.subscribe((data) => {
           setInquiries(data || []);
@@ -699,11 +704,11 @@ export default function Admin() {
           )}
           {activeTab === 'customers' && <Customers isAdmin={isAdmin} />}
           {activeTab === 'expenses' && <Expenses isAdmin={isAdmin} />}
-          {activeTab === 'history' && <History salesHistory={salesHistory} fetchSales={fetchSales} handleDeleteSale={handleDeleteSale} user={user} posCategories={posCategories} isAdmin={isAdmin} customersList={customersList} />}
-          {activeTab === 'repairs' && <Repairs user={user} fetchSales={fetchSales} />}
+          {activeTab === 'history' && <History salesHistory={salesHistory} fetchSales={fetchSales} handleDeleteSale={handleDeleteSale} user={user} posCategories={posCategories} isAdmin={isAdmin} customersList={customersList} setActiveTab={setActiveTab} />}
+          {activeTab === 'repairs' && <Repairs user={user} fetchSales={fetchSales} isAdmin={isAdmin} />}
           {activeTab === 'items' && <ItemsManager posCategories={posCategories} fetchCategories={fetchCategories} />}
           {activeTab === 'inquiries' && <Inquiries />}
-          {activeTab === 'reports' && <Reports salesHistory={salesHistory} customersList={customersList} isAdmin={isAdmin} />}
+          {activeTab === 'reports' && <Reports salesHistory={salesHistory} customersList={customersList} isAdmin={isAdmin} setActiveTab={setActiveTab} />}
           {activeTab === 'settings' && <Settings isAdmin={isAdmin} posCategories={posCategories} fetchCategories={fetchCategories} />}
         </Suspense>
       </AdminLayout>

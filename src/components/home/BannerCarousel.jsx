@@ -58,7 +58,9 @@ export default function BannerCarousel() {
         const data = await settingsService.getSetting('banners');
         if (isMounted) {
           if (data && Array.isArray(data.items) && data.items.length > 0) {
-            const activeItems = data.items.filter((b) => b.active !== false);
+            const activeItems = data.items
+              .filter((b) => b.active !== false)
+              .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
             setBanners(activeItems.length > 0 ? activeItems : DEFAULT_BANNERS);
           } else {
             setBanners(DEFAULT_BANNERS);

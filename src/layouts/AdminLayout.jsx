@@ -59,6 +59,7 @@ export default function AdminLayout({
   const [isTodaySalesOpen, setIsTodaySalesOpen] = useState(false);
   const [isPendingSalesOpen, setIsPendingSalesOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isReportsOpen, setIsReportsOpen] = useState(() => activeTab === 'history' || activeTab === 'reports');
   const dropdownRef = useRef(null);
   const calculatorRef = useRef(null);
   const todaySalesDropdownRef = useRef(null);
@@ -109,13 +110,27 @@ export default function AdminLayout({
     window.location.reload(true);
   };
 
+  useEffect(() => {
+    if (activeTab === 'history' || activeTab === 'reports') {
+      setIsReportsOpen(true);
+    }
+  }, [activeTab]);
+
   // Grouped Navigation Items matching StoreMate layout
   const mainNavItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, hasDropdown: true },
     { id: 'pos', label: 'Sales / POS', icon: ShoppingCart, hasDropdown: true },
     { id: 'repairs', label: 'PC Repairs', icon: Wrench, hasDropdown: false },
-    { id: 'history', label: 'Sales History', icon: History, hasDropdown: true },
-    { id: 'reports', label: 'Reports', icon: BarChart3, hasDropdown: false },
+    { 
+      id: 'reports', 
+      label: 'Reports', 
+      icon: BarChart3, 
+      hasSubNav: true,
+      subItems: [
+        { id: 'history', label: 'Sales Report', icon: Receipt },
+        { id: 'reports', label: 'Customer Report', icon: Users }
+      ]
+    },
   ];
 
   const optionalNavItems = [
@@ -136,8 +151,8 @@ export default function AdminLayout({
       case 'expenses': return { section: 'Accounting', page: 'Shop Expenses' };
       case 'items': return { section: 'Inventory Management', page: 'Products & Stock' };
       case 'inquiries': return { section: 'Customer Support', page: 'Messages & Inquiries' };
-      case 'history': return { section: 'Sales History', page: 'Sales Invoices & Receipts' };
-      case 'reports': return { section: 'Business Intelligence', page: 'Analytics & Reports' };
+      case 'history': return { section: 'Business Reports', page: 'Sales Report & Records' };
+      case 'reports': return { section: 'Business Reports', page: 'Customer Analytics Report' };
       case 'settings': return { section: 'System Configuration', page: 'Settings' };
       default: return { section: 'DESH Management', page: 'Home' };
     }
@@ -222,45 +237,134 @@ export default function AdminLayout({
               <div className="space-y-1">
                 {mainNavItems.map((item) => {
                   const Icon = item.icon;
-                  const isActive = activeTab === item.id;
+                  const isItemActive = activeTab === item.id || (item.hasSubNav && (activeTab === 'history' || activeTab === 'reports'));
 
                   return (
-                    <button
-                      key={item.id}
-                      onClick={() => setActiveTab(item.id)}
-                      className={`group relative w-full flex items-center rounded-xl transition-all duration-200 cursor-pointer ${
-                        isSidebarOpen 
-                          ? 'justify-between px-3.5 py-2.5 text-xs' 
-                          : 'flex-col justify-center py-2 px-1 text-center'
-                      } ${
-                        isActive 
-                          ? 'bg-white/20 text-white font-bold backdrop-blur-md shadow-sm border border-white/20' 
-                          : 'text-white/80 hover:text-white hover:bg-white/10 font-medium border border-transparent'
-                      }`}
-                    >
-                      <div className={`flex items-center ${isSidebarOpen ? 'gap-3' : 'flex-col gap-1'}`}>
-                        <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-white/80 group-hover:text-white'}`} />
-                        {isSidebarOpen ? (
-                          <span className="truncate">{item.label}</span>
-                        ) : (
-                          <span className="text-[9px] font-semibold leading-tight text-white/70 group-hover:text-white truncate max-w-[60px]">
-                            {item.label.split('/')[0]}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Dropdown chevron on right matching screenshot */}
-                      {isSidebarOpen && item.hasDropdown && (
-                        <ChevronDown className={`w-3.5 h-3.5 text-white/60 transition-transform ${isActive ? 'rotate-180 text-white' : 'group-hover:text-white'}`} />
-                      )}
-
-                      {/* Collapsed Tooltip */}
-                      {!isSidebarOpen && (
-                        <div className="absolute left-16 hidden group-hover:block bg-slate-900 text-white text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-700 whitespace-nowrap z-50 shadow-2xl pointer-events-none">
-                          {item.label}
+                    <div key={item.id} className="space-y-1">
+                      <button
+                        onClick={() => {
+                          if (item.hasSubNav) {
+                            setIsReportsOpen(prev => !prev);
+                            if (activeTab !== 'history' && activeTab !== 'reports') {
+                              setActiveTab('history');
+                            }
+                          } else {
+                            setActiveTab(item.id);
+                          }
+                        }}
+                        className={`group relative w-full flex items-center rounded-xl transition-all duration-200 cursor-pointer ${
+                          isSidebarOpen 
+                            ? 'justify-between px-3.5 py-2.5 text-xs' 
+                            : 'flex-col justify-center py-2 px-1 text-center'
+                        } ${
+                          isItemActive 
+                            ? 'bg-white/20 text-white font-bold backdrop-blur-md shadow-sm border border-white/20' 
+                            : 'text-white/80 hover:text-white hover:bg-white/10 font-medium border border-transparent'
+                        }`}
+                      >
+                        <div className={`flex items-center ${isSidebarOpen ? 'gap-3' : 'flex-col gap-1'}`}>
+                          <Icon className={`w-4 h-4 shrink-0 ${isItemActive ? 'text-white' : 'text-white/80 group-hover:text-white'}`} />
+                          {isSidebarOpen ? (
+                            <span className="truncate">{item.label}</span>
+                          ) : (
+                            <span className="text-[9px] font-semibold leading-tight text-white/70 group-hover:text-white truncate max-w-[60px]">
+                              {item.label.split('/')[0]}
+                            </span>
+                          )}
                         </div>
+
+                        {/* Dropdown chevron on right */}
+                        {isSidebarOpen && (item.hasDropdown || item.hasSubNav) && (
+                          <ChevronDown className={`w-3.5 h-3.5 text-white/60 transition-transform ${
+                            item.hasSubNav 
+                              ? (isReportsOpen ? 'rotate-180 text-white' : 'group-hover:text-white') 
+                              : (isItemActive ? 'rotate-180 text-white' : 'group-hover:text-white')
+                          }`} />
+                        )}
+
+                        {/* Collapsed Tooltip / Sub-menu Popover */}
+                        {!isSidebarOpen && (
+                          <div className="absolute left-16 hidden group-hover:flex flex-col gap-1 bg-slate-900 text-white text-xs font-bold p-2 rounded-xl border border-slate-700 whitespace-nowrap z-50 shadow-2xl">
+                            <span className="text-[10px] uppercase tracking-wider text-slate-400 px-2 py-0.5">{item.label}</span>
+                            {item.subItems ? (
+                              item.subItems.map(sub => (
+                                <div
+                                  key={sub.id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveTab(sub.id);
+                                  }}
+                                  className={`px-3 py-1.5 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer flex items-center gap-2 ${activeTab === sub.id ? 'text-sky-400 bg-sky-500/10 font-bold' : 'text-slate-300'}`}
+                                >
+                                  <span>{sub.label}</span>
+                                </div>
+                              ))
+                            ) : null}
+                          </div>
+                        )}
+                      </button>
+
+                      {/* Expandable Sub-items for Reports (Visible in both Expanded & Collapsed Sidebar) */}
+                      {item.hasSubNav && isReportsOpen && (
+                        isSidebarOpen ? (
+                          <div className="pl-4 pr-1 pt-0.5 pb-1 space-y-1">
+                            {item.subItems.map(sub => {
+                              const SubIcon = sub.icon;
+                              const isSubActive = activeTab === sub.id;
+                              return (
+                                <button
+                                  key={sub.id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveTab(sub.id);
+                                  }}
+                                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-all cursor-pointer ${
+                                    isSubActive
+                                      ? 'bg-sky-500/25 text-white font-bold border border-sky-400/40 shadow-sm'
+                                      : 'text-white/70 hover:text-white hover:bg-white/10 font-medium border border-transparent'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2.5">
+                                    <SubIcon className={`w-3.5 h-3.5 ${isSubActive ? 'text-sky-300' : 'text-white/60'}`} />
+                                    <span>{sub.label}</span>
+                                  </div>
+                                  {isSubActive && <span className="w-1.5 h-1.5 rounded-full bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.8)]" />}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          /* Collapsed Sidebar: Sub-icons stacked vertically right below Reports */
+                          <div className="flex flex-col items-center gap-1.5 py-1.5 my-1 bg-black/30 rounded-2xl border border-white/10 shadow-inner">
+                            {item.subItems.map(sub => {
+                              const SubIcon = sub.icon;
+                              const isSubActive = activeTab === sub.id;
+                              return (
+                                <button
+                                  key={sub.id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveTab(sub.id);
+                                  }}
+                                  className={`relative group/sub w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+                                    isSubActive
+                                      ? 'bg-sky-500 text-slate-950 font-black shadow-md shadow-sky-500/40 ring-1 ring-sky-300'
+                                      : 'text-white/70 hover:text-white hover:bg-white/15'
+                                  }`}
+                                  title={sub.label}
+                                >
+                                  <SubIcon className="w-4 h-4" />
+                                  {/* Popover label tooltip on hover */}
+                                  <div className="absolute left-12 hidden group-hover/sub:flex items-center bg-slate-900 text-white text-xs font-bold px-2.5 py-1 rounded-lg border border-slate-700 whitespace-nowrap z-50 shadow-xl pointer-events-none">
+                                    {sub.label}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )
                       )}
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -890,7 +994,7 @@ export default function AdminLayout({
         </header>
 
         {/* Content Body */}
-        <main className={`flex-1 p-2 sm:p-2.5 flex flex-col min-h-0 ${(activeTab === 'pos' || activeTab === 'repairs') ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+        <main className={`flex-1 p-2 sm:p-2.5 flex flex-col min-h-0 ${(activeTab === 'pos' || activeTab === 'repairs' || activeTab === 'history') ? 'overflow-hidden' : 'overflow-y-auto'}`}>
           {children}
         </main>
 

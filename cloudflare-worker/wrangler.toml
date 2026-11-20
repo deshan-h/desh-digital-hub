@@ -1,0 +1,15 @@
+name = "desh-banner-uploader"
+main = "banner-uploader.js"
+compatibility_date = "2024-09-23"
+
+# Cloudflare Workers AI Binding (Free 10,000 neurons/day)
+[ai]
+binding = "AI"
+
+# R2 Object Storage Binding (Free 10GB forever)
+[[r2_buckets]]
+binding = "MY_BUCKET"
+bucket_name = "desh-hub-banners"
+
+[vars]
+PUBLIC_URL = "https://pub-your-id.r2.dev"

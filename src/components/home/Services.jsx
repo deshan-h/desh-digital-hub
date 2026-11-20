@@ -12,7 +12,7 @@ import {
 // ========================================================
 // THE 12 CORE SERVICES (SPLIT & ENRICHED WITH 3D ISOMETRIC ART)
 // ========================================================
-const DEFAULT_SERVICES = [
+export const DEFAULT_SERVICES = [
   {
     id: 'pc-repair',
     title: 'PC & Laptop Repair',
@@ -190,26 +190,38 @@ export default function Services() {
   const [hoveredId, setHoveredId] = useState(null);
   const [cycleIndex, setCycleIndex] = useState(0);
 
-  // Load hidden/visible state from Supabase if configured in Admin
+  // Load dynamic services and hidden/visible state from Supabase
   useEffect(() => {
-    async function loadVisibility() {
+    async function loadPublicServices() {
       try {
+        const publicServicesSetting = await settingsService.getSetting('public_services').catch(() => null);
         const hiddenIds = await settingsService.getPublicCategoryVisibility().catch(() => []);
-        if (Array.isArray(hiddenIds) && hiddenIds.length > 0) {
-          const visible = DEFAULT_SERVICES.filter(
-            s => !hiddenIds.includes(s.id) && !hiddenIds.includes(s.title) && !hiddenIds.includes(s.sinhala)
-          );
-          setServices(visible);
-        } else {
-          setServices(DEFAULT_SERVICES);
+
+        let serviceList = DEFAULT_SERVICES;
+        if (publicServicesSetting && Array.isArray(publicServicesSetting.items) && publicServicesSetting.items.length > 0) {
+          serviceList = publicServicesSetting.items;
         }
+
+        const visible = serviceList.filter(s => {
+          if (s.active === false) return false;
+          if (Array.isArray(hiddenIds) && hiddenIds.length > 0) {
+            if (hiddenIds.includes(s.id) || hiddenIds.includes(s.title) || hiddenIds.includes(s.sinhala)) {
+              return false;
+            }
+          }
+          return true;
+        });
+
+        visible.sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+        setServices(visible);
       } catch (err) {
-        console.error('Error loading service visibility:', err);
+        console.error('Error loading public services:', err);
+        setServices(DEFAULT_SERVICES);
       } finally {
         setLoading(false);
       }
     }
-    loadVisibility();
+    loadPublicServices();
   }, []);
 
   // Idle cycle: Automatically alternate hover description overlay among tiles every 3 seconds

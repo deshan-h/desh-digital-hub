@@ -408,8 +408,9 @@ export const categoryService = {
   },
 
   subscribe(callback) {
+    const channelName = `pos_categories_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const channel = supabase
-      .channel('pos_categories_realtime')
+      .channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_categories' }, () => {
         categoryService.getCategories().then(callback).catch(console.error);
       })
@@ -676,8 +677,9 @@ export const pendingOrderService = {
   },
 
   subscribe(callback) {
+    const channelName = `pending_orders_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const channel = supabase
-      .channel('pending_orders_realtime')
+      .channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pending_orders' }, () => {
         pendingOrderService.getPendingOrders().then(callback).catch(console.error);
       })
@@ -803,9 +805,10 @@ export const inquiryService = {
     // Initial fetch
     this.getInquiries().then(callback).catch(console.error);
 
-    // Realtime channel
+    // Realtime channel with unique channel name to prevent duplicate subscription collisions
+    const channelName = `customer_inquiries_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const channel = supabase
-      .channel('customer_inquiries_realtime')
+      .channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'settings', filter: 'id=eq.customer_inquiries' }, () => {
         this.getInquiries().then(callback).catch(console.error);
       })

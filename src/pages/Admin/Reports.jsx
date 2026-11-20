@@ -1,42 +1,96 @@
 import React, { useState, useMemo } from 'react';
 import { 
-  Users, Calendar, Search, ArrowUpDown, Download, Printer, 
-  ChevronRight, TrendingUp, ShoppingBag, DollarSign, Clock, 
-  Phone, MapPin, Star, X, Eye, FileText, CheckCircle2, 
-  BarChart3, Award, ExternalLink
+  Users, 
+  Calendar, 
+  Search, 
+  ChevronLeft, 
+  ChevronRight, 
+  ChevronDown, 
+  RotateCcw, 
+  ArrowUpDown, 
+  Download, 
+  Printer, 
+  TrendingUp, 
+  ShoppingBag, 
+  DollarSign, 
+  Clock, 
+  Phone, 
+  MapPin, 
+  Star, 
+  X, 
+  Eye, 
+  Award, 
+  MessageCircle, 
+  Receipt,
+  Crown,
+  Sparkles,
+  Filter
 } from 'lucide-react';
-import { format, formatDistanceToNow, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
+import { 
+  format, 
+  startOfMonth, 
+  endOfMonth, 
+  subMonths, 
+  addMonths, 
+  startOfDay, 
+  endOfDay, 
+  formatDistanceToNow 
+} from 'date-fns';
 import { parseTimestamp } from '../../utils/helpers';
-import { motion, AnimatePresence } from 'framer-motion';
+import { notify } from '../../utils/toast';
 
 export default function Reports({ salesHistory = [], customersList = [], isAdmin = false }) {
-  // Main Sub-Tab State (Customer Report is default)
-  const [activeSubTab, setActiveSubTab] = useState('customerReport');
-
-  // Filter States - Default: 'thisMonth'
-  const [timeFilter, setTimeFilter] = useState('thisMonth');
+  // Month Navigation & Period Filter States
+  const [monthFilterType, setMonthFilterType] = useState('this-month'); // 'this-month', 'last-month', 'all-time', 'today', 'this-week', 'this-year', 'custom-month'
+  const [currentSelectedMonth, setCurrentSelectedMonth] = useState(new Date());
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
+
+  // Sidebar Filters
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState('spend'); // 'spend' | 'orders' | 'date' | 'name'
-  const [sortOrder, setSortOrder] = useState('desc'); // 'asc' | 'desc'
+  const [sortBy, setSortBy] = useState('spend-desc'); // 'spend-desc', 'spend-asc', 'orders-desc', 'orders-asc', 'date-desc', 'name-asc'
+  const [tierFilter, setTierFilter] = useState('ALL'); // 'ALL', 'VIP', 'REGULAR', 'NEW'
+  const [areaFilter, setAreaFilter] = useState('ALL');
+  const [minSpend, setMinSpend] = useState('');
+  const [maxSpend, setMaxSpend] = useState('');
+
+  // Customer Details Modal
   const [selectedCustomer, setSelectedCustomer] = useState(null);
 
-  // Calculate Date Range based on timeFilter
+  // Month Navigation Handlers
+  const handlePrevMonth = () => {
+    const prev = subMonths(currentSelectedMonth, 1);
+    setCurrentSelectedMonth(prev);
+    setMonthFilterType('custom-month');
+  };
+
+  const handleNextMonth = () => {
+    const next = addMonths(currentSelectedMonth, 1);
+    setCurrentSelectedMonth(next);
+    setMonthFilterType('custom-month');
+  };
+
+  const handleMonthTypeChange = (type) => {
+    setMonthFilterType(type);
+    if (type === 'this-month') {
+      setCurrentSelectedMonth(new Date());
+    } else if (type === 'last-month') {
+      setCurrentSelectedMonth(subMonths(new Date(), 1));
+    }
+  };
+
+  // Compute Active Date Range based on Period Filter
   const { startDate, endDate, periodLabel } = useMemo(() => {
     const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth();
+    let start = null;
+    let end = null;
+    let label = 'This Month';
 
-    let start = new Date(currentYear, currentMonth, 1, 0, 0, 0, 0);
-    let end = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59, 999);
-    let label = format(now, 'MMMM yyyy');
-
-    if (timeFilter === 'today') {
+    if (monthFilterType === 'today') {
       start = startOfDay(now);
       end = endOfDay(now);
-      label = format(now, 'MMM dd, yyyy');
-    } else if (timeFilter === 'week') {
+      label = `Today (${format(now, 'MMM dd, yyyy')})`;
+    } else if (monthFilterType === 'this-week') {
       const day = now.getDay();
       const diffToMonday = day === 0 ? 6 : day - 1;
       start = new Date(now);
@@ -44,44 +98,48 @@ export default function Reports({ salesHistory = [], customersList = [], isAdmin
       start.setHours(0, 0, 0, 0);
       end = endOfDay(now);
       label = `This Week (${format(start, 'MMM dd')} - ${format(end, 'MMM dd')})`;
-    } else if (timeFilter === 'thisMonth') {
-      start = new Date(currentYear, currentMonth, 1, 0, 0, 0, 0);
-      end = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59, 999);
+    } else if (monthFilterType === 'this-month') {
+      start = startOfMonth(now);
+      end = endOfMonth(now);
       label = `This Month (${format(now, 'MMMM yyyy')})`;
-    } else if (timeFilter === 'lastMonth') {
-      const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-      const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
-      start = new Date(prevYear, prevMonth, 1, 0, 0, 0, 0);
-      end = new Date(prevYear, prevMonth + 1, 0, 23, 59, 59, 999);
-      label = `Last Month (${format(start, 'MMMM yyyy')})`;
-    } else if (timeFilter === 'thisYear') {
-      start = new Date(currentYear, 0, 1, 0, 0, 0, 0);
-      end = new Date(currentYear, 11, 31, 23, 59, 59, 999);
-      label = `This Year (${currentYear})`;
-    } else if (timeFilter === 'all') {
+    } else if (monthFilterType === 'last-month') {
+      const lm = subMonths(now, 1);
+      start = startOfMonth(lm);
+      end = endOfMonth(lm);
+      label = `Last Month (${format(lm, 'MMMM yyyy')})`;
+    } else if (monthFilterType === 'this-year') {
+      start = new Date(now.getFullYear(), 0, 1, 0, 0, 0);
+      end = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+      label = `This Year (${now.getFullYear()})`;
+    } else if (monthFilterType === 'custom-month') {
+      start = startOfMonth(currentSelectedMonth);
+      end = endOfMonth(currentSelectedMonth);
+      label = format(currentSelectedMonth, 'MMMM yyyy');
+    } else if (monthFilterType === 'all-time') {
       start = new Date(2020, 0, 1);
-      end = new Date(now.getFullYear() + 1, 11, 31);
+      end = new Date(now.getFullYear() + 2, 11, 31);
       label = 'All Time';
-    } else if (timeFilter === 'custom') {
-      if (customStartDate) {
-        start = startOfDay(new Date(customStartDate));
-      }
-      if (customEndDate) {
-        end = endOfDay(new Date(customEndDate));
-      }
-      label = customStartDate && customEndDate 
-        ? `${customStartDate} to ${customEndDate}` 
-        : 'Custom Range';
     }
 
     return { startDate: start, endDate: end, periodLabel: label };
-  }, [timeFilter, customStartDate, customEndDate]);
+  }, [monthFilterType, currentSelectedMonth]);
+
+  // Extract unique areas from customersList for filter dropdown
+  const uniqueAreas = useMemo(() => {
+    const areas = new Set();
+    (customersList || []).forEach(c => {
+      if (c.area && c.area.trim()) {
+        areas.add(c.area.trim());
+      }
+    });
+    return Array.from(areas).sort();
+  }, [customersList]);
 
   // Aggregate customer metrics from salesHistory
-  const customerReportsData = useMemo(() => {
+  const aggregatedCustomers = useMemo(() => {
     const customerMap = {};
 
-    // 1. First populate customer metadata from customersList
+    // 1. Populate metadata from customersList
     (customersList || []).forEach(cust => {
       if (cust.name) {
         const key = cust.name.trim();
@@ -101,12 +159,11 @@ export default function Reports({ salesHistory = [], customersList = [], isAdmin
     });
 
     // 2. Iterate through salesHistory
-    salesHistory.forEach(sale => {
+    (salesHistory || []).forEach(sale => {
       const rawName = (sale.customerName || sale.customer || 'Walk-in Customer').trim();
       const saleDate = parseTimestamp(sale.timestamp);
 
       if (!customerMap[rawName]) {
-        // Find in customersList with case-insensitive check
         const matched = (customersList || []).find(
           c => c.name && c.name.toLowerCase() === rawName.toLowerCase()
         );
@@ -125,14 +182,13 @@ export default function Reports({ salesHistory = [], customersList = [], isAdmin
         };
       }
 
-      // Track all-time last order date
       if (!customerMap[rawName].allTimeLastDate || saleDate > customerMap[rawName].allTimeLastDate) {
         customerMap[rawName].allTimeLastDate = saleDate;
       }
       customerMap[rawName].allTimeOrdersCount += 1;
 
-      // Check if this sale is within the selected filter period
-      if (saleDate >= startDate && saleDate <= endDate) {
+      // Period interval check
+      if (startDate && endDate && saleDate >= startDate && saleDate <= endDate) {
         customerMap[rawName].ordersCount += 1;
         customerMap[rawName].spendValue += Number(sale.amount || 0);
         customerMap[rawName].sales.push(sale);
@@ -143,71 +199,103 @@ export default function Reports({ salesHistory = [], customersList = [], isAdmin
       }
     });
 
-    // Convert to array and filter out customers who had 0 orders in the selected period
-    // (unless they specifically search for that customer)
-    let list = Object.values(customerMap).filter(c => c.ordersCount > 0);
+    // Sort order sales by date descending inside each customer
+    Object.values(customerMap).forEach(c => {
+      c.sales.sort((a, b) => {
+        const dA = parseTimestamp(a.timestamp);
+        const dB = parseTimestamp(b.timestamp);
+        return dB - dA;
+      });
+    });
 
-    // Apply Search Query Filter
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      list = Object.values(customerMap).filter(c => 
-        c.name.toLowerCase().includes(q) || 
-        (c.phone && c.phone.includes(q)) ||
-        (c.area && c.area.toLowerCase().includes(q))
-      );
-    }
+    return Object.values(customerMap);
+  }, [salesHistory, customersList, startDate, endDate]);
 
-    // Sort list
+  // Filter & Sort Customer Report Data
+  const filteredCustomers = useMemo(() => {
+    let list = aggregatedCustomers.filter(c => {
+      // Must have orders in period unless searching for specific customer
+      if (!searchQuery.trim() && c.ordersCount === 0) return false;
+
+      // Search Query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchesName = (c.name || '').toLowerCase().includes(q);
+        const matchesPhone = (c.phone || '').includes(q);
+        const matchesArea = (c.area || '').toLowerCase().includes(q);
+        if (!matchesName && !matchesPhone && !matchesArea) return false;
+      }
+
+      // Customer Tier
+      if (tierFilter === 'VIP' && c.spendValue < 5000) return false;
+      if (tierFilter === 'REGULAR' && c.ordersCount < 3) return false;
+      if (tierFilter === 'NEW' && c.ordersCount > 2) return false;
+
+      // Area Filter
+      if (areaFilter !== 'ALL' && c.area !== areaFilter) return false;
+
+      // Min/Max Spend
+      if (minSpend !== '' && c.spendValue < Number(minSpend)) return false;
+      if (maxSpend !== '' && c.spendValue > Number(maxSpend)) return false;
+
+      return true;
+    });
+
+    // Sorting
     list.sort((a, b) => {
-      let comparison = 0;
-      if (sortBy === 'spend') {
-        comparison = b.spendValue - a.spendValue;
-      } else if (sortBy === 'orders') {
-        comparison = b.ordersCount - a.ordersCount;
-      } else if (sortBy === 'date') {
+      if (sortBy === 'spend-desc') return b.spendValue - a.spendValue;
+      if (sortBy === 'spend-asc') return a.spendValue - b.spendValue;
+      if (sortBy === 'orders-desc') return b.ordersCount - a.ordersCount;
+      if (sortBy === 'orders-asc') return a.ordersCount - b.ordersCount;
+      if (sortBy === 'date-desc') {
         const dateA = a.lastCameDate ? a.lastCameDate.getTime() : 0;
         const dateB = b.lastCameDate ? b.lastCameDate.getTime() : 0;
-        comparison = dateB - dateA;
-      } else if (sortBy === 'name') {
-        comparison = a.name.localeCompare(b.name);
+        return dateB - dateA;
       }
-      return sortOrder === 'asc' ? -comparison : comparison;
+      if (sortBy === 'name-asc') return a.name.localeCompare(b.name);
+      return 0;
     });
 
     return list;
-  }, [salesHistory, customersList, startDate, endDate, searchQuery, sortBy, sortOrder]);
+  }, [aggregatedCustomers, searchQuery, sortBy, tierFilter, areaFilter, minSpend, maxSpend]);
 
   // Overall Period Summary KPIs
   const periodSummary = useMemo(() => {
-    const totalCustomers = customerReportsData.length;
-    const totalOrders = customerReportsData.reduce((sum, c) => sum + c.ordersCount, 0);
-    const totalSpend = customerReportsData.reduce((sum, c) => sum + c.spendValue, 0);
+    const totalCustomers = filteredCustomers.length;
+    const totalOrders = filteredCustomers.reduce((sum, c) => sum + c.ordersCount, 0);
+    const totalSpend = filteredCustomers.reduce((sum, c) => sum + c.spendValue, 0);
     const avgSpend = totalCustomers > 0 ? (totalSpend / totalCustomers) : 0;
-    const topSpender = customerReportsData.length > 0 ? customerReportsData[0] : null;
+    const topSpender = filteredCustomers.length > 0 ? filteredCustomers[0] : null;
 
     return { totalCustomers, totalOrders, totalSpend, avgSpend, topSpender };
-  }, [customerReportsData]);
+  }, [filteredCustomers]);
 
-  // Toggle Sorting
-  const handleSortChange = (newSortBy) => {
-    if (sortBy === newSortBy) {
-      setSortOrder(prev => (prev === 'desc' ? 'asc' : 'desc'));
-    } else {
-      setSortBy(newSortBy);
-      setSortOrder('desc');
-    }
+  // Reset Filters
+  const handleResetFilters = () => {
+    setSearchQuery('');
+    setSortBy('spend-desc');
+    setTierFilter('ALL');
+    setAreaFilter('ALL');
+    setMinSpend('');
+    setMaxSpend('');
+    setMonthFilterType('this-month');
+    setCurrentSelectedMonth(new Date());
+    notify.info('Filters reset to default');
   };
 
   // Export to CSV
   const exportToCSV = () => {
-    if (customerReportsData.length === 0) return;
+    if (filteredCustomers.length === 0) {
+      notify.error('No customer records to export');
+      return;
+    }
 
-    const headers = ['Rank', 'Customer Name', 'Phone', 'Area', 'Orders Count', 'Spend Value (Rs)', 'Average Order Value (Rs)', 'Last Came Date'];
-    const rows = customerReportsData.map((c, idx) => [
+    const headers = ['Rank', 'Customer Name', 'Phone', 'Area', 'Period Orders', 'Total Spend (Rs)', 'Avg Order Value (Rs)', 'Last Came Date'];
+    const rows = filteredCustomers.map((c, idx) => [
       idx + 1,
-      `"${c.name.replace(/"/g, '""')}"`,
-      `"${c.phone}"`,
-      `"${c.area}"`,
+      `"${(c.name || '').replace(/"/g, '""')}"`,
+      `"${c.phone || ''}"`,
+      `"${c.area || ''}"`,
       c.ordersCount,
       c.spendValue.toFixed(2),
       c.ordersCount > 0 ? (c.spendValue / c.ordersCount).toFixed(2) : '0.00',
@@ -219,10 +307,11 @@ export default function Reports({ salesHistory = [], customersList = [], isAdmin
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `Customer_Report_${timeFilter}_${format(new Date(), 'yyyyMMdd_HHmm')}.csv`);
+    link.setAttribute('download', `Customer_Report_${format(new Date(), 'yyyyMMdd_HHmm')}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    notify.success('Customer report downloaded as CSV');
   };
 
   // Print view
@@ -231,355 +320,356 @@ export default function Reports({ salesHistory = [], customersList = [], isAdmin
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1700px] mx-auto min-h-screen text-slate-100">
+    <div className="w-full h-full flex flex-col space-y-2 overflow-hidden text-slate-100">
       
-      {/* PAGE HEADER & MAIN SUB-TABS */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-white/5">
-        <div>
-          <h1 className="text-2xl lg:text-3xl font-black text-white tracking-tight flex items-center gap-3">
-            <div className="p-2.5 bg-teal-500/10 border border-teal-500/20 rounded-2xl text-teal-400">
-              <BarChart3 className="w-6 h-6" />
+      {/* Main Split Layout: Left Filter Drawer + Right Content */}
+      <div className="flex-1 flex flex-col md:flex-row gap-3 min-h-0 overflow-hidden">
+        
+        {/* Left: Advanced Filters Drawer */}
+        <div className="w-full md:w-64 shrink-0 bg-[#071326]/90 backdrop-blur-md border border-slate-800/80 rounded-2xl p-3.5 flex flex-col gap-3 shadow-xl overflow-y-auto custom-scrollbar">
+          
+          {/* Header: Title & Reset */}
+          <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-teal-400" />
+              <span className="text-xs font-black uppercase tracking-wider text-slate-200">Customer Filter</span>
             </div>
-            <span>Business Reports</span>
-          </h1>
-          <p className="text-slate-400 text-sm mt-1 font-medium">
-            Customer behavior, order frequency, and revenue analytics
-          </p>
-        </div>
+            <button
+              onClick={handleResetFilters}
+              className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
+              title="Reset all filters"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+          </div>
 
-        {/* Sub-Tabs Bar */}
-        <div className="flex bg-slate-900/80 p-1.5 rounded-2xl border border-white/5 backdrop-blur-md">
-          <button
-            onClick={() => setActiveSubTab('customerReport')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all duration-200 ${
-              activeSubTab === 'customerReport'
-                ? 'bg-teal-500 text-slate-950 shadow-[0_0_20px_rgba(20,184,166,0.4)]'
-                : 'text-slate-400 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            <span>Customer Report</span>
-          </button>
-        </div>
-      </div>
-
-      {/* CUSTOMER REPORT CONTENT */}
-      {activeSubTab === 'customerReport' && (
-        <div className="space-y-6">
-
-          {/* TOP FILTERS BAR */}
-          <div className="bg-slate-900/60 backdrop-blur-xl border border-white/5 p-4 sm:p-5 rounded-2xl shadow-xl space-y-4">
-            
-            {/* Row 1: Time Filter Pills & Action Buttons */}
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-              
-              {/* Date Filter Pills */}
-              <div className="flex flex-wrap items-center gap-1.5 bg-slate-950/70 p-1.5 rounded-xl border border-white/5">
-                {[
-                  { id: 'today', label: 'Today' },
-                  { id: 'week', label: 'This Week' },
-                  { id: 'thisMonth', label: 'This Month' },
-                  { id: 'lastMonth', label: 'Last Month' },
-                  { id: 'thisYear', label: 'This Year' },
-                  { id: 'all', label: 'All Time' },
-                  { id: 'custom', label: 'Custom' }
-                ].map(tab => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setTimeFilter(tab.id)}
-                    className={`px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all duration-200 ${
-                      timeFilter === tab.id
-                        ? 'bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 font-black shadow-md'
-                        : 'text-slate-400 hover:text-white hover:bg-white/5'
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Action Buttons: Export & Print */}
-              <div className="flex items-center gap-2.5 w-full sm:w-auto">
+          {/* Search Input */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Search</label>
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Name, Phone, Area..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-[#090d16] border border-slate-800 focus:border-teal-500/80 rounded-xl pl-8.5 pr-7 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none transition-all shadow-inner"
+              />
+              {searchQuery && (
                 <button
-                  onClick={exportToCSV}
-                  disabled={customerReportsData.length === 0}
-                  className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold border border-slate-700/60 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-                  title="Export to CSV Spreadsheet"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
                 >
-                  <Download className="w-4 h-4 text-teal-400" />
-                  <span>Export CSV</span>
+                  <X className="w-3.5 h-3.5" />
                 </button>
-                <button
-                  onClick={handlePrint}
-                  disabled={customerReportsData.length === 0}
-                  className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold border border-slate-700/60 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-                  title="Print Report"
-                >
-                  <Printer className="w-4 h-4 text-cyan-400" />
-                  <span>Print</span>
-                </button>
-              </div>
+              )}
             </div>
+          </div>
 
-            {/* Custom Date Range Picker (shown when custom filter is active) */}
-            {timeFilter === 'custom' && (
-              <motion.div 
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="flex flex-wrap items-center gap-3 pt-2 border-t border-white/5"
+          {/* Sort By */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Sort By</label>
+            <div className="relative">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="w-full appearance-none bg-[#090d16] border border-slate-800 focus:border-teal-500/80 rounded-xl px-3 py-1.5 text-xs text-slate-200 font-medium focus:outline-none cursor-pointer pr-8 shadow-inner"
               >
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">From:</span>
-                  <input
-                    type="date"
-                    value={customStartDate}
-                    onChange={(e) => setCustomStartDate(e.target.value)}
-                    className="bg-slate-950 border border-slate-700 text-slate-200 text-xs px-3 py-1.5 rounded-lg focus:outline-none focus:border-teal-500"
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">To:</span>
-                  <input
-                    type="date"
-                    value={customEndDate}
-                    onChange={(e) => setCustomEndDate(e.target.value)}
-                    className="bg-slate-950 border border-slate-700 text-slate-200 text-xs px-3 py-1.5 rounded-lg focus:outline-none focus:border-teal-500"
-                  />
-                </div>
-              </motion.div>
-            )}
+                <option value="spend-desc">Highest Spender (Rs ↓)</option>
+                <option value="spend-asc">Lowest Spender (Rs ↑)</option>
+                <option value="orders-desc">Most Orders (Count ↓)</option>
+                <option value="orders-asc">Least Orders (Count ↑)</option>
+                <option value="date-desc">Recent Visit (Newest)</option>
+                <option value="name-asc">Customer Name (A-Z)</option>
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          </div>
 
-            {/* Row 2: Search Input & Current Filter Indicator */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-white/5">
-              
-              {/* Search Box */}
-              <div className="relative w-full sm:w-80">
-                <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Search customer name or phone..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-slate-950/80 border border-slate-800 text-slate-200 text-sm pl-10 pr-9 py-2 rounded-xl focus:outline-none focus:border-teal-500/60 transition-colors shadow-inner"
-                />
-                {searchQuery && (
-                  <button 
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+          {/* Customer Tier / Frequency */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Customer Tier</label>
+            <div className="relative">
+              <select
+                value={tierFilter}
+                onChange={(e) => setTierFilter(e.target.value)}
+                className="w-full appearance-none bg-[#090d16] border border-slate-800 focus:border-teal-500/80 rounded-xl px-3 py-1.5 text-xs text-slate-200 font-medium focus:outline-none cursor-pointer pr-8 shadow-inner"
+              >
+                <option value="ALL">All Customers</option>
+                <option value="VIP">💎 VIP (Spend &gt; Rs. 5,000)</option>
+                <option value="REGULAR">⭐ Regular (3+ Orders)</option>
+                <option value="NEW">🌱 New / Casual (1-2 Orders)</option>
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          </div>
+
+          {/* Area / Location */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Area / Location</label>
+            <div className="relative">
+              <select
+                value={areaFilter}
+                onChange={(e) => setAreaFilter(e.target.value)}
+                className="w-full appearance-none bg-[#090d16] border border-slate-800 focus:border-teal-500/80 rounded-xl px-3 py-1.5 text-xs text-slate-200 font-medium focus:outline-none cursor-pointer pr-8 shadow-inner"
+              >
+                <option value="ALL">All Areas</option>
+                {uniqueAreas.map(area => (
+                  <option key={area} value={area}>{area}</option>
+                ))}
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          </div>
+
+          {/* Spend Range */}
+          <div className="space-y-1 pt-1 border-t border-slate-800/80">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Spend Range</label>
+              <span className="text-[10px] font-mono text-slate-500">LKR</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="number"
+                placeholder="Min Rs"
+                value={minSpend}
+                onChange={(e) => setMinSpend(e.target.value)}
+                className="w-full bg-[#090d16] border border-slate-800 focus:border-teal-500/80 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none font-mono shadow-inner"
+              />
+              <input
+                type="number"
+                placeholder="Max Rs"
+                value={maxSpend}
+                onChange={(e) => setMaxSpend(e.target.value)}
+                className="w-full bg-[#090d16] border border-slate-800 focus:border-teal-500/80 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none font-mono shadow-inner"
+              />
+            </div>
+          </div>
+
+          {/* Filter Status Badge */}
+          <div className="mt-auto pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
+            <span className="text-slate-400 uppercase font-black tracking-wider text-[10px]">Filtered Clients</span>
+            <span className="font-mono font-black text-teal-400 bg-teal-500/10 border border-teal-500/20 px-2.5 py-0.5 rounded-full">
+              {filteredCustomers.length}
+            </span>
+          </div>
+
+        </div>
+
+        {/* Right: Main Content Area */}
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden space-y-2">
+          
+          {/* Top Header Control Strip: Month Selection + Summary Pills + Export */}
+          <div className="relative z-20 bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-2 sm:p-2.5 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-2.5 shrink-0">
+            
+            {/* Left: Month Navigator `< This month ▾ >` */}
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              <div className="flex items-center bg-[#090d16] border border-slate-800/90 rounded-xl p-0.5 shadow-inner">
+                <button
+                  onClick={handlePrevMonth}
+                  className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                  title="Previous Month"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                
+                <div className="relative px-1">
+                  <select
+                    value={monthFilterType === 'custom-month' ? 'custom-month' : monthFilterType}
+                    onChange={(e) => handleMonthTypeChange(e.target.value)}
+                    className="appearance-none bg-transparent text-xs font-bold text-slate-200 pl-2 pr-6 py-1 cursor-pointer focus:outline-none"
                   >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
+                    <option value="this-month" className="bg-slate-900 text-slate-200 font-bold">
+                      This month ({format(new Date(), 'MMM yyyy')})
+                    </option>
+                    <option value="last-month" className="bg-slate-900 text-slate-200 font-bold">
+                      Last month ({format(subMonths(new Date(), 1), 'MMM yyyy')})
+                    </option>
+                    {monthFilterType === 'custom-month' && (
+                      <option value="custom-month" className="bg-slate-900 text-teal-400 font-bold">
+                        {format(currentSelectedMonth, 'MMMM yyyy')}
+                      </option>
+                    )}
+                    <option value="today" className="bg-slate-900 text-slate-200 font-bold">
+                      Today
+                    </option>
+                    <option value="this-week" className="bg-slate-900 text-slate-200 font-bold">
+                      This Week
+                    </option>
+                    <option value="this-year" className="bg-slate-900 text-slate-200 font-bold">
+                      This Year ({new Date().getFullYear()})
+                    </option>
+                    <option value="all-time" className="bg-slate-900 text-slate-200 font-bold">
+                      All Time
+                    </option>
+                  </select>
+                  <ChevronDown className="w-3 h-3 text-slate-400 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+
+                <button
+                  onClick={handleNextMonth}
+                  className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                  title="Next Month"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
               </div>
 
-              {/* Active Period Badge */}
-              <div className="flex items-center gap-2 text-xs text-slate-400 font-medium self-end sm:self-auto">
-                <Calendar className="w-4 h-4 text-teal-400" />
-                <span>Showing report for: <strong className="text-teal-300 font-bold">{periodLabel}</strong></span>
-              </div>
+              {/* Top Spender Pill */}
+              {periodSummary.topSpender && (
+                <div className="hidden lg:flex items-center gap-1.5 px-3 py-1 bg-amber-500/10 border border-amber-500/25 rounded-xl text-amber-300 text-xs font-bold">
+                  <Crown className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="truncate max-w-[130px]">Top: {periodSummary.topSpender.name}</span>
+                </div>
+              )}
             </div>
 
+            {/* Right: Summary KPIs & Actions */}
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
+              
+              {/* Total Orders Metric */}
+              <div className="flex items-center gap-1.5 px-3 py-1 bg-[#090d16] border border-slate-800/90 rounded-xl shadow-inner text-xs">
+                <span className="text-[10px] text-slate-400 font-black uppercase">Orders:</span>
+                <span className="font-mono font-black text-cyan-400">{periodSummary.totalOrders}</span>
+              </div>
+
+              {/* Total Revenue Metric */}
+              <div className="flex items-center gap-1.5 px-3 py-1 bg-teal-500/10 border border-teal-500/30 rounded-xl shadow-inner text-xs">
+                <span className="text-[10px] text-teal-400 font-black uppercase">Total:</span>
+                <span className="font-mono font-black text-teal-300">
+                  Rs. {periodSummary.totalSpend.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                </span>
+              </div>
+
+              {/* Avg Spend Metric */}
+              <div className="hidden md:flex items-center gap-1.5 px-3 py-1 bg-[#090d16] border border-slate-800/90 rounded-xl shadow-inner text-xs">
+                <span className="text-[10px] text-slate-400 font-black uppercase">Avg:</span>
+                <span className="font-mono font-black text-purple-400">
+                  Rs. {periodSummary.avgSpend.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                </span>
+              </div>
+
+              {/* Export CSV Button */}
+              <button
+                onClick={exportToCSV}
+                className="p-1.5 bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl border border-slate-700/80 transition-all cursor-pointer shadow-sm"
+                title="Export as CSV"
+              >
+                <Download className="w-3.5 h-3.5" />
+              </button>
+
+              {/* Print Button */}
+              <button
+                onClick={handlePrint}
+                className="p-1.5 bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl border border-slate-700/80 transition-all cursor-pointer shadow-sm"
+                title="Print Report"
+              >
+                <Printer className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
 
-          {/* KPI SUMMARY CARDS */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-            
-            {/* Card 1: Active Customers */}
-            <div className="bg-slate-900/60 backdrop-blur-md border border-white/5 p-4 rounded-2xl relative overflow-hidden shadow-lg group hover:border-teal-500/30 transition-all">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active Customers</span>
-                <Users className="w-4 h-4 text-teal-400" />
-              </div>
-              <h3 className="text-2xl font-black text-white tracking-tight">{periodSummary.totalCustomers}</h3>
-              <p className="text-[11px] text-slate-500 mt-1">made orders in this period</p>
-            </div>
-
-            {/* Card 2: Orders Count */}
-            <div className="bg-slate-900/60 backdrop-blur-md border border-white/5 p-4 rounded-2xl relative overflow-hidden shadow-lg group hover:border-cyan-500/30 transition-all">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Orders</span>
-                <ShoppingBag className="w-4 h-4 text-cyan-400" />
-              </div>
-              <h3 className="text-2xl font-black text-cyan-300 tracking-tight">{periodSummary.totalOrders}</h3>
-              <p className="text-[11px] text-slate-500 mt-1">transactions recorded</p>
-            </div>
-
-            {/* Card 3: Total Spend Value */}
-            <div className="bg-slate-900/60 backdrop-blur-md border border-white/5 p-4 rounded-2xl relative overflow-hidden shadow-lg group hover:border-emerald-500/30 transition-all">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Spend Value</span>
-                <DollarSign className="w-4 h-4 text-emerald-400" />
-              </div>
-              <h3 className="text-2xl font-black text-emerald-400 tracking-tight">
-                <span className="text-sm font-bold text-slate-400">Rs.</span> {periodSummary.totalSpend.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-              </h3>
-              <p className="text-[11px] text-slate-500 mt-1">revenue from customers</p>
-            </div>
-
-            {/* Card 4: Average Spend */}
-            <div className="bg-slate-900/60 backdrop-blur-md border border-white/5 p-4 rounded-2xl relative overflow-hidden shadow-lg group hover:border-purple-500/30 transition-all">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Avg Spend / Customer</span>
-                <TrendingUp className="w-4 h-4 text-purple-400" />
-              </div>
-              <h3 className="text-2xl font-black text-purple-300 tracking-tight">
-                <span className="text-sm font-bold text-slate-400">Rs.</span> {periodSummary.avgSpend.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-              </h3>
-              <p className="text-[11px] text-slate-500 mt-1">average spend per client</p>
-            </div>
-
-          </div>
-
-          {/* CUSTOMER REPORT TABLE */}
-          <div className="bg-slate-900/60 backdrop-blur-xl border border-white/5 rounded-2xl shadow-xl overflow-hidden">
-            
-            {/* Table Header Info */}
-            <div className="px-5 py-4 border-b border-white/5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-              <div className="flex items-center gap-2">
-                <Award className="w-4 h-4 text-teal-400" />
-                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-200">
-                  Customer Performance Breakdown ({customerReportsData.length})
-                </h3>
-              </div>
-              <span className="text-xs text-slate-500 font-medium">
-                Click any customer to inspect order history
-              </span>
-            </div>
-
-            {/* Table Container */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-white/10 text-xs font-bold text-slate-400 uppercase tracking-wider bg-slate-950/40 select-none">
-                    <th className="py-3.5 px-4 text-center w-12">#</th>
-                    
-                    {/* Customer Name Column Header */}
-                    <th 
-                      onClick={() => handleSortChange('name')}
-                      className="py-3.5 px-4 cursor-pointer hover:text-white transition-colors"
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <span>Customer Name</span>
-                        {sortBy === 'name' && (
-                          <ArrowUpDown className={`w-3.5 h-3.5 text-teal-400 transition-transform ${sortOrder === 'asc' ? 'rotate-180' : ''}`} />
-                        )}
-                      </div>
-                    </th>
-
-                    {/* Orders Count Column Header */}
-                    <th 
-                      onClick={() => handleSortChange('orders')}
-                      className="py-3.5 px-4 text-center cursor-pointer hover:text-white transition-colors"
-                    >
-                      <div className="flex items-center justify-center gap-1.5">
-                        <span>Orders Count</span>
-                        {sortBy === 'orders' && (
-                          <ArrowUpDown className={`w-3.5 h-3.5 text-teal-400 transition-transform ${sortOrder === 'asc' ? 'rotate-180' : ''}`} />
-                        )}
-                      </div>
-                    </th>
-
-                    {/* Spend Value Column Header */}
-                    <th 
-                      onClick={() => handleSortChange('spend')}
-                      className="py-3.5 px-4 text-right cursor-pointer hover:text-white transition-colors"
-                    >
-                      <div className="flex items-center justify-end gap-1.5">
-                        <span>Spend Value</span>
-                        {sortBy === 'spend' && (
-                          <ArrowUpDown className={`w-3.5 h-3.5 text-teal-400 transition-transform ${sortOrder === 'asc' ? 'rotate-180' : ''}`} />
-                        )}
-                      </div>
-                    </th>
-
-                    {/* Average Order Value Header */}
-                    <th className="py-3.5 px-4 text-right hidden md:table-cell">
-                      <span>Avg / Order</span>
-                    </th>
-
-                    {/* Last Came Date Column Header */}
-                    <th 
-                      onClick={() => handleSortChange('date')}
-                      className="py-3.5 px-4 text-right cursor-pointer hover:text-white transition-colors"
-                    >
-                      <div className="flex items-center justify-end gap-1.5">
-                        <span>Last Came Date</span>
-                        {sortBy === 'date' && (
-                          <ArrowUpDown className={`w-3.5 h-3.5 text-teal-400 transition-transform ${sortOrder === 'asc' ? 'rotate-180' : ''}`} />
-                        )}
-                      </div>
-                    </th>
-
-                    <th className="py-3.5 px-4 text-center w-16">Details</th>
+          {/* Table Container */}
+          <div className="flex-1 bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl shadow-xl overflow-hidden flex flex-col min-h-0">
+            <div className="overflow-x-auto overflow-y-auto flex-1 custom-scrollbar">
+              <table className="w-full text-xs text-left border-collapse">
+                <thead className="sticky top-0 z-10 bg-[#071326] border-b border-slate-800 text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                  <tr>
+                    <th className="py-2.5 px-3.5 text-center w-12"># Rank</th>
+                    <th className="py-2.5 px-3.5">Customer Profile</th>
+                    <th className="py-2.5 px-3.5 text-center w-28">Period Orders</th>
+                    <th className="py-2.5 px-3.5 text-right w-36">Total Spend (LKR)</th>
+                    <th className="py-2.5 px-3.5 text-right w-32 hidden md:table-cell">Avg Order Value</th>
+                    <th className="py-2.5 px-3.5 text-left w-36 hidden sm:table-cell">Last Visit</th>
+                    <th className="py-2.5 px-3.5 text-center w-24">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5 text-sm font-medium">
-                  {customerReportsData.length === 0 ? (
+                <tbody className="divide-y divide-slate-800/60 font-sans">
+                  {filteredCustomers.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-16 text-center text-slate-500">
-                        <Users className="w-10 h-10 mx-auto text-slate-600 mb-3" />
-                        <p className="text-base font-bold text-slate-400">No customer records found</p>
-                        <p className="text-xs text-slate-500 mt-1">No orders match the selected time filter or search query.</p>
+                      <td colSpan="7" className="py-16 text-center">
+                        <div className="flex flex-col items-center justify-center gap-2.5 text-slate-500">
+                          <Users className="w-10 h-10 stroke-[1.5] text-slate-600" />
+                          <p className="text-sm font-bold text-slate-400">No customer records found</p>
+                          <p className="text-xs text-slate-500">Try adjusting your date range, search query or filters.</p>
+                          <button
+                            onClick={handleResetFilters}
+                            className="mt-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-teal-400 rounded-xl text-xs font-bold border border-slate-700 transition-all cursor-pointer"
+                          >
+                            Reset Filters
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ) : (
-                    customerReportsData.map((customer, idx) => {
-                      const avgOrder = customer.ordersCount > 0 ? (customer.spendValue / customer.ordersCount) : 0;
-                      const isTop3 = idx < 3 && sortBy === 'spend' && sortOrder === 'desc';
-
+                    filteredCustomers.map((cust, idx) => {
+                      const rank = idx + 1;
+                      const avgOrder = cust.ordersCount > 0 ? cust.spendValue / cust.ordersCount : 0;
+                      const isTop3 = rank <= 3;
+                      
                       return (
-                        <tr 
-                          key={customer.name + idx}
-                          onClick={() => setSelectedCustomer(customer)}
-                          className="hover:bg-slate-800/40 transition-colors cursor-pointer group"
+                        <tr
+                          key={cust.name}
+                          className="hover:bg-slate-800/40 transition-colors group cursor-pointer"
+                          onClick={() => setSelectedCustomer(cust)}
                         >
-                          {/* Rank */}
-                          <td className="py-3.5 px-4 text-center">
-                            {isTop3 ? (
-                              <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-black shadow-md ${
-                                idx === 0 
-                                  ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40' 
-                                  : idx === 1 
-                                  ? 'bg-slate-300/20 text-slate-200 border border-slate-300/40' 
-                                  : 'bg-orange-500/20 text-orange-400 border border-orange-500/40'
-                              }`}>
-                                {idx + 1}
+                          {/* Rank Column */}
+                          <td className="py-2.5 px-3.5 text-center whitespace-nowrap align-middle">
+                            {rank === 1 ? (
+                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/40 font-black text-xs shadow-[0_0_10px_rgba(245,158,11,0.2)]">
+                                🥇
+                              </span>
+                            ) : rank === 2 ? (
+                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-300/20 text-slate-300 border border-slate-300/40 font-black text-xs">
+                                🥈
+                              </span>
+                            ) : rank === 3 ? (
+                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-700/20 text-amber-500 border border-amber-700/40 font-black text-xs">
+                                🥉
                               </span>
                             ) : (
-                              <span className="text-slate-500 text-xs font-bold">{idx + 1}</span>
+                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-slate-800/80 text-slate-400 font-mono font-bold text-[11px] border border-slate-700/50">
+                                {rank}
+                              </span>
                             )}
                           </td>
 
-                          {/* Customer Name */}
-                          <td className="py-3.5 px-4">
-                            <div className="flex items-center gap-3">
-                              {/* Avatar Initial */}
-                              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 border border-white/10 flex items-center justify-center font-bold text-xs text-teal-400 shadow-sm shrink-0">
-                                {customer.name.charAt(0).toUpperCase()}
+                          {/* Customer Profile Column */}
+                          <td className="py-2.5 px-3.5 align-middle">
+                            <div className="flex items-center gap-2.5">
+                              {/* Avatar Initials */}
+                              <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs shrink-0 border ${
+                                isTop3
+                                  ? 'bg-gradient-to-tr from-teal-500/30 to-emerald-500/30 text-teal-300 border-teal-500/40'
+                                  : 'bg-slate-800 text-slate-300 border-slate-700'
+                              }`}>
+                                {cust.name.substring(0, 2).toUpperCase()}
                               </div>
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="font-bold text-slate-200 group-hover:text-teal-300 transition-colors truncate">
-                                    {customer.name}
+
+                              <div className="flex flex-col min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="font-bold text-slate-100 text-xs truncate max-w-[180px]">
+                                    {cust.name}
                                   </span>
-                                  {customer.mostVisited && (
-                                    <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400 shrink-0" title="Favorite Customer" />
+                                  {cust.spendValue >= 5000 && (
+                                    <span className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase tracking-wider bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                                      VIP
+                                    </span>
+                                  )}
+                                  {cust.mostVisited && (
+                                    <span className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase tracking-wider bg-teal-500/15 text-teal-400 border border-teal-500/30">
+                                      Frequent
+                                    </span>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-2 text-[11px] text-slate-500 font-medium">
-                                  {customer.phone ? (
-                                    <span className="flex items-center gap-1 text-slate-400">
-                                      <Phone className="w-3 h-3 text-slate-500" />
-                                      {customer.phone}
-                                    </span>
-                                  ) : (
-                                    <span className="text-slate-600">No phone</span>
+                                
+                                <div className="flex items-center gap-2 text-[10px] text-slate-400">
+                                  {cust.phone && (
+                                    <span className="font-mono text-slate-400">{cust.phone}</span>
                                   )}
-                                  {customer.area && (
-                                    <span className="flex items-center gap-1 text-slate-500 truncate">
-                                      • <MapPin className="w-3 h-3" />
-                                      {customer.area}
+                                  {cust.area && (
+                                    <span className="px-1 rounded bg-slate-800/80 text-slate-400 border border-slate-700/60 truncate max-w-[100px]">
+                                      📍 {cust.area}
                                     </span>
                                   )}
                                 </div>
@@ -587,60 +677,68 @@ export default function Reports({ salesHistory = [], customersList = [], isAdmin
                             </div>
                           </td>
 
-                          {/* Orders Count */}
-                          <td className="py-3.5 px-4 text-center">
-                            <span className="inline-block px-3 py-1 rounded-xl bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 font-black text-xs">
-                              {customer.ordersCount} {customer.ordersCount === 1 ? 'Order' : 'Orders'}
+                          {/* Period Orders Column */}
+                          <td className="py-2.5 px-3.5 text-center whitespace-nowrap align-middle">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-500/10 text-sky-400 border border-sky-500/20 font-mono font-bold text-xs">
+                              <ShoppingBag className="w-3 h-3 text-sky-400" />
+                              {cust.ordersCount}
                             </span>
                           </td>
 
-                          {/* Spend Value */}
-                          <td className="py-3.5 px-4 text-right">
-                            <span className="text-base font-black text-emerald-400 tracking-tight">
-                              <span className="text-xs font-bold text-emerald-600 mr-0.5">Rs.</span>
-                              {customer.spendValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </span>
+                          {/* Total Spend Column */}
+                          <td className="py-2.5 px-3.5 text-right whitespace-nowrap align-middle font-mono font-black text-emerald-400 text-xs">
+                            Rs. {cust.spendValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
 
-                          {/* Average Order Value */}
-                          <td className="py-3.5 px-4 text-right text-slate-400 text-xs hidden md:table-cell font-bold">
-                            Rs. {avgOrder.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                          {/* Avg Order Value Column */}
+                          <td className="py-2.5 px-3.5 text-right whitespace-nowrap align-middle font-mono font-medium text-slate-300 text-xs hidden md:table-cell">
+                            Rs. {avgOrder.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
 
-                          {/* Last Came Date */}
-                          <td className="py-3.5 px-4 text-right">
-                            {customer.lastCameDate ? (
-                              <div>
-                                <span className="font-bold text-slate-200 text-xs block">
-                                  {format(customer.lastCameDate, 'yyyy-MM-dd')}
+                          {/* Last Visit Column */}
+                          <td className="py-2.5 px-3.5 text-left whitespace-nowrap align-middle hidden sm:table-cell">
+                            {cust.lastCameDate ? (
+                              <div className="flex flex-col">
+                                <span className="text-[11px] font-semibold text-slate-300">
+                                  {format(cust.lastCameDate, 'MMM dd, yyyy')}
                                 </span>
-                                <span className="text-[10px] text-teal-400/80 font-medium block">
-                                  {format(customer.lastCameDate, 'hh:mm a')} • {formatDistanceToNow(customer.lastCameDate, { addSuffix: true })}
-                                </span>
-                              </div>
-                            ) : customer.allTimeLastDate ? (
-                              <div>
-                                <span className="font-bold text-slate-400 text-xs block">
-                                  {format(customer.allTimeLastDate, 'yyyy-MM-dd')}
-                                </span>
-                                <span className="text-[10px] text-slate-500 block">
-                                  (Previous period)
+                                <span className="text-[9px] text-slate-500">
+                                  {formatDistanceToNow(cust.lastCameDate, { addSuffix: true })}
                                 </span>
                               </div>
                             ) : (
-                              <span className="text-slate-600 text-xs">-</span>
+                              <span className="text-slate-500 text-[11px]">N/A</span>
                             )}
                           </td>
 
-                          {/* Action Button */}
-                          <td className="py-3.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
-                            <button
-                              onClick={() => setSelectedCustomer(customer)}
-                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-teal-500 hover:text-slate-950 text-slate-400 transition-colors"
-                              title="View Customer Order Details"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
+                          {/* Actions Column */}
+                          <td 
+                            className="py-2.5 px-3.5 text-center whitespace-nowrap align-middle"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div className="flex items-center justify-center gap-1.5">
+                              {/* View Details Modal */}
+                              <button
+                                onClick={() => setSelectedCustomer(cust)}
+                                className="p-1.5 rounded-lg bg-slate-800 hover:bg-teal-500/20 text-slate-400 hover:text-teal-300 border border-slate-700 transition-all cursor-pointer"
+                                title="Inspect Order History"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+
+                              {/* WhatsApp Direct Chat */}
+                              {cust.phone ? (
+                                <a
+                                  href={`https://wa.me/${cust.phone.replace(/\D/g, '')}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-emerald-500/20 text-slate-400 hover:text-emerald-300 border border-slate-700 transition-all cursor-pointer"
+                                  title="WhatsApp Customer"
+                                >
+                                  <Phone className="w-3.5 h-3.5" />
+                                </a>
+                              ) : null}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -650,150 +748,160 @@ export default function Reports({ salesHistory = [], customersList = [], isAdmin
               </table>
             </div>
 
-            {/* Table Footer */}
-            {customerReportsData.length > 0 && (
-              <div className="px-5 py-3.5 border-t border-white/5 bg-slate-950/40 flex flex-col sm:flex-row justify-between items-center text-xs text-slate-400 gap-2">
-                <span>Showing {customerReportsData.length} customer records for <strong>{periodLabel}</strong></span>
-                <span className="font-bold text-slate-300">
-                  Total Value: Rs. {periodSummary.totalSpend.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                </span>
+            {/* Table Footer: Summary Status */}
+            <div className="px-4 py-2 bg-[#071326] border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400 shrink-0">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></span>
+                <span>Active Period: <strong className="text-teal-300">{periodLabel}</strong></span>
               </div>
-            )}
+              <div className="font-mono text-slate-400">
+                Showing {filteredCustomers.length} active customer profiles
+              </div>
+            </div>
+
           </div>
 
         </div>
-      )}
 
-      {/* CUSTOMER ORDERS DETAILS MODAL */}
-      <AnimatePresence>
-        {selectedCustomer && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col shadow-2xl"
-            >
-              {/* Modal Header */}
-              <div className="p-5 border-b border-white/10 flex justify-between items-center bg-slate-950/60">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-teal-500/10 border border-teal-500/20 text-teal-400 flex items-center justify-center font-bold text-base">
-                    {selectedCustomer.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-black text-white flex items-center gap-2">
+      </div>
+
+      {/* CUSTOMER ORDER HISTORY MODAL */}
+      {selectedCustomer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-[#071326] border border-teal-500/30 rounded-3xl w-full max-w-2xl max-h-[88vh] flex flex-col shadow-[0_0_50px_rgba(20,184,166,0.15)] overflow-hidden slide-in-from-bottom-6">
+            
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-teal-500/20 bg-gradient-to-r from-[#0a1e38] via-[#09182d] to-[#071326] flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-teal-500/20 border border-teal-500/40 flex items-center justify-center text-teal-300 font-black text-sm">
+                  {selectedCustomer.name.substring(0, 2).toUpperCase()}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base sm:text-lg font-black text-white tracking-wide">
                       {selectedCustomer.name}
-                      {selectedCustomer.mostVisited && (
-                        <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-                      )}
                     </h3>
-                    <p className="text-xs text-slate-400 font-medium flex items-center gap-2 mt-0.5">
-                      {selectedCustomer.phone && <span>📞 {selectedCustomer.phone}</span>}
-                      {selectedCustomer.area && <span>📍 {selectedCustomer.area}</span>}
-                    </p>
+                    {selectedCustomer.spendValue >= 5000 && (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                        VIP
+                      </span>
+                    )}
                   </div>
-                </div>
-                <button
-                  onClick={() => setSelectedCustomer(null)}
-                  className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Modal Body: Customer Summary Stats */}
-              <div className="p-4 grid grid-cols-3 gap-3 bg-slate-950/40 border-b border-white/5">
-                <div className="bg-slate-900/60 p-3 rounded-xl border border-white/5 text-center">
-                  <span className="text-[10px] text-slate-400 uppercase font-bold block">Period Orders</span>
-                  <span className="text-lg font-black text-cyan-400">{selectedCustomer.ordersCount}</span>
-                </div>
-                <div className="bg-slate-900/60 p-3 rounded-xl border border-white/5 text-center">
-                  <span className="text-[10px] text-slate-400 uppercase font-bold block">Period Spend</span>
-                  <span className="text-lg font-black text-emerald-400">Rs. {selectedCustomer.spendValue.toFixed(0)}</span>
-                </div>
-                <div className="bg-slate-900/60 p-3 rounded-xl border border-white/5 text-center">
-                  <span className="text-[10px] text-slate-400 uppercase font-bold block">Last Came</span>
-                  <span className="text-xs font-bold text-teal-300 block mt-1">
-                    {selectedCustomer.lastCameDate ? format(selectedCustomer.lastCameDate, 'MMM dd, yyyy') : 'N/A'}
-                  </span>
+                  <p className="text-xs text-slate-400 font-mono mt-0.5">
+                    {selectedCustomer.phone || 'No phone recorded'} {selectedCustomer.area && `• 📍 ${selectedCustomer.area}`}
+                  </p>
                 </div>
               </div>
 
-              {/* Orders List */}
-              <div className="flex-1 overflow-y-auto p-5 space-y-3" style={{ scrollbarWidth: 'thin' }}>
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-                  Orders in {periodLabel} ({selectedCustomer.sales.length})
+              <button
+                onClick={() => setSelectedCustomer(null)}
+                className="w-8 h-8 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-all cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body: Summary Stats */}
+            <div className="p-4 grid grid-cols-3 gap-3 bg-[#090d16] border-b border-slate-800/80 shrink-0">
+              <div className="bg-[#071326] p-3 rounded-xl border border-slate-800 text-center">
+                <span className="text-[10px] text-slate-400 uppercase font-black tracking-wider block">Period Orders</span>
+                <span className="text-lg font-black text-cyan-400 font-mono">{selectedCustomer.ordersCount}</span>
+              </div>
+              <div className="bg-[#071326] p-3 rounded-xl border border-slate-800 text-center">
+                <span className="text-[10px] text-slate-400 uppercase font-black tracking-wider block">Period Spend</span>
+                <span className="text-lg font-black text-emerald-400 font-mono">
+                  Rs. {selectedCustomer.spendValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                </span>
+              </div>
+              <div className="bg-[#071326] p-3 rounded-xl border border-slate-800 text-center">
+                <span className="text-[10px] text-slate-400 uppercase font-black tracking-wider block">Last Visit</span>
+                <span className="text-xs font-bold text-teal-300 block mt-1 font-mono">
+                  {selectedCustomer.lastCameDate ? format(selectedCustomer.lastCameDate, 'MMM dd, yyyy') : 'N/A'}
+                </span>
+              </div>
+            </div>
+
+            {/* Orders List */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-3 custom-scrollbar">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                  <Receipt className="w-3.5 h-3.5 text-teal-400" />
+                  <span>Purchases in {periodLabel} ({selectedCustomer.sales.length})</span>
                 </h4>
+              </div>
 
-                {selectedCustomer.sales.length === 0 ? (
-                  <p className="text-center text-slate-500 py-8 text-xs">No order records in this timeframe.</p>
-                ) : (
-                  selectedCustomer.sales.map((sale, i) => {
-                    const sDate = parseTimestamp(sale.timestamp);
-                    return (
-                      <div 
-                        key={sale.id || i}
-                        className="bg-slate-950/60 border border-white/5 rounded-xl p-3.5 flex flex-col gap-2 hover:border-slate-700 transition-colors"
-                      >
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-slate-400 font-semibold flex items-center gap-1.5">
-                            <Clock className="w-3.5 h-3.5 text-slate-500" />
-                            {format(sDate, 'yyyy-MM-dd • hh:mm a')}
-                          </span>
-                          <span className="text-sm font-black text-emerald-400">
-                            Rs. {Number(sale.amount || 0).toFixed(2)}
-                          </span>
-                        </div>
-
-                        {/* Items Preview */}
-                        {sale.cartItems && Array.isArray(sale.cartItems) && sale.cartItems.length > 0 ? (
-                          <div className="flex flex-wrap gap-1.5 mt-1">
-                            {sale.cartItems.map((item, idx) => (
-                              <span 
-                                key={idx} 
-                                className="text-[11px] bg-slate-900 border border-white/5 text-slate-300 px-2 py-0.5 rounded-md"
-                              >
-                                {item.name} <strong className="text-cyan-400">x{item.qty || 1}</strong>
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-xs text-slate-500 italic">
-                            {sale.description || (sale.isRepair ? 'PC Repair Service' : 'POS Transaction')}
-                          </p>
-                        )}
+              {selectedCustomer.sales.length === 0 ? (
+                <div className="text-center py-10 text-slate-500 text-xs">
+                  No sales recorded in this specific time window.
+                </div>
+              ) : (
+                selectedCustomer.sales.map((sale, i) => {
+                  const sDate = parseTimestamp(sale.timestamp);
+                  return (
+                    <div
+                      key={sale.id || i}
+                      className="bg-[#090d16] border border-slate-800/80 rounded-2xl p-3.5 flex flex-col gap-2 hover:border-slate-700 transition-all shadow-sm"
+                    >
+                      <div className="flex justify-between items-center border-b border-slate-800/60 pb-2">
+                        <span className="text-xs text-slate-400 font-semibold flex items-center gap-1.5 font-mono">
+                          <Clock className="w-3.5 h-3.5 text-slate-500" />
+                          {format(sDate, 'yyyy-MM-dd • hh:mm a')}
+                        </span>
+                        <span className="text-sm font-black text-emerald-400 font-mono">
+                          Rs. {Number(sale.amount || 0).toFixed(2)}
+                        </span>
                       </div>
-                    );
-                  })
-                )}
-              </div>
 
-              {/* Modal Footer */}
-              <div className="p-4 border-t border-white/10 bg-slate-950/60 flex justify-between items-center">
-                {selectedCustomer.phone ? (
-                  <a
-                    href={`https://wa.me/${selectedCustomer.phone.replace(/\D/g, '')}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 text-xs font-bold border border-emerald-500/30 transition-all"
-                  >
-                    <Phone className="w-3.5 h-3.5" />
-                    <span>WhatsApp Customer</span>
-                  </a>
-                ) : <div></div>}
-                <button
-                  onClick={() => setSelectedCustomer(null)}
-                  className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-colors"
+                      {/* Items Preview */}
+                      {sale.cartItems && Array.isArray(sale.cartItems) && sale.cartItems.length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {sale.cartItems.map((item, idx) => (
+                            <span
+                              key={idx}
+                              className="text-[11px] bg-slate-900 border border-slate-800 text-slate-300 px-2 py-0.5 rounded-lg flex items-center gap-1 font-medium"
+                            >
+                              <span>{item.name}</span>
+                              <strong className="text-cyan-400 font-mono">x{item.qty || 1}</strong>
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-400 italic pt-1">
+                          {sale.description || (sale.isRepair ? 'PC Repair Service' : 'POS Transaction')}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-slate-800/80 bg-[#090d16] flex justify-between items-center shrink-0">
+              {selectedCustomer.phone ? (
+                <a
+                  href={`https://wa.me/${selectedCustomer.phone.replace(/\D/g, '')}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500 hover:text-slate-950 text-xs font-bold border border-emerald-500/30 transition-all"
                 >
-                  Close
-                </button>
-              </div>
-            </motion.div>
+                  <MessageCircle className="w-4 h-4" />
+                  <span>WhatsApp Customer</span>
+                </a>
+              ) : <div></div>}
+
+              <button
+                onClick={() => setSelectedCustomer(null)}
+                className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-all cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+
           </div>
-        )}
-      </AnimatePresence>
+        </div>
+      )}
 
     </div>
   );
 }
-

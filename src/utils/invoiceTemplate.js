@@ -1011,6 +1011,8 @@ export const generateUtilityReceiptHtml = (sale) => {
 // =========================================================================
 export const generateRepairInvoiceHtml = (job, isEstimate = false) => {
   const date = parseTimestamp(job.timestamp || job.createdAt);
+  const isReadyOrFinished = job.status === 'Completed' || job.status === 'Paid' || job.status === 'Delivered';
+  const effectiveIsEstimate = isReadyOrFinished ? false : (job.status === 'Pending' || job.status === 'In Progress' ? true : Boolean(isEstimate));
   
   // Combine parts and calcItems into unified rows
   const rows = [];
@@ -1055,7 +1057,7 @@ export const generateRepairInvoiceHtml = (job, isEstimate = false) => {
   const discount = Number(job.discount || 0);
   const balanceDue = Math.max(0, subTotal - advance - discount);
   const jobId = (job.id || 'NEW').slice(0, 6).toUpperCase();
-  const titleText = isEstimate ? 'REPAIR ESTIMATE' : 'REPAIR INVOICE';
+  const titleText = effectiveIsEstimate ? 'REPAIR ESTIMATE' : 'REPAIR INVOICE';
   const warrantyDays = Number(job.warrantyDays || 0);
 
   const itemsHtml = rows.map(r => `
@@ -1143,7 +1145,7 @@ export const generateRepairInvoiceHtml = (job, isEstimate = false) => {
         }
         .title-section h1 {
           color: #1d4ed8; 
-          font-size: ${isEstimate ? '24px' : '26px'};
+          font-size: ${effectiveIsEstimate ? '24px' : '26px'};
           font-weight: 900;
           margin: 0 0 6px 0;
           letter-spacing: 1.5px;
@@ -1443,8 +1445,8 @@ export const generateRepairInvoiceHtml = (job, isEstimate = false) => {
               </div>
               ` : ''}
               <div class="grand-total">
-                <span>${isEstimate ? 'Balance Due:' : 'Net Payable Total:'}</span>
-                <span>Rs ${(isEstimate ? balanceDue : (subTotal - discount)).toFixed(2)}</span>
+                <span>${effectiveIsEstimate ? 'Balance Due:' : 'Net Payable Total:'}</span>
+                <span>Rs ${(effectiveIsEstimate ? balanceDue : (subTotal - discount)).toFixed(2)}</span>
               </div>
             </div>
           </div>

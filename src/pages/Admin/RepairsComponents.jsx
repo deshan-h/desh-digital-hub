@@ -277,6 +277,7 @@ export const RepairJobModal = ({
   calcItemsTotal,
   currentFinalTotal,
   user,
+  isAdmin,
   printEstimate,
   printFinalBill,
   hasPendingBalanceToComplete
@@ -296,8 +297,8 @@ export const RepairJobModal = ({
   const totalSubtotal = (partsTotal || 0) + estServicesTotal;
   const netDue = Math.max(0, totalSubtotal - Number(editAdvancePayment || 0) - Number(discount || 0) - Number(editFinalPayment || 0));
 
-  const totalBuyingCost = editCalcItems.reduce((sum, item) => sum + Number(item.buyingPrice || 0), 0) + 
-    ((selectedRepair?.parts || []).reduce((sum, p) => sum + Number(p.buyingPrice || 0), 0));
+  const totalBuyingCost = editCalcItems.reduce((sum, item) => sum + Number(item.buyingPrice ?? item.cost ?? item.buyCost ?? 0), 0) + 
+    ((selectedRepair?.parts || []).reduce((sum, p) => sum + Number(p.buyingPrice ?? p.cost ?? p.buyCost ?? 0), 0));
   const estimatedProfit = Math.max(0, totalSubtotal - totalBuyingCost - Number(discount || 0));
 
   return (
@@ -485,13 +486,9 @@ export const RepairJobModal = ({
                 <thead>
                   <tr className="border-b border-slate-800 text-[10px] uppercase font-bold text-slate-400 tracking-wider">
                     <th className="py-2 pr-2">Service / Part Description</th>
-                    {user?.email === 'admin@desh.lk' && (
-                      <th className="py-2 px-2 text-right w-28">Buy Cost (Rs)</th>
-                    )}
+                    <th className="py-2 px-2 text-right w-28 text-slate-300">Buy Cost (Rs)</th>
                     <th className="py-2 pl-2 text-right w-32">Selling Price (Rs)</th>
-                    {user?.email === 'admin@desh.lk' && (
-                      <th className="py-2 pl-2 text-right w-24 text-sky-400">Profit</th>
-                    )}
+                    <th className="py-2 pl-2 text-right w-24 text-sky-400">Profit</th>
                     <th className="py-2 pl-2 text-center w-10"></th>
                   </tr>
                 </thead>
@@ -512,23 +509,28 @@ export const RepairJobModal = ({
                         />
                       </td>
 
-                      {user?.email === 'admin@desh.lk' && (
-                        <td className="py-2 px-2">
-                          <input
-                            type="number"
-                            min="0"
-                            step="any"
-                            value={item.buyingPrice === 0 || item.buyingPrice === '0' ? '' : item.buyingPrice || ''}
-                            onChange={e => {
-                              const newItems = [...editCalcItems];
-                              newItems[idx].buyingPrice = e.target.value === '' ? '' : Number(e.target.value);
-                              setEditCalcItems(newItems);
-                            }}
-                            placeholder="0.00"
-                            className="w-full bg-[#071326] border border-slate-700/80 focus:border-sky-500 rounded-lg px-2 py-1.5 text-slate-300 font-mono text-right text-xs focus:outline-none"
-                          />
-                        </td>
-                      )}
+                      <td className="py-2 px-2">
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={
+                            item.buyingPrice === 0 || item.buyingPrice === '0'
+                              ? ''
+                              : (item.buyingPrice ?? item.cost ?? item.buyCost ?? '')
+                          }
+                          onChange={e => {
+                            const newItems = [...editCalcItems];
+                            const val = e.target.value === '' ? '' : Number(e.target.value);
+                            newItems[idx].buyingPrice = val;
+                            newItems[idx].cost = val;
+                            newItems[idx].buyCost = val;
+                            setEditCalcItems(newItems);
+                          }}
+                          placeholder="0.00"
+                          className="w-full bg-[#071326] border border-slate-700/80 focus:border-sky-500 rounded-lg px-2 py-1.5 text-slate-300 font-mono text-right text-xs focus:outline-none"
+                        />
+                      </td>
 
                       <td className="py-2 pl-2">
                         <input
@@ -546,18 +548,16 @@ export const RepairJobModal = ({
                         />
                       </td>
 
-                      {user?.email === 'admin@desh.lk' && (
-                        <td className="py-2 pl-2 text-right font-mono font-bold text-sky-400 text-xs">
-                          {((Number(item.amount) || 0) - (Number(item.buyingPrice) || 0)).toFixed(2)}
-                        </td>
-                      )}
+                      <td className="py-2 pl-2 text-right font-mono font-bold text-sky-400 text-xs">
+                        {((Number(item.amount) || 0) - (Number(item.buyingPrice ?? item.cost ?? item.buyCost) || 0)).toFixed(2)}
+                      </td>
 
                       <td className="py-2 pl-2 text-center">
                         <button
                           type="button"
                           onClick={() => {
                             if (editCalcItems.length === 1) {
-                              setEditCalcItems([{ desc: '', amount: '', buyingPrice: '' }]);
+                              setEditCalcItems([{ desc: '', amount: '', buyingPrice: '', cost: '', buyCost: '' }]);
                             } else {
                               setEditCalcItems(editCalcItems.filter((_, i) => i !== idx));
                             }
@@ -688,14 +688,12 @@ export const RepairJobModal = ({
               </span>
             </div>
 
-            {user?.email === 'admin@desh.lk' && (
-              <div className="flex flex-col border-l border-slate-700/80 pl-3">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-sky-400">Est. Profit</span>
-                <span className="text-xs font-mono font-bold text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/20">
-                  Rs {estimatedProfit.toFixed(2)}
-                </span>
-              </div>
-            )}
+            <div className="flex flex-col border-l border-slate-700/80 pl-3">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-sky-400">Est. Profit</span>
+              <span className="text-xs font-mono font-bold text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/20">
+                Rs {estimatedProfit.toFixed(2)}
+              </span>
+            </div>
           </div>
 
           {/* Action Buttons */}
