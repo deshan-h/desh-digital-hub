@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { AreaChart, Area, BarChart, Bar, LineChart, Line, ComposedChart, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ReferenceDot, Label, LabelList, ReferenceLine } from 'recharts';
-import { repairService, expenseService } from '../../services/supabaseService';
+import { repairService, expenseService, inquiryService } from '../../services/supabaseService';
+import { visitTracker } from '../../services/visitTracker';
+import { PublicVisitsWidget, BarCustomTooltip, CustomTooltip } from './DashboardComponents';
 import { formatDistanceToNow } from 'date-fns';
 import { parseTimestamp } from '../../utils/helpers';
 import { 
   TrendingUp, TrendingDown, Activity, Wrench, ShoppingBag, 
   PlusCircle, Clock, CheckCircle2, AlertCircle, ShoppingCart, Users, RefreshCw, PieChart as PieChartIcon,
-  ChevronDown, ChevronRight, Zap, Target, ArrowRight, UserX, AlertTriangle, ShieldAlert, Package, HelpCircle, LayoutDashboard, Filter
+  ChevronDown, ChevronRight, Zap, Target, ArrowRight, UserX, AlertTriangle, ShieldAlert, Package, HelpCircle, LayoutDashboard, Filter, Globe, Eye,
+  MessageSquare, Mail
 } from 'lucide-react';
 import { FcPackage, FcPrint, FcTemplate, FcDocument, FcRules, FcImageFile, FcDataBackup, FcCommandLine, FcSettings } from 'react-icons/fc';
 import { motion } from 'framer-motion';
@@ -29,33 +32,10 @@ const COLORS_EXTENDED = [
   '#0ea5e9', '#d946ef', '#f43f5e', '#eab308', '#22c55e', '#a855f7', '#06b6d4'
 ];
 
-
-
-const BarCustomTooltip = ({ active, payload, label }) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-[#0b182f]/95 backdrop-blur-md border border-slate-700/80 p-3.5 rounded-xl shadow-2xl">
-        <p className="text-slate-200 font-bold mb-2.5 border-b border-slate-700/60 pb-1.5 text-xs">{label}</p>
-        <div className="space-y-1.5">
-          {payload.map((entry, index) => {
-             if (!entry.value) return null;
-             return (
-               <div key={index} className="flex justify-between items-center gap-6 text-xs">
-                 <span style={{ color: entry.color }} className="font-bold">{entry.name}</span>
-                 <span className="text-white font-mono font-black">Rs {entry.value.toFixed(0)}</span>
-               </div>
-             );
-          })}
-        </div>
-      </div>
-    );
-  }
-  return null;
-};
-
-export default function Dashboard({ salesHistory, setActiveTab, posCategories = [], totalPendingDues = 0, fetchSales, fetchCustomerDues, pendingOrders = [], customerDuesList = [] }) {
+export default function Dashboard({ salesHistory, setActiveTab, posCategories = [], totalPendingDues = 0, fetchSales, fetchCustomerDues, pendingOrders = [], customerDuesList = [], inquiries = [] }) {
   const [repairs, setRepairs] = useState([]);
   const [expenses, setExpenses] = useState([]);
+  const [localInquiries, setLocalInquiries] = useState(inquiries || []);
   const [loading, setLoading] = useState(true);
   const [lastRefreshed, setLastRefreshed] = useState(() => localStorage.getItem('dashboardLastRefreshed') || null);
   const [revenueTimeFilter, setRevenueTimeFilter] = useState('month');
@@ -63,6 +43,8 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
   const [ordersViewMode, setOrdersViewMode] = useState('monthly');
   const [summaryTimeFilter, setSummaryTimeFilter] = useState('today');
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
+  const [publicVisits, setPublicVisits] = useState([]);
+  const [visitsTimeFilter, setVisitsTimeFilter] = useState('14'); // '7' | '14' | '30'
   const dropdownRef = React.useRef(null);
 
   useEffect(() => {
@@ -94,6 +76,12 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
     handleManualRefresh();
   }, []);
 
+  useEffect(() => {
+    if (inquiries && inquiries.length > 0) {
+      setLocalInquiries(inquiries);
+    }
+  }, [inquiries]);
+
   const handleManualRefresh = async () => {
     setLoading(true);
     try {
@@ -107,6 +95,16 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
       const expensesData = await expenseService.getExpenses();
       setExpenses(expensesData);
       localStorage.setItem('dashboardExpenses', JSON.stringify(expensesData));
+
+      try {
+        const inqData = await inquiryService.getInquiries();
+        if (inqData) setLocalInquiries(inqData);
+      } catch (err) {
+        console.error("Error fetching inquiries:", err);
+      }
+
+      const visitsHistory = await visitTracker.getDailyVisits(30);
+      setPublicVisits(visitsHistory);
 
       const now = new Date().toISOString();
       setLastRefreshed(now);
@@ -273,9 +271,26 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
         ? 20000
         : 20000;
 
-  const salesProgressPercent = summarySalesTarget > 0 
-    ? Math.min(100, Math.round((summarySalesTotal / summarySalesTarget) * 100))
+  const rawSalesProgressPercent = summarySalesTarget > 0 
+    ? Math.round((summarySalesTotal / summarySalesTarget) * 100)
     : 0;
+
+  const salesProgressPercent = Math.min(100, rawSalesProgressPercent);
+  const isTargetExceeded = summarySalesTotal >= summarySalesTarget && summarySalesTarget > 0;
+  const targetSurplus = Math.max(0, summarySalesTotal - summarySalesTarget);
+
+  // Inquiries metrics
+  const unreadInquiriesCount = React.useMemo(() => {
+    return (localInquiries || []).filter(i => i.status === 'new').length;
+  }, [localInquiries]);
+
+  const todayNewInquiriesCount = React.useMemo(() => {
+    const todayStr = new Date().toDateString();
+    return (localInquiries || []).filter(i => {
+      const itemDate = i.createdAt ? new Date(i.createdAt) : null;
+      return itemDate && itemDate.toDateString() === todayStr;
+    }).length;
+  }, [localInquiries]);
 
   const summaryDuesTotal = totalPendingDues || 0;
   const summaryDuesCustomerCount = uniqueDebtorsCount;
@@ -799,40 +814,6 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
     );
   };
 
-
-
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      const isDate = payload[0].payload.fullDate;
-      const dataObj = payload[0].payload;
-      return (
-        <div className="bg-[#0b182f] border border-slate-700/80 p-3 rounded-xl shadow-2xl min-w-[150px]">
-          <p className="text-slate-200 text-xs font-black mb-2 border-b border-slate-800 pb-1.5 flex items-center justify-between">
-            <span>{isDate || label}</span>
-            {dataObj.billCount !== undefined && (
-              <span className="text-[10px] text-cyan-400 font-mono font-bold">
-                {dataObj.billCount} {dataObj.billCount === 1 ? 'Bill' : 'Bills'}
-              </span>
-            )}
-          </p>
-          <div className="space-y-1">
-            {payload.map((entry, index) => (
-              <div key={index} className="flex justify-between items-center gap-4 text-xs">
-                <span className="text-slate-400 font-medium">{entry.name}:</span>
-                <span className="font-black font-mono" style={{ color: entry.color }}>
-                  {entry.name?.includes('Order') || entry.name?.includes('Count') || entry.name?.includes('Bill') 
-                    ? entry.value 
-                    : `Rs ${Number(entry.value || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
-
   const renderCustomizedLabel = (props) => {
     const { cx, cy, midAngle, outerRadius, index, name } = props;
     if (index !== 0) return null;
@@ -858,6 +839,20 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
       </g>
     );
   };
+
+  // -- PUBLIC SITE DAILY VISITS METRICS --
+  const filteredVisitsData = React.useMemo(() => {
+    const days = Number(visitsTimeFilter) || 14;
+    return publicVisits.slice(-days);
+  }, [publicVisits, visitsTimeFilter]);
+
+  const todayVisits = publicVisits.length > 0 ? (publicVisits[publicVisits.length - 1]?.visits || 0) : 0;
+  const totalVisitsInPeriod = filteredVisitsData.reduce((sum, item) => sum + (item.visits || 0), 0);
+  const avgVisitsPerDay = filteredVisitsData.length > 0 ? Math.round(totalVisitsInPeriod / filteredVisitsData.length) : 0;
+  
+  const peakVisitsDay = filteredVisitsData.length > 0 
+    ? filteredVisitsData.reduce((max, item) => (item.visits || 0) > (max.visits || 0) ? item : max, filteredVisitsData[0])
+    : { displayDate: '-', visits: 0 };
 
   if (loading) {
     return (
@@ -942,144 +937,223 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
           </div>
         </div>
 
-        {/* 4 DYNAMIC SUMMARY TILES (COMPACT SINGLE ROW) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 lg:gap-3 mb-3">
+        {/* 5 DYNAMIC SUMMARY TILES (MATCHING LOWER WIDGET THEME) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5 lg:gap-3 mb-3.5">
           
-          {/* Tile 1: Total Sales (with bill count & progress bar) */}
+          {/* Tile 1: Total Sales (with dynamic target exceed state) */}
           <motion.div 
             key={`sales-${summaryTimeFilter}`}
             initial={{ opacity: 0, y: 10 }} 
             animate={{ opacity: 1, y: 0 }} 
             transition={{ duration: 0.2 }}
-            className="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-600 via-sky-600 to-cyan-500 p-3 text-white shadow-md flex flex-col justify-between"
+            className={`relative overflow-hidden rounded-2xl p-3.5 sm:p-4 shadow-xl border transition-all duration-300 flex flex-col justify-between ${
+              isTargetExceeded
+                ? 'bg-gradient-to-br from-[#062024] via-[#071626] to-[#071326] border-emerald-500/40 shadow-emerald-500/10'
+                : 'bg-[#071326] border-slate-800/90 hover:border-slate-700/80'
+            }`}
           >
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-[10px] font-black uppercase tracking-wider text-white/90">
-                Total Sales
-              </span>
-              <div className="w-6 h-6 rounded-full border border-white/30 bg-white/10 flex items-center justify-center shrink-0 text-[9px] font-black font-mono shadow-inner">
-                {salesProgressPercent}%
+            <div className="flex justify-between items-center mb-1.5">
+              <div className="flex items-center gap-1.5">
+                <span className={`w-2 h-2 rounded-full ${isTargetExceeded ? 'bg-emerald-400 animate-pulse' : 'bg-sky-400'}`}></span>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                  Total Sales
+                </span>
+              </div>
+              <div className={`px-2 py-0.5 rounded-full border text-[10px] font-black font-mono shadow-xs flex items-center gap-1 ${
+                isTargetExceeded
+                  ? 'bg-emerald-500/20 border-emerald-400/40 text-emerald-300'
+                  : 'bg-sky-500/10 border-sky-500/30 text-sky-400'
+              }`}>
+                {isTargetExceeded && <span>🎯</span>}
+                <span>{rawSalesProgressPercent}%</span>
               </div>
             </div>
 
-            <div className="flex items-baseline justify-between gap-1 my-0.5">
-              <h4 className="text-base sm:text-lg font-black font-mono tracking-tight">
+            <div className="flex items-baseline justify-between gap-1 my-1">
+              <h4 className={`text-lg sm:text-xl font-black font-mono tracking-tight ${
+                isTargetExceeded ? 'text-emerald-300' : 'text-white'
+              }`}>
                 Rs. {summarySalesTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </h4>
-              <span className="text-[9px] font-bold font-mono px-1.5 py-0.5 rounded bg-black/25 border border-white/15 whitespace-nowrap">
-                Count: {summaryBillCount}
+              <span className="text-[10px] font-bold font-mono px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300 whitespace-nowrap">
+                {summaryBillCount} Bills
               </span>
             </div>
 
             {/* Compact Progress Bar against dynamic target (daily 1000, week 5000, month 20000) */}
-            <div className="mt-1.5 pt-1 border-t border-white/15">
-              <div className="flex justify-between items-center text-[9px] font-mono text-white/80 mb-0.5">
+            <div className="mt-2 pt-1.5 border-t border-slate-800/80">
+              <div className="flex justify-between items-center text-[10px] font-mono text-slate-400 mb-1">
                 <span>{activeFilterObj.targetLabel}</span>
-                <span>{salesProgressPercent}%</span>
+                {isTargetExceeded ? (
+                  <span className="text-emerald-400 font-bold">
+                    +Rs. {targetSurplus.toLocaleString('en-US', { maximumFractionDigits: 0 })} Exceeded
+                  </span>
+                ) : (
+                  <span>{salesProgressPercent}%</span>
+                )}
               </div>
-              <div className="w-full h-1 rounded-full bg-black/30 overflow-hidden">
+              <div className="w-full h-1.5 rounded-full bg-slate-900 overflow-hidden border border-slate-800">
                 <div 
-                  className="h-full rounded-full bg-white transition-all duration-500"
+                  className={`h-full rounded-full transition-all duration-500 ${
+                    isTargetExceeded 
+                      ? 'bg-gradient-to-r from-emerald-400 to-teal-300 shadow-[0_0_8px_rgba(52,211,153,0.5)]' 
+                      : 'bg-sky-500'
+                  }`}
                   style={{ width: `${salesProgressPercent}%` }}
                 ></div>
               </div>
             </div>
           </motion.div>
 
-          {/* Tile 2: Total Dues (with customer count, NO progress bar) */}
+          {/* Tile 2: Total Dues (Matching lower widgets theme) */}
           <motion.div 
             initial={{ opacity: 0, y: 10 }} 
             animate={{ opacity: 1, y: 0 }} 
             transition={{ duration: 0.2, delay: 0.04 }}
-            className="relative overflow-hidden rounded-xl bg-gradient-to-br from-amber-600 via-orange-600 to-amber-700 p-3 text-white shadow-md flex flex-col justify-between"
+            className="relative overflow-hidden rounded-2xl bg-[#071326] border border-slate-800/90 hover:border-slate-700/80 p-3.5 sm:p-4 shadow-xl flex flex-col justify-between transition-all"
           >
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-[10px] font-black uppercase tracking-wider text-white/90">
-                Total Dues
-              </span>
-              <div className="w-6 h-6 rounded-full border border-white/30 bg-white/10 flex items-center justify-center shrink-0">
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-100" />
+            <div className="flex justify-between items-center mb-1.5">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                  Total Dues
+                </span>
+              </div>
+              <div className="w-6 h-6 rounded-full border border-amber-500/30 bg-amber-500/10 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
               </div>
             </div>
 
-            <div className="flex items-baseline justify-between gap-1 my-0.5">
-              <h4 className="text-base sm:text-lg font-black font-mono tracking-tight">
+            <div className="flex items-baseline justify-between gap-1 my-1">
+              <h4 className="text-lg sm:text-xl font-black font-mono tracking-tight text-white">
                 Rs. {summaryDuesTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </h4>
-              <span className="text-[9px] font-bold font-mono px-1.5 py-0.5 rounded bg-black/25 border border-white/15 whitespace-nowrap">
-                {summaryDuesCustomerCount} Customers
+              <span className="text-[10px] font-bold font-mono px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/25 text-amber-300 whitespace-nowrap">
+                {summaryDuesCustomerCount} Debtors
               </span>
             </div>
 
-            <div className="mt-1.5 pt-1 border-t border-white/15 flex items-center justify-between text-[9px] text-white/80 font-mono">
+            <div className="mt-2 pt-1.5 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400 font-mono">
               <span>Customer Ledger</span>
-              <span className="font-bold">{summaryDuesCustomerCount > 0 ? 'Action Req' : 'Clear'}</span>
+              <span className={`font-bold ${summaryDuesCustomerCount > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                {summaryDuesCustomerCount > 0 ? 'Action Req' : 'Clear'}
+              </span>
             </div>
           </motion.div>
 
-          {/* Tile 3: Expenses Sum */}
+          {/* Tile 3: Expenses Sum (Matching lower widgets theme) */}
           <motion.div 
             key={`exp-${summaryTimeFilter}`}
             initial={{ opacity: 0, y: 10 }} 
             animate={{ opacity: 1, y: 0 }} 
             transition={{ duration: 0.2, delay: 0.08 }}
-            className="relative overflow-hidden rounded-xl bg-gradient-to-br from-rose-700 via-red-600 to-rose-700 p-3 text-white shadow-md flex flex-col justify-between"
+            className="relative overflow-hidden rounded-2xl bg-[#071326] border border-slate-800/90 hover:border-slate-700/80 p-3.5 sm:p-4 shadow-xl flex flex-col justify-between transition-all"
           >
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-[10px] font-black uppercase tracking-wider text-white/90">
-                Expenses
-              </span>
-              <div className="w-6 h-6 rounded-full border border-white/30 bg-white/10 flex items-center justify-center shrink-0">
-                <TrendingDown className="w-3.5 h-3.5 text-rose-100" />
+            <div className="flex justify-between items-center mb-1.5">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-rose-400"></span>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                  Expenses
+                </span>
+              </div>
+              <div className="w-6 h-6 rounded-full border border-rose-500/30 bg-rose-500/10 flex items-center justify-center shrink-0">
+                <TrendingDown className="w-3.5 h-3.5 text-rose-400" />
               </div>
             </div>
 
-            <div className="flex items-baseline justify-between gap-1 my-0.5">
-              <h4 className="text-base sm:text-lg font-black font-mono tracking-tight">
+            <div className="flex items-baseline justify-between gap-1 my-1">
+              <h4 className="text-lg sm:text-xl font-black font-mono tracking-tight text-white">
                 Rs. {summaryExpensesTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </h4>
-              <span className="text-[9px] font-bold font-mono px-1.5 py-0.5 rounded bg-black/25 border border-white/15 whitespace-nowrap">
+              <span className="text-[10px] font-bold font-mono px-1.5 py-0.5 rounded bg-rose-500/10 border border-rose-500/25 text-rose-300 whitespace-nowrap">
                 {summaryExpensesCount} Bills
               </span>
             </div>
 
-            <div className="mt-1.5 pt-1 border-t border-white/15 flex items-center justify-between text-[9px] text-white/80 font-mono">
+            <div className="mt-2 pt-1.5 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400 font-mono">
               <span>{activeFilterObj.label} Expenses</span>
-              <span className="font-bold">
+              <span className="font-bold text-rose-400">
                 {summarySalesTotal > 0 ? `${Math.round((summaryExpensesTotal / summarySalesTotal) * 100)}% of Sales` : '0%'}
               </span>
             </div>
           </motion.div>
 
-          {/* Tile 4: Income */}
+          {/* Tile 4: Net Income (Matching lower widgets theme) */}
           <motion.div 
             key={`inc-${summaryTimeFilter}`}
             initial={{ opacity: 0, y: 10 }} 
             animate={{ opacity: 1, y: 0 }} 
             transition={{ duration: 0.2, delay: 0.12 }}
-            className="relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-600 via-teal-600 to-green-600 p-3 text-white shadow-md flex flex-col justify-between"
+            className="relative overflow-hidden rounded-2xl bg-[#071326] border border-slate-800/90 hover:border-slate-700/80 p-3.5 sm:p-4 shadow-xl flex flex-col justify-between transition-all"
           >
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-[10px] font-black uppercase tracking-wider text-white/90">
-                Net Income
-              </span>
-              <div className="w-6 h-6 rounded-full border border-white/30 bg-white/10 flex items-center justify-center shrink-0 text-[9px] font-black font-mono shadow-inner">
+            <div className="flex justify-between items-center mb-1.5">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                  Net Income
+                </span>
+              </div>
+              <div className="px-2 py-0.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-[10px] font-black font-mono">
                 {summaryProfitMargin}%
               </div>
             </div>
 
-            <div className="flex items-baseline justify-between gap-1 my-0.5">
-              <h4 className="text-base sm:text-lg font-black font-mono tracking-tight">
+            <div className="flex items-baseline justify-between gap-1 my-1">
+              <h4 className="text-lg sm:text-xl font-black font-mono tracking-tight text-white">
                 Rs. {summaryIncomeTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </h4>
-              <span className="text-[9px] font-bold font-mono px-1.5 py-0.5 rounded bg-black/25 border border-white/15 whitespace-nowrap">
+              <span className="text-[10px] font-bold font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 whitespace-nowrap">
                 Margin: {summaryProfitMargin}%
               </span>
             </div>
 
-            <div className="mt-1.5 pt-1 border-t border-white/15 flex items-center justify-between text-[9px] text-white/80 font-mono">
+            <div className="mt-2 pt-1.5 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400 font-mono">
               <span>{activeFilterObj.label} Income</span>
-              <span className="font-bold">Realized Net</span>
+              <span className="font-bold text-emerald-400">Realized Net</span>
+            </div>
+          </motion.div>
+
+          {/* Tile 5: Message Summary (Total Unread & Today New Messages) */}
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            transition={{ duration: 0.2, delay: 0.16 }}
+            onClick={() => setActiveTab && setActiveTab('inquiries')}
+            className="relative overflow-hidden rounded-2xl bg-[#071326] border border-slate-800/90 hover:border-sky-500/50 p-3.5 sm:p-4 shadow-xl flex flex-col justify-between transition-all cursor-pointer group/msg"
+            title="Click to view all inquiries"
+          >
+            <div className="flex justify-between items-center mb-1.5">
+              <div className="flex items-center gap-1.5">
+                <span className={`w-2 h-2 rounded-full ${unreadInquiriesCount > 0 ? 'bg-cyan-400 animate-ping' : 'bg-slate-500'}`}></span>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                  Messages / Inquiries
+                </span>
+              </div>
+              <div className="w-6 h-6 rounded-full border border-sky-500/30 bg-sky-500/10 flex items-center justify-center shrink-0 group-hover/msg:scale-110 transition-transform">
+                <MessageSquare className="w-3.5 h-3.5 text-cyan-400" />
+              </div>
+            </div>
+
+            <div className="flex items-baseline justify-between gap-1 my-1">
+              <h4 className="text-lg sm:text-xl font-black font-mono tracking-tight text-white flex items-baseline gap-1">
+                <span>{unreadInquiriesCount}</span>
+                <span className="text-xs text-slate-400 font-sans font-semibold">Unread</span>
+              </h4>
+              <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border whitespace-nowrap ${
+                todayNewInquiriesCount > 0
+                  ? 'bg-cyan-500/15 border-cyan-500/30 text-cyan-300'
+                  : 'bg-slate-900 border-slate-800 text-slate-400'
+              }`}>
+                Today: {todayNewInquiriesCount} New
+              </span>
+            </div>
+
+            <div className="mt-2 pt-1.5 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400 font-mono group-hover/msg:text-sky-300 transition-colors">
+              <span>Customer Inquiries</span>
+              <span className="font-bold flex items-center gap-0.5">
+                <span>Open</span>
+                <ChevronRight className="w-3 h-3 group-hover/msg:translate-x-0.5 transition-transform" />
+              </span>
             </div>
           </motion.div>
 
@@ -1571,6 +1645,17 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
           </motion.div>
 
         </div>
+
+        {/* ROW: PUBLIC SITE DAILY VISIT COUNTS (LINE CHART WIDGET) */}
+        <PublicVisitsWidget
+          filteredVisitsData={filteredVisitsData}
+          visitsTimeFilter={visitsTimeFilter}
+          setVisitsTimeFilter={setVisitsTimeFilter}
+          todayVisits={todayVisits}
+          totalVisitsInPeriod={totalVisitsInPeriod}
+          avgVisitsPerDay={avgVisitsPerDay}
+          peakVisitsDay={peakVisitsDay}
+        />
 
         {/* ROW 5: CATEGORY BREAKDOWN COMPARISON (FULL WIDTH) */}
         <div className="w-full mb-4">

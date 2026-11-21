@@ -452,30 +452,30 @@ export async function generateAiImage({ prompt, categoryName = '' }) {
   let fallbackUrl = 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=1000&q=80';
 
   if (q.includes('repair') || q.includes('laptop') || q.includes('pc') || q.includes('computer')) {
-    fallbackUrl = '/images/services/computer_repair.jpg';
+    fallbackUrl = '/images/services/computer_repair.webp';
   } else if (q.includes('print') || q.includes('photocopy')) {
-    fallbackUrl = '/images/services/print_photocopy.jpg';
+    fallbackUrl = '/images/services/print_photocopy.webp';
   } else if (q.includes('laminat')) {
-    fallbackUrl = '/images/services/laminating.jpg';
+    fallbackUrl = '/images/services/laminating.webp';
   } else if (q.includes('binding') || q.includes('book')) {
-    fallbackUrl = '/images/services/book_binding.jpg';
+    fallbackUrl = '/images/services/book_binding.webp';
   } else if (q.includes('scan')) {
-    fallbackUrl = '/images/services/document_scanning.jpg';
+    fallbackUrl = '/images/services/document_scanning.webp';
   } else if (q.includes('online') || q.includes('passport') || q.includes('application')) {
-    fallbackUrl = '/images/services/online_applications.jpg';
+    fallbackUrl = '/images/services/online_applications.webp';
   } else if (q.includes('cctv') || q.includes('security')) {
     fallbackUrl = 'https://images.unsplash.com/photo-1557597774-9d273605dfa9?auto=format&fit=crop&w=1000&q=80';
   } else if (q.includes('design') || q.includes('graphic')) {
-    fallbackUrl = '/images/services/graphic_design.jpg';
+    fallbackUrl = '/images/services/graphic_design.webp';
   } else if (q.includes('bill') || q.includes('payment')) {
-    fallbackUrl = '/images/services/bill_payments.jpg';
+    fallbackUrl = '/images/services/bill_payments.webp';
   } else if (q.includes('web') || q.includes('software')) {
-    fallbackUrl = '/images/services/web_development.jpg';
+    fallbackUrl = '/images/services/web_development.webp';
   }
 
   return {
     url: fallbackUrl,
-    name: 'tech-service-visual.jpg',
+    name: 'tech-service-visual.webp',
     engine: 'DESH Curated Tech Visuals'
   };
 }

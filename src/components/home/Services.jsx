@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { settingsService } from '../../services/supabaseService';
+import AskServiceModal from '../common/AskServiceModal';
 import { 
   Sparkles, 
   CheckCircle2, 
   X, 
-  MessageCircle, 
   ArrowRight
 } from 'lucide-react';
 
@@ -17,7 +17,7 @@ export const DEFAULT_SERVICES = [
     id: 'pc-repair',
     title: 'PC & Laptop Repair',
     sinhala: 'පරිගණක අලුත්වැඩියා',
-    image: '/images/services/computer_repair.jpg',
+    image: '/images/services/computer_repair.webp',
     description: 'දෝෂ හඳුනාගැනීම, Windows OS Formatting, High-Speed SSD & RAM upgrades, motherboard servicing සහ ගැඹුරු පිරිසිදු කිරීම්.',
     items: [
       { name: 'Hardware Diagnostics & Fault Checking' },
@@ -31,7 +31,7 @@ export const DEFAULT_SERVICES = [
     id: 'print-photocopy',
     title: 'Printout & Photocopy',
     sinhala: 'ප්‍රින්ට් අවුට් , ෆොටොකොපි (වර්ණ / කලුසුදු)',
-    image: '/images/services/print_photocopy.jpg',
+    image: '/images/services/print_photocopy.webp',
     description: 'අධිවේගී ලේසර් කළු-සුදු සහ වර්ණ මුද්‍රණ, ෆොටෝකොපි සහ උසස් පැහැදිලි ලේඛන පිටපත් කිරීම.',
     items: [
       { name: 'Laser Printout [B/W & Full Color]' },
@@ -45,7 +45,7 @@ export const DEFAULT_SERVICES = [
     id: 'laminating',
     title: 'Document Laminating',
     sinhala: 'ලැමිනේටින් සේවා',
-    image: '/images/services/laminating.jpg',
+    image: '/images/services/laminating.webp',
     description: 'ජාතික හැඳුනුම්පත් (NIC), A4, Legal, A3 ප්‍රමාණයේ වැදගත් සහතික සහ ලේඛන කල්පවත්නා ලෙස Thermal Laminating කිරීම.',
     items: [
       { name: 'NIC & Driving License Thermal Lamination' },
@@ -59,7 +59,7 @@ export const DEFAULT_SERVICES = [
     id: 'book-binding',
     title: 'Book Binding',
     sinhala: 'පොත් බයින්ඩින් සේවා',
-    image: '/images/services/book_binding.jpg',
+    image: '/images/services/book_binding.webp',
     description: 'පාසල් හා විශ්වවිද්‍යාල නිබන්ධන, ව්‍යාපෘති වාර්තා සහ පොත් සඳහා Plastic Spiral, Comb, Tape සහ Hardcover බයින්ඩින්.',
     items: [
       { name: 'Plastic Spiral & Wire-O Metal Binding' },
@@ -73,7 +73,7 @@ export const DEFAULT_SERVICES = [
     id: 'document-scanning',
     title: 'Document Scanning',
     sinhala: 'ලේඛන ස්කෑන් කිරීම',
-    image: '/images/services/document_scanning.jpg',
+    image: '/images/services/document_scanning.webp',
     description: 'ඔබගේ සහතික, අත්සන්, ඡායාරූප සහ වැදගත් ලේඛන 600+ DPI උසස් පැහැදිලි බවකින් යුතුව PDF හෝ JPG ලෙස ඩිජිටල්කරණය කිරීම.',
     items: [
       { name: 'High-Resolution Optical Scanning (600+ DPI)' },
@@ -87,7 +87,7 @@ export const DEFAULT_SERVICES = [
     id: 'email-services',
     title: 'Email & Internet Services',
     sinhala: 'ඊ-මේල් සේවා',
-    image: '/images/services/email_services.jpg',
+    image: '/images/services/email_services.webp',
     description: 'විශ්වාසදායී ලෙස ඊ-මේල් පණිවිඩ යැවීම, ලේඛන ඇමුණුම් පරීක්ෂාව සහ ආරක්ෂිත ඩිජිටල් සන්නිවේදන විසඳුම්.',
     items: [
       { name: 'Official Email Composition & Fast Dispatch' },
@@ -101,7 +101,7 @@ export const DEFAULT_SERVICES = [
     id: 'online-applications',
     title: 'Online Applications',
     sinhala: 'මාර්ගගත අයදුම් පත්‍ර',
-    image: '/images/services/online_applications.jpg',
+    image: '/images/services/online_applications.webp',
     description: 'විශ්වවිද්‍යාල, විභාග, රියදුරු බලපත්‍ර, ආදායම් බලපත්‍ර සහ රජයේ සියලුම මාර්ගගත අයදුම්පත් නිවැරදිව පිරවීම.',
     items: [
       { name: 'University & Examination Registrations' },
@@ -115,7 +115,7 @@ export const DEFAULT_SERVICES = [
     id: 'media-downloads',
     title: 'Entertainment & Downloads',
     sinhala: 'චිත්‍රපට, ගීත, වීඩියෝ, මෘදුකාංග ඩවුන්ලෝඩ්',
-    image: '/images/services/media_downloads.jpg',
+    image: '/images/services/media_downloads.webp',
     description: 'චිත්‍රපට, ගීත ඇල්බම්, වීඩියෝ, අත්‍යවශ්‍ය පරිගණක මෘදුකාංග සහ ක්‍රීඩා අධිවේගී ඩවුන්ලෝඩ්.',
     items: [
       { name: 'Sinhala, English & Tamil MP3 Song Collections' },
@@ -129,7 +129,7 @@ export const DEFAULT_SERVICES = [
     id: 'graphic-design',
     title: 'Graphic Design',
     sinhala: 'Graphic Design & නිර්මාණ',
-    image: '/images/services/graphic_design.jpg',
+    image: '/images/services/graphic_design.webp',
     description: 'වෘත්තීය මට්ටමේ CV නිර්මාණය, ව්‍යාපාරික කාඩ්පත්, පෝස්ටර්, බැනර් සහ සමාජ මාධ්‍ය ප්‍රවර්ධන දැන්වීම්.',
     items: [
       { name: 'Professional CV & Modern ATS Resumes' },
@@ -143,7 +143,7 @@ export const DEFAULT_SERVICES = [
     id: 'bill-payments',
     title: 'Utility Bill Payments',
     sinhala: 'බිල්පත් ගෙවීම්',
-    image: '/images/services/bill_payments.jpg',
+    image: '/images/services/bill_payments.webp',
     description: 'විදුලි, ජල, ස්ථාවර දුරකථන සහ රක්ෂණ බිල්පත් කඩිනමින් සහ විශ්වාසදායී රිසිට්පත් සහිතව ක්ෂණිකව ගෙවීම.',
     items: [
       { name: 'CEB & LECO Electricity Bill Settlement' },
@@ -157,7 +157,7 @@ export const DEFAULT_SERVICES = [
     id: 'reloads-packages',
     title: 'Mobile Reloads & Packages',
     sinhala: 'පැකේජ සක්‍රිය කිරීම් සහ Reload',
-    image: '/images/services/mobile_reloads.jpg',
+    image: '/images/services/mobile_reloads.webp',
     description: 'සියලුම දුරකථන ජාල සඳහා Reloads, 4G/5G Data Plans, Unlimited Voice Plans සහ DTV නාලිකා සක්‍රිය කිරීම්.',
     items: [
       { name: 'Instant Mobile Reloads for All Networks' },
@@ -171,14 +171,13 @@ export const DEFAULT_SERVICES = [
     id: 'web-development',
     title: 'Web Application Development',
     sinhala: 'වෙබ් අඩවි සහ මෘදුකාංග නිර්මාණය',
-    image: '/images/services/web_development.jpg',
+    image: '/images/services/web_development.webp',
     description: 'නවීන තාක්ෂණයෙන් යුත් Responsive වෙබ් අඩවි, Cloud Management Systems සහ E-Commerce විසඳුම් සැලසුම් කිරීම.',
     items: [
       { name: 'Custom Business & Portfolio Websites' },
       { name: 'Modern React & Node.js Cloud Web Apps' },
-      { name: 'E-Commerce Online Stores & Payment Gateways' },
-      { name: 'Cloud Inventory & Database Management Portals' },
-      { name: 'Search Engine Optimization (SEO) & Fast Hosting' }
+      { name: 'E-Commerce Online Stores' },
+      { name: 'Cloud Inventory & Database Management Portals' }
     ]
   }
 ];
@@ -189,6 +188,17 @@ export default function Services() {
   const [selectedServiceModal, setSelectedServiceModal] = useState(null);
   const [hoveredId, setHoveredId] = useState(null);
   const [cycleIndex, setCycleIndex] = useState(0);
+
+  // State for "Ask More Details / Prices" modal
+  const [askModalTarget, setAskModalTarget] = useState(null);
+
+  const handleOpenServiceModal = (service) => {
+    setSelectedServiceModal(service);
+  };
+
+  const handleCloseServiceModal = () => {
+    setSelectedServiceModal(null);
+  };
 
   // Load dynamic services and hidden/visible state from Supabase
   useEffect(() => {
@@ -291,15 +301,19 @@ export default function Services() {
                   transition={{ duration: 0.45, delay: idx * 0.04 }}
                   onMouseEnter={() => setHoveredId(service.id)}
                   onMouseLeave={() => setHoveredId(null)}
-                  onClick={() => setSelectedServiceModal(service)}
+                  onClick={() => handleOpenServiceModal(service)}
                   className="group relative aspect-square rounded-[24px] sm:rounded-[30px] overflow-hidden border border-white/10 hover:border-sky-400/60 shadow-[0_12px_35px_rgba(0,0,0,0.6)] hover:shadow-[0_20px_50px_rgba(14,165,233,0.3)] hover:-translate-y-1.5 transition-all duration-300 cursor-pointer select-none bg-[#050c18] isolate"
                 >
+                  {/* Shimmer Skeleton Placeholder while loading */}
+                  <div className="absolute inset-0 bg-slate-900 animate-pulse pointer-events-none -z-10" />
+
                   {/* Full Box Edge-to-Edge Image */}
                   <img 
                     src={service.image} 
                     alt={service.title} 
                     className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-108 block"
                     loading="lazy"
+                    decoding="async"
                   />
 
                   {/* Bottom Dark Gradient Fade for Text */}
@@ -408,21 +422,28 @@ export default function Services() {
                 </div>
               </div>
 
-              {/* Modal Bottom Actions */}
+              {/* Modal Bottom Actions: 1 Single "Ask More Details / Prices" Button */}
               <div className="pt-4 border-t border-slate-700/80 flex items-center justify-between gap-3">
                 <button
-                  onClick={() => setSelectedServiceModal(null)}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors cursor-pointer"
+                  type="button"
+                  onClick={handleCloseServiceModal}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors cursor-pointer"
                 >
                   Close (වසන්න)
                 </button>
 
+                {/* Single Button: Ask More Details / Prices (Clean Plain Professional Solid Color) */}
                 <button
-                  onClick={() => handleWhatsAppInquiry(selectedServiceModal.title)}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black transition-all shadow-lg shadow-emerald-500/25 cursor-pointer"
+                  type="button"
+                  onClick={() => {
+                    const target = selectedServiceModal;
+                    setSelectedServiceModal(null);
+                    setAskModalTarget(target);
+                  }}
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 active:bg-sky-700 text-white text-xs font-bold transition-colors cursor-pointer shadow-sm"
                 >
-                  <MessageCircle className="w-4 h-4 fill-slate-950" />
-                  <span>Order via WhatsApp (විමසන්න)</span>
+                  <Sparkles className="w-4 h-4 text-white shrink-0" />
+                  <span>Ask More Details / Prices</span>
                 </button>
               </div>
 
@@ -430,6 +451,17 @@ export default function Services() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* ======================================================== */}
+      {/* ASK MORE DETAILS / PRICES MODAL (SYSTEM INQUIRY & CALL)  */}
+      {/* ======================================================== */}
+      <AskServiceModal
+        isOpen={Boolean(askModalTarget)}
+        onClose={() => setAskModalTarget(null)}
+        serviceTitle={askModalTarget?.title}
+        serviceCategory={askModalTarget?.sinhala}
+        source="Public Services"
+      />
 
     </section>
   );

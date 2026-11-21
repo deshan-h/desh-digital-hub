@@ -109,7 +109,9 @@ export default function Admin() {
     if ('serviceWorker' in navigator) {
       import('virtual:pwa-register').then(({ registerSW }) => {
         registerSW({ immediate: true });
-      }).catch((err) => console.log('PWA registration error', err));
+      }).catch((err) => {
+        console.warn('PWA registration skipped:', err?.message || err);
+      });
     }
 
     return () => {
@@ -668,7 +670,7 @@ export default function Admin() {
         onMarkAllInquiriesRead={handleMarkAllInquiriesRead}
       >
         <Suspense fallback={<Loader />}>
-          {activeTab === 'dashboard' && <Dashboard salesHistory={salesHistory} setActiveTab={setActiveTab} posCategories={posCategories} totalPendingDues={totalPendingDues} fetchSales={fetchSales} fetchCustomerDues={fetchCustomerDues} pendingOrders={pendingOrders} customerDuesList={customerDuesList} />}
+          {activeTab === 'dashboard' && <Dashboard salesHistory={salesHistory} setActiveTab={setActiveTab} posCategories={posCategories} totalPendingDues={totalPendingDues} fetchSales={fetchSales} fetchCustomerDues={fetchCustomerDues} pendingOrders={pendingOrders} customerDuesList={customerDuesList} inquiries={inquiries} />}
           {activeTab === 'pos' && (
             <POS 
               cart={cart}

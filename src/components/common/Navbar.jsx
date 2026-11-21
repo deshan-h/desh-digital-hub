@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { Menu, X, MessageCircle, Lock, ChevronRight, Phone } from 'lucide-react';
+import { Menu, X, MessageCircle, Lock, ChevronRight, Phone, Sparkles } from 'lucide-react';
+import BannerCarousel from '../home/BannerCarousel';
+import WhatsAppIcon from './WhatsAppIcon';
 
 export default function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isPromotionsModalOpen, setIsPromotionsModalOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -14,8 +18,30 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isPromotionsModalOpen) {
+        setIsPromotionsModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isPromotionsModalOpen]);
+
+  const handleNavLinkClick = (e, item) => {
+    if (item.label === 'ප්‍රවර්ධන' || item.href === '#promotions') {
+      e.preventDefault();
+      setIsPromotionsModalOpen(true);
+      setIsMobileMenuOpen(false);
+    } else {
+      setIsMobileMenuOpen(false);
+    }
+  };
+
   const navLinks = [
     { label: 'මුල් පිටුව', href: '#home' },
+    { label: 'සාම්පල', href: '#our-works' },
+    { label: 'ඔන්ලයින් සේවා', href: '#online-services' },
     { label: 'සේවාවන්', href: '#services' },
     { label: 'ප්‍රවර්ධන', href: '#promotions' },
     { label: 'අප ගැන', href: '#about' },
@@ -23,10 +49,10 @@ export default function Navbar() {
   ];
 
   return (
-    <header className={`sticky top-0 z-40 w-full transition-all duration-300 ${
+    <header className={`sticky top-0 z-40 w-full transition-all duration-300 bg-[#0c2340]/95 backdrop-blur-xl border-b border-sky-500/15 ${
       scrolled 
-        ? 'bg-[#0c2340]/95 backdrop-blur-xl border-b border-sky-500/15 shadow-lg py-2.5 sm:py-3 px-4 sm:px-8' 
-        : 'bg-transparent border-b-0 py-3 sm:py-4 px-4 sm:px-8'
+        ? 'shadow-xl shadow-black/40 py-2.5 sm:py-3 px-4 sm:px-8' 
+        : 'shadow-md py-3 sm:py-4 px-4 sm:px-8'
     }`}>
       <nav 
         aria-label="Main Navigation"
@@ -59,7 +85,8 @@ export default function Navbar() {
                 <a 
                   key={item.label}
                   href={item.href} 
-                  className="group relative px-3.5 py-2 text-xs font-bold text-slate-300 hover:text-white transition-all duration-200 rounded-xl hover:bg-white/[0.06]"
+                  onClick={(e) => handleNavLinkClick(e, item)}
+                  className="group relative px-3.5 py-2 text-xs font-bold text-slate-300 hover:text-white transition-all duration-200 rounded-xl hover:bg-white/[0.06] cursor-pointer"
                 >
                   <span className="relative z-10 tracking-wide">{item.label}</span>
                   {/* Sleek Neon Glow Indicator on Hover */}
@@ -79,7 +106,7 @@ export default function Navbar() {
                 className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/15 hover:bg-emerald-500 text-emerald-400 hover:text-slate-950 border border-emerald-500/30 text-xs font-bold font-mono transition-all shadow-[0_0_15px_rgba(16,185,129,0.15)] hover:shadow-[0_0_25px_rgba(16,185,129,0.4)] hover:-translate-y-0.5 cursor-pointer"
                 title="WhatsApp: +94 (71) 998 9000"
               >
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <WhatsAppIcon className="w-3.5 h-3.5 shrink-0" />
                 <span>+94 (71) 998 9000</span>
               </a>
 
@@ -102,7 +129,7 @@ export default function Navbar() {
                 className="sm:hidden px-2.5 py-1.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[11px] font-bold font-mono flex items-center gap-1.5"
                 title="WhatsApp: +94 (71) 998 9000"
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <WhatsAppIcon className="w-3 h-3 shrink-0" />
                 <span>+94 (71) 998 9000</span>
               </a>
 
@@ -128,8 +155,8 @@ export default function Navbar() {
               <a 
                 key={item.label}
                 href={item.href} 
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="flex items-center justify-between text-sm font-semibold text-slate-300 hover:text-sky-300 border-b border-white/5 pb-2 transition-colors"
+                onClick={(e) => handleNavLinkClick(e, item)}
+                className="flex items-center justify-between text-sm font-semibold text-slate-300 hover:text-sky-300 border-b border-white/5 pb-2 transition-colors cursor-pointer"
               >
                 <span>{item.label}</span>
                 <ChevronRight className="w-4 h-4 text-slate-500" />
@@ -157,6 +184,68 @@ export default function Navbar() {
           </div>
         </div>
       </nav>
+
+      {/* Promotional Banners & Carousel Lightbox Modal */}
+      {isPromotionsModalOpen && createPortal(
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-5 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200"
+          onClick={() => setIsPromotionsModalOpen(false)}
+        >
+          <div 
+            className="bg-[#071326] border border-sky-500/30 rounded-3xl w-full max-w-xl max-h-[92vh] flex flex-col shadow-[0_0_60px_rgba(14,165,233,0.25)] overflow-hidden slide-in-from-bottom-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="px-5 sm:px-6 py-4 border-b border-sky-500/20 bg-gradient-to-r from-[#0a1e38] via-[#09182d] to-[#071326] flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-md shadow-sky-500/20 text-white shrink-0">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-black text-white tracking-tight flex items-center gap-2">
+                    <span>විශේෂ ප්‍රවර්ධන හා දීමනා</span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 uppercase font-bold">
+                      Promotions
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Latest marketing flyers, special offers and digital wallpapers
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsPromotionsModalOpen(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Close Modal"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body with Carousel */}
+            <div className="p-4 sm:p-6 overflow-y-auto flex items-center justify-center bg-slate-950/60 custom-scrollbar">
+              <div className="w-full max-w-[440px]">
+                <BannerCarousel />
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-5 py-3 border-t border-slate-800/80 bg-[#071326] flex items-center justify-between text-[11px] text-slate-400 shrink-0">
+              <span className="font-mono text-cyan-400/90 text-[10px] sm:text-[11px]">✨ Auto-sliding active • Hover to pause</span>
+              <button
+                type="button"
+                onClick={() => setIsPromotionsModalOpen(false)}
+                className="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold transition-colors cursor-pointer text-xs"
+              >
+                Close (වසන්න)
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </header>
   );
 }

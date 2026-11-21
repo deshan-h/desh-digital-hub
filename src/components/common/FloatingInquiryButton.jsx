@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, MessageCircle, Send } from 'lucide-react';
+import { X, Send } from 'lucide-react';
+import WhatsAppIcon from './WhatsAppIcon';
 
 export default function FloatingInquiryButton() {
   const [showBubble, setShowBubble] = useState(false);
@@ -14,8 +15,8 @@ export default function FloatingInquiryButton() {
         setIsDismissed(true);
         return;
       }
-    } catch (e) {
-      console.warn(e);
+    } catch {
+      // Ignore sessionStorage access errors
     }
 
     const timer = setTimeout(() => {
@@ -57,8 +58,8 @@ export default function FloatingInquiryButton() {
     setIsDismissed(true);
     try {
       sessionStorage.setItem('desh_support_bubble_dismissed', 'true');
-    } catch (err) {
-      console.warn(err);
+    } catch {
+      // Ignore sessionStorage access errors
     }
   };
 
@@ -139,7 +140,7 @@ export default function FloatingInquiryButton() {
                 onClick={handleDirectWhatsApp}
                 className="flex-1 py-1.5 px-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white text-[11px] font-bold transition-all active:scale-95 cursor-pointer text-center border border-slate-700/80 flex items-center justify-center gap-1.5 truncate"
               >
-                <MessageCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <WhatsAppIcon className="w-3.5 h-3.5 shrink-0" />
                 <span>WhatsApp</span>
               </button>
             </div>

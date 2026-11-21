@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { inquiryService } from '../../services/supabaseService';
 import { notify } from '../../utils/toast';
+import WhatsAppIcon from '../../components/common/WhatsAppIcon';
 import { 
   MessageSquare, 
   Phone, 
@@ -419,7 +420,7 @@ export default function Inquiries() {
                     onClick={() => handleReplyWhatsApp(activeInquiry)}
                     className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/25 transition-all cursor-pointer"
                   >
-                    <MessageCircle className="w-4 h-4 stroke-[2.5]" />
+                    <WhatsAppIcon className="w-4 h-4 shrink-0" />
                     <span>Reply on WhatsApp</span>
                   </button>
                 ) : null}

@@ -243,7 +243,7 @@ export default function SocialChannels() {
             {/* Bottom Button */}
             <div className="w-full pt-6 relative z-10 flex justify-center">
               <a
-                href="https://deshedublog.blogspot.com"
+                href="https://desh.s.gy/edu-hub"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full border border-emerald-500/40 text-emerald-400 hover:text-white hover:bg-emerald-500/20 hover:border-emerald-300 text-xs font-bold transition-all group/btn"

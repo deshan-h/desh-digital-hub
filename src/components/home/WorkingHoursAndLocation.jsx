@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Clock, MapPin, Phone, MessageCircle, Navigation, ExternalLink, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { Clock, MapPin, Phone, Navigation, ExternalLink, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import WhatsAppIcon from '../common/WhatsAppIcon';
 
 export default function WorkingHoursAndLocation() {
   const [isOpenNow, setIsOpenNow] = useState(true);
@@ -175,7 +176,7 @@ export default function WorkingHoursAndLocation() {
                     rel="noopener noreferrer"
                     className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-emerald-500/40 text-slate-300 hover:text-white transition-all flex items-center gap-2.5 group cursor-pointer"
                   >
-                    <MessageCircle className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+                    <WhatsAppIcon className="w-4 h-4 shrink-0 group-hover:scale-110 transition-transform" />
                     <div>
                       <span className="text-[10px] text-slate-500 block uppercase">WhatsApp</span>
                       <span className="text-xs font-bold font-mono">Chat Online</span>

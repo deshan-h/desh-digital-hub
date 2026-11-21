@@ -27,7 +27,7 @@ const DEFAULT_BANNERS = [
     subtitle: 'Free and premium educational resources, exam papers and study guides.',
     badge: 'EDUCATIONAL',
     imageUrl: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80',
-    linkUrl: 'https://deshedublog.blogspot.com',
+    linkUrl: 'https://desh.s.gy/edu-hub',
     linkText: 'Visit Edu Hub',
     active: true
   },
@@ -181,7 +181,9 @@ export default function BannerCarousel() {
                   src={currentBanner.imageUrl}
                   alt={currentBanner.title || 'Promotion Graphic'}
                   className="w-full h-full object-cover object-center transform transition-transform duration-700 group-hover:scale-105"
-                  loading="lazy"
+                  loading={currentIndex === 0 ? "eager" : "lazy"}
+                  decoding="async"
+                  fetchPriority={currentIndex === 0 ? "high" : "auto"}
                   onError={(e) => {
                     e.target.onerror = null;
                     e.target.src = DEFAULT_BANNERS[0].imageUrl;
@@ -244,7 +246,9 @@ export default function BannerCarousel() {
                   src={currentBanner.imageUrl}
                   alt={currentBanner.title || 'Promotion Graphic'}
                   className="w-full h-full object-cover object-center transform transition-transform duration-700 group-hover:scale-105"
-                  loading="lazy"
+                  loading={currentIndex === 0 ? "eager" : "lazy"}
+                  decoding="async"
+                  fetchPriority={currentIndex === 0 ? "high" : "auto"}
                   onError={(e) => {
                     e.target.onerror = null;
                     e.target.src = DEFAULT_BANNERS[0].imageUrl;

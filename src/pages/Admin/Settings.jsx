@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { settingsService } from '../../services/supabaseService';
 import { supabase } from '../../config/supabase';
-import { uploadToCloudflare } from '../../services/cloudflareStorage';
+import { uploadToCloudflare, compressAndConvertToWebP } from '../../services/cloudflareStorage';
 import { generateBannerCopy, generateServiceCopy, generateAiImage } from '../../services/bannerAiService';
 import { DEFAULT_SERVICES } from '../../components/home/Services';
+import { SAMPLE_WORKS } from '../../components/home/OnlinePortfolioGallery';
 import { notify } from '../../utils/toast';
+import { BannerEditModal, WorkersAiModal, ServiceEditModal, WorkEditModal } from './SettingsComponents';
 import { 
   Save, 
   Plus, 
@@ -56,7 +58,7 @@ const DEFAULT_BANNERS = [
     subtitle: 'Free and premium educational resources, exam papers and study guides.',
     badge: 'EDUCATIONAL',
     imageUrl: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80',
-    linkUrl: 'https://deshedublog.blogspot.com',
+    linkUrl: 'https://desh.s.gy/edu-hub',
     linkText: 'Visit Edu Hub',
     active: true,
     order: 2
@@ -111,7 +113,7 @@ export default function Settings({ isAdmin }) {
   const handleGenerateAiCopy = async (customPrompt) => {
     const promptToUse = (customPrompt || aiPrompt).trim();
     if (!promptToUse) {
-      notify.error('කරුණාකර මාතෘකාවක් ඇතුළත් කරන්න හෝ පහතින් එකක් තෝරන්න.');
+      notify.error('Please enter a topic or select one of the presets.');
       return;
     }
     setAiGenerating(true);
@@ -193,6 +195,26 @@ export default function Settings({ isAdmin }) {
   const [editAiGeneratingServiceDesc, setEditAiGeneratingServiceDesc] = useState(false);
   const [editSubInput, setEditSubInput] = useState('');
 
+  // ==========================================
+  // 4. OUR WORKS SHOWCASE PORTFOLIO STATE
+  // ==========================================
+  const [worksList, setWorksList] = useState([]);
+  const [savingWorks, setSavingWorks] = useState(false);
+  const [workImageMode, setWorkImageMode] = useState('file'); // 'file' | 'url'
+  const [workUploading, setWorkUploading] = useState(false);
+  const [isNewWorkOpen, setIsNewWorkOpen] = useState(false);
+  const [newWork, setNewWork] = useState({
+    title: '',
+    image: '',
+    description: '',
+    active: true
+  });
+
+  // Edit Work Modal State
+  const [editingWork, setEditingWork] = useState(null);
+  const [editWorkImageMode, setEditWorkImageMode] = useState('file');
+  const [editWorkUploading, setEditWorkUploading] = useState(false);
+
   useEffect(() => {
     fetchInitialSettings();
   }, []);
@@ -225,6 +247,23 @@ export default function Settings({ isAdmin }) {
         setServicesList(items);
       } else {
         setServicesList(DEFAULT_SERVICES.map((s, idx) => ({ ...s, order: idx + 1, active: true })));
+      }
+
+      // 3. Fetch Our Works Showcase Portfolio
+      const worksData = await settingsService.getSetting('our_works').catch(() => null);
+      if (worksData && Array.isArray(worksData.items) && worksData.items.length > 0) {
+        const items = worksData.items.map((w, idx) => ({
+          ...w,
+          order: w.order !== undefined && w.order !== null ? Number(w.order) : idx + 1,
+          highlights: Array.isArray(w.highlights) ? w.highlights : []
+        }));
+        items.sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+        setWorksList(items);
+        localStorage.setItem('desh_our_works', JSON.stringify(items));
+      } else {
+        const initial = SAMPLE_WORKS.map((w, idx) => ({ ...w, order: idx + 1, active: true }));
+        setWorksList(initial);
+        localStorage.setItem('desh_our_works', JSON.stringify(initial));
       }
     } catch (error) {
       console.error(error);
@@ -641,6 +680,213 @@ export default function Settings({ isAdmin }) {
     }
   };
 
+  // ==========================================
+  // OUR WORKS SHOWCASE HANDLERS
+  // ==========================================
+  const handleSaveWorks = async (listToSave) => {
+    const list = listToSave || worksList;
+    const ordered = list.map((w, idx) => ({
+      ...w,
+      order: idx + 1
+    }));
+    setWorksList(ordered);
+    try {
+      localStorage.setItem('desh_our_works', JSON.stringify(ordered));
+    } catch (e) {
+      console.warn('localStorage error:', e);
+    }
+    setSavingWorks(true);
+    try {
+      await settingsService.saveSetting('our_works', { items: ordered });
+      notify.success('Our Works Showcase updated and published successfully!');
+      return true;
+    } catch (err) {
+      console.error(err);
+      notify.error('Failed to save works to Supabase');
+      return false;
+    } finally {
+      setSavingWorks(false);
+    }
+  };
+
+  const handleResetDefaultWorks = async () => {
+    if (!window.confirm('Reset Our Works to standard sample works? Any custom works will be overwritten.')) return;
+    const initial = SAMPLE_WORKS.map((w, idx) => ({ ...w, order: idx + 1, active: true }));
+    await handleSaveWorks(initial);
+  };
+
+  const handleToggleWorkActive = async (workId) => {
+    const updated = worksList.map(w => w.id === workId ? { ...w, active: !w.active } : w);
+    await handleSaveWorks(updated);
+  };
+
+  const handleDeleteWork = async (workId) => {
+    const target = worksList.find(w => w.id === workId);
+    if (!window.confirm(`Are you sure you want to delete "${target?.title || 'this work item'}"?`)) return;
+    const updated = worksList.filter(w => w.id !== workId);
+    await handleSaveWorks(updated);
+  };
+
+  const handleReorderWork = async (fromIndex, toIndex) => {
+    if (toIndex < 0 || toIndex >= worksList.length || fromIndex === toIndex) return;
+    const reordered = [...worksList];
+    const [moved] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, moved);
+    await handleSaveWorks(reordered);
+  };
+
+  const handleMoveWork = (index, direction) => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    handleReorderWork(index, targetIndex);
+  };
+
+  const handleWorkFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setWorkUploading(true);
+    try {
+      let url = '';
+      try {
+        const res = await uploadToCloudflare(file);
+        if (res?.url) url = res.url;
+      } catch (cfErr) {
+        console.warn('Cloudflare upload not available, falling back to base64 reader:', cfErr);
+      }
+      if (!url) {
+        let fileToRead = file;
+        try {
+          const comp = await compressAndConvertToWebP(file, { maxWidth: 1400, quality: 0.82 });
+          fileToRead = comp.file;
+        } catch (_) {}
+        url = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (ev) => resolve(ev.target.result);
+          reader.onerror = () => reject(new Error('Failed to read image file'));
+          reader.readAsDataURL(fileToRead);
+        });
+      }
+      setNewWork(prev => ({ ...prev, image: url }));
+      notify.success('Work sample photo compressed (WebP) & loaded successfully!');
+    } catch (err) {
+      notify.error(err.message || 'Image upload failed.');
+    } finally {
+      setWorkUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleEditWorkFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !editingWork) return;
+    setEditWorkUploading(true);
+    try {
+      let url = '';
+      try {
+        const res = await uploadToCloudflare(file);
+        if (res?.url) url = res.url;
+      } catch (cfErr) {
+        console.warn('Cloudflare upload fallback to base64 reader:', cfErr);
+      }
+      if (!url) {
+        let fileToRead = file;
+        try {
+          const comp = await compressAndConvertToWebP(file, { maxWidth: 1400, quality: 0.82 });
+          fileToRead = comp.file;
+        } catch (_) {}
+        url = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (ev) => resolve(ev.target.result);
+          reader.onerror = () => reject(new Error('Failed to read image file'));
+          reader.readAsDataURL(fileToRead);
+        });
+      }
+      setEditingWork(prev => ({ ...prev, image: url }));
+      notify.success('Work sample photo compressed (WebP) & updated successfully!');
+    } catch (err) {
+      notify.error(err.message || 'Image upload failed.');
+    } finally {
+      setEditWorkUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleAddHighlightToNew = () => {
+    if (!newHighlightInput.trim()) return;
+    setNewWork(prev => ({
+      ...prev,
+      highlights: [...(prev.highlights || []), newHighlightInput.trim()]
+    }));
+    setNewHighlightInput('');
+  };
+
+  const handleAddWorkItem = async (e) => {
+    if (e) e.preventDefault();
+    if (!newWork.title.trim()) {
+      notify.error('Please enter a title for the work sample.');
+      return;
+    }
+    if (!newWork.image.trim()) {
+      notify.error('Please upload or provide an image for the work sample.');
+      return;
+    }
+
+    const newItem = {
+      id: `work-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      title: newWork.title.trim(),
+      image: newWork.image.trim(),
+      description: newWork.description.trim(),
+      active: true,
+      order: worksList.length + 1
+    };
+
+    const updated = [...worksList, newItem];
+    const ok = await handleSaveWorks(updated);
+    if (ok) {
+      setNewWork({
+        title: '',
+        image: '',
+        description: '',
+        active: true
+      });
+      setIsNewWorkOpen(false);
+      notify.success('✨ New work item added and published to Our Works!');
+    }
+  };
+
+  const handleSaveEditedWork = async (e) => {
+    if (e) e.preventDefault();
+    if (!editingWork || !editingWork.image?.trim()) {
+      notify.error('Please provide an image for the work item.');
+      return;
+    }
+
+    const originalIndex = editingWork.originalIndex;
+    const targetOrder = Math.max(1, Math.min(worksList.length, Number(editingWork.order) || (originalIndex + 1)));
+    const targetIndex = targetOrder - 1;
+
+    let updated = [...worksList];
+    const updatedItem = {
+      ...updated[originalIndex],
+      title: editingWork.title.trim(),
+      image: editingWork.image.trim(),
+      description: editingWork.description.trim(),
+      active: Boolean(editingWork.active)
+    };
+
+    if (targetIndex !== originalIndex) {
+      updated.splice(originalIndex, 1);
+      updated.splice(targetIndex, 0, updatedItem);
+    } else {
+      updated[originalIndex] = updatedItem;
+    }
+
+    const ok = await handleSaveWorks(updated);
+    if (ok) {
+      setEditingWork(null);
+      notify.success('Work item updated successfully!');
+    }
+  };
+
   if (loading) return <Loader text="Loading Settings..." subText="Configuring Preferences" />;
 
   const navTabs = [
@@ -653,10 +899,17 @@ export default function Settings({ isAdmin }) {
     },
     {
       id: 'services',
-      label: 'Our Services (ප්‍රසිද්ධ සේවාවන්)',
+      label: 'Our Services',
       icon: Sparkles,
       count: servicesList.length,
       badgeColor: 'text-sky-400'
+    },
+    {
+      id: 'our-works',
+      label: 'Our Works Showcase',
+      icon: Layers,
+      count: worksList.length,
+      badgeColor: 'text-indigo-400'
     },
     {
       id: 'storage',
@@ -733,6 +986,29 @@ export default function Settings({ isAdmin }) {
               >
                 <Save className="w-3.5 h-3.5" />
                 <span>{savingServices ? 'Saving...' : 'Save Services'}</span>
+              </button>
+            </div>
+          )}
+
+          {activeTab === 'our-works' && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleResetDefaultWorks}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all cursor-pointer shadow-sm"
+                title="Restore default sample works"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+                <span className="hidden sm:inline">Reset Defaults</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSaveWorks(worksList)}
+                disabled={savingWorks}
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl font-black text-xs bg-gradient-to-r from-sky-500 to-teal-500 hover:from-sky-400 hover:to-teal-400 text-slate-950 transition-all shadow-md shadow-sky-500/20 disabled:opacity-50 cursor-pointer"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>{savingWorks ? 'Saving...' : 'Save Works'}</span>
               </button>
             </div>
           )}
@@ -1124,483 +1400,36 @@ export default function Settings({ isAdmin }) {
             </div>
 
             {/* Edit Banner Modal */}
-            {editingBanner && createPortal(
-              <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
-                <div className="bg-[#071326] border border-sky-500/30 rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-[0_0_50px_rgba(14,165,233,0.15)] overflow-hidden slide-in-from-bottom-6">
-                  {/* Modal Header */}
-                  <div className="px-6 py-4 border-b border-sky-500/20 bg-gradient-to-r from-[#0a1e38] via-[#09182d] to-[#071326] flex justify-between items-center shrink-0">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-sky-500/20 border border-sky-400/40 flex items-center justify-center text-sky-400">
-                        <Edit className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <h3 className="text-base font-bold text-white">Edit Promotional Banner</h3>
-                        <p className="text-xs text-slate-400">Update headline, graphic flyer, play order, or link</p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setEditingBanner(null)}
-                      className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
+            <BannerEditModal
+              editingBanner={editingBanner}
+              setEditingBanner={setEditingBanner}
+              banners={banners}
+              editImageInputMode={editImageInputMode}
+              setEditImageInputMode={setEditImageInputMode}
+              editUploading={editUploading}
+              handleEditFileUpload={handleEditFileUpload}
+              handleOpenAiModal={handleOpenAiModal}
+              handleSaveEditedBanner={handleSaveEditedBanner}
+            />
 
-                  {/* Modal Form */}
-                  <form onSubmit={handleSaveEditedBanner} className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs">
-                    <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
-                    {/* Image Upload / URL */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-300">
-                          Banner Image Flyer
-                        </label>
-                        <div className="flex items-center gap-1 bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-[11px]">
-                          <button
-                            type="button"
-                            onClick={() => setEditImageInputMode('file')}
-                            className={`px-2 py-0.5 rounded cursor-pointer transition-all ${
-                              editImageInputMode === 'file' ? 'bg-amber-500/20 text-amber-300 font-bold' : 'text-slate-400 hover:text-slate-200'
-                            }`}
-                          >
-                            Upload New
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditImageInputMode('url')}
-                            className={`px-2 py-0.5 rounded cursor-pointer transition-all ${
-                              editImageInputMode === 'url' ? 'bg-amber-500/20 text-amber-300 font-bold' : 'text-slate-400 hover:text-slate-200'
-                            }`}
-                          >
-                            Edit URL
-                          </button>
-                        </div>
-                      </div>
-
-                      {editImageInputMode === 'file' ? (
-                        <div className="relative border-2 border-dashed border-slate-700 hover:border-sky-500/60 rounded-xl p-4 text-center bg-slate-950/60 transition-colors group">
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={handleEditFileUpload}
-                            disabled={editUploading}
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
-                          />
-                          <div className="flex flex-col items-center justify-center gap-1.5">
-                            <UploadCloud className="w-6 h-6 text-sky-400" />
-                            <p className="text-xs font-bold text-slate-200">
-                              {editUploading ? 'Uploading to Cloudflare...' : 'Click or drop new flyer image'}
-                            </p>
-                          </div>
-                        </div>
-                      ) : (
-                        <input
-                          type="url"
-                          value={editingBanner.imageUrl}
-                          onChange={(e) => setEditingBanner({ ...editingBanner, imageUrl: e.target.value })}
-                          placeholder="https://..."
-                          className="w-full bg-slate-950 text-slate-100 px-3 py-2 rounded-xl border border-slate-700 focus:border-sky-500 outline-none font-mono text-xs"
-                        />
-                      )}
-
-                      {/* Live Preview */}
-                      {editingBanner.imageUrl && (
-                        <div className="p-2 bg-slate-950 rounded-xl border border-slate-800 flex items-center gap-3">
-                          <img
-                            src={editingBanner.imageUrl}
-                            alt="Preview"
-                            className="w-14 h-14 object-cover rounded-lg border border-slate-700 shrink-0"
-                          />
-                          <div className="min-w-0 flex-1">
-                            <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
-                              <Check className="w-3 h-3" /> Image Active
-                            </span>
-                            <p className="text-[10px] text-slate-400 truncate font-mono">{editingBanner.imageUrl}</p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Title & Subtitle */}
-                    <div className="space-y-3">
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                            Banner Headline Title
-                          </label>
-                          <button
-                            type="button"
-                            onClick={() => handleOpenAiModal('edit')}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-gradient-to-r from-sky-500/20 via-cyan-500/20 to-teal-500/20 hover:from-sky-500/30 hover:to-teal-500/30 text-sky-300 border border-sky-500/40 text-[10px] font-black cursor-pointer transition-all shadow-sm group"
-                          >
-                            <Sparkles className="w-3 h-3 text-sky-400 group-hover:rotate-12 transition-transform" />
-                            <span>✨ AI Rewrite Copy</span>
-                          </button>
-                        </div>
-                        <input
-                          type="text"
-                          value={editingBanner.title}
-                          onChange={(e) => setEditingBanner({ ...editingBanner, title: e.target.value })}
-                          className="w-full bg-slate-950 text-slate-100 text-xs px-3 py-2 rounded-xl border border-slate-700 focus:border-sky-500 outline-none"
-                          placeholder="Headline title..."
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                          Subtext / Promotional Description
-                        </label>
-                        <textarea
-                          rows={2}
-                          value={editingBanner.subtitle}
-                          onChange={(e) => setEditingBanner({ ...editingBanner, subtitle: e.target.value })}
-                          className="w-full bg-slate-950 text-slate-100 text-xs px-3 py-2 rounded-xl border border-slate-700 focus:border-sky-500 outline-none resize-none"
-                          placeholder="Description..."
-                        />
-                      </div>
-                    </div>
-
-                    {/* Badge, Play Order, Visibility */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div>
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                          Badge Tag
-                        </label>
-                        <select
-                          value={editingBanner.badge}
-                          onChange={(e) => setEditingBanner({ ...editingBanner, badge: e.target.value })}
-                          className="w-full bg-slate-950 text-slate-200 text-xs px-3 py-2 rounded-xl border border-slate-700 focus:border-sky-500 outline-none cursor-pointer"
-                        >
-                          <option value="PROMOTION">PROMOTION</option>
-                          <option value="FEATURED">FEATURED</option>
-                          <option value="NEW SERVICE">NEW SERVICE</option>
-                          <option value="SPECIAL OFFER">SPECIAL OFFER</option>
-                          <option value="EDUCATIONAL">EDUCATIONAL</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                          Play Order (Sequence #)
-                        </label>
-                        <select
-                          value={editingBanner.order}
-                          onChange={(e) => setEditingBanner({ ...editingBanner, order: Number(e.target.value) })}
-                          className="w-full bg-slate-950 text-sky-400 font-bold font-mono text-xs px-3 py-2 rounded-xl border border-slate-700 focus:border-sky-500 outline-none cursor-pointer"
-                        >
-                          {banners.map((_, i) => (
-                            <option key={i} value={i + 1} className="bg-slate-900 text-slate-200">
-                              Position #{i + 1} {i === 0 ? '(Plays First)' : ''}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                          Visibility Status
-                        </label>
-                        <select
-                          value={editingBanner.active ? 'active' : 'hidden'}
-                          onChange={(e) => setEditingBanner({ ...editingBanner, active: e.target.value === 'active' })}
-                          className={`w-full font-bold text-xs px-3 py-2 rounded-xl border outline-none cursor-pointer ${
-                            editingBanner.active 
-                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/40' 
-                              : 'bg-slate-900 text-slate-400 border-slate-700'
-                          }`}
-                        >
-                          <option value="active" className="bg-slate-900 text-emerald-400 font-bold">Active (Show on Website)</option>
-                          <option value="hidden" className="bg-slate-900 text-slate-400 font-bold">Hidden (Draft)</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Target Link & Button Text */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                          Button Action Link
-                        </label>
-                        <input
-                          type="text"
-                          value={editingBanner.linkUrl}
-                          onChange={(e) => setEditingBanner({ ...editingBanner, linkUrl: e.target.value })}
-                          className="w-full bg-slate-950 text-slate-100 text-xs px-3 py-2 rounded-xl border border-slate-700 focus:border-sky-500 outline-none font-mono"
-                          placeholder="e.g. #services or https://..."
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                          Button Label
-                        </label>
-                        <input
-                          type="text"
-                          value={editingBanner.linkText}
-                          onChange={(e) => setEditingBanner({ ...editingBanner, linkText: e.target.value })}
-                          className="w-full bg-slate-950 text-slate-100 text-xs px-3 py-2 rounded-xl border border-slate-700 focus:border-sky-500 outline-none"
-                          placeholder="e.g. View Details"
-                        />
-                      </div>
-                    </div>
-
-                    </div>
-
-                    {/* Modal Fixed Footer Actions */}
-                    <div className="shrink-0 px-6 py-4 border-t border-slate-800 bg-[#071326] flex items-center justify-end gap-2.5">
-                      <button
-                        type="button"
-                        onClick={() => setEditingBanner(null)}
-                        className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition-colors cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        className="px-5 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-black text-xs transition-all shadow-md shadow-sky-500/25 flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Save className="w-3.5 h-3.5" />
-                        <span>Save & Update Banner</span>
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </div>,
-              document.body
-            )}
-
-            {/* ======================================================== */}
-            {/* CLOUDFLARE WORKERS AI COPYWRITER MODAL                   */}
-            {/* ======================================================== */}
-            {isAiModalOpen && createPortal(
-              <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
-                <div className="bg-[#0b182f] border border-sky-500/30 rounded-2xl w-full max-w-xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-                  {/* Header */}
-                  <div className="px-5 sm:px-6 py-4 border-b border-slate-800 shrink-0 flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-md shadow-sky-500/20">
-                        <Sparkles className="w-4 h-4 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-black text-slate-100 flex items-center gap-1.5">
-                          <span>Cloudflare Workers AI Copywriter</span>
-                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30 uppercase">
-                            Free Llama 3.1
-                          </span>
-                        </h3>
-                        <p className="text-[11px] text-slate-400">
-                          Draft catchy banner titles, subtitles & badges tailored for DESH Digital Hub.
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setIsAiModalOpen(false)}
-                      className="p-1.5 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 custom-scrollbar">
-
-                  {/* Target indicator */}
-                  <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-950/70 border border-slate-800 text-[11px]">
-                    <span className="text-slate-400">Applying copy to:</span>
-                    <span className="font-bold text-sky-400 flex items-center gap-1">
-                      {aiTarget === 'new' ? '+ Add New Banner Form' : '✏️ Current Banner in Edit'}
-                    </span>
-                  </div>
-
-                  {/* Quick Idea Presets */}
-                  <div>
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-2 flex items-center gap-1">
-                      <Zap className="w-3 h-3 text-amber-400" /> Quick Idea Presets (ක්ෂණික අදහස්)
-                    </label>
-                    <div className="flex flex-wrap gap-1.5">
-                      {[
-                        { label: '🚀 SSD & RAM වේගය', prompt: 'පරිගණකයේ වේගය වැඩි කරගන්න NVMe SSD සහ RAM Upgrade විශේෂ වට්ටම්' },
-                        { label: '💻 ලැප්ටොප් Chip රෙපයාර්', prompt: 'විශ්වාසනීය ලැප්ටොප් මදර්බෝඩ් චිප් ලෙවල් රෙපයාර් සහ නොමිලේ දෝෂ පරීක්ෂාව' },
-                        { label: '🖨️ Color Print & Binding', prompt: 'උසස් තත්වයේ වර්ණ මුද්‍රණ, ඡායා පිටපත්, සහ පොත් බැඳීම' },
-                        { label: '🌐 Online අයදුම්පත් (Passport)', prompt: 'මාර්ගගත පාස්පෝට් දිනයන්, රියදුරු බලපත්‍ර සහ රජයේ විභාග අයදුම්පත්' },
-                        { label: '🎧 පරිගණක උපාංග', prompt: 'Gaming Keyboards, Wireless Mice, Cables සහ CCTV කැමරා උපාංග' },
-                        { label: '⚡ සති අන්ත 20% Discount', prompt: 'සති අන්ත විශේෂ දීමනා පරිගණක උපාංග සහ සේවාවන් සඳහා 20%ක වට්ටමක්' },
-                      ].map((preset, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => {
-                            setAiPrompt(preset.prompt);
-                            handleGenerateAiCopy(preset.prompt);
-                          }}
-                          className="px-2.5 py-1 rounded-lg bg-slate-950/80 hover:bg-sky-950/50 text-slate-300 hover:text-sky-300 border border-slate-800 hover:border-sky-500/40 text-[10px] font-bold transition-all cursor-pointer"
-                        >
-                          {preset.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Prompt Input & Style */}
-                  <div className="space-y-3">
-                    <div>
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                        Describe what you want to promote (ප්‍රවර්ධනය කිරීමට අවශ්‍ය දේ ඇතුළත් කරන්න) *
-                      </label>
-                      <textarea
-                        rows={2}
-                        value={aiPrompt}
-                        onChange={(e) => setAiPrompt(e.target.value)}
-                        placeholder="උදා: ලැප්ටොප් SSD upgrade එකක් සමඟ Windows 11 දැමීම 15%ක වට්ටමක් සහිතව..."
-                        className="w-full bg-slate-950 text-slate-100 text-xs p-3 rounded-xl border border-slate-700 focus:border-sky-500 outline-none resize-none leading-relaxed"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div>
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                          Language (භාෂාව)
-                        </label>
-                        <select
-                          value={aiLanguage}
-                          onChange={(e) => setAiLanguage(e.target.value)}
-                          className="w-full bg-slate-950 text-sky-400 font-bold text-xs px-3 py-2 rounded-xl border border-slate-700 focus:border-sky-500 outline-none cursor-pointer"
-                        >
-                          <option value="sinhala">🇱🇰 සිංහල (Sinhala)</option>
-                          <option value="singlish">🇱🇰 Singlish (සිංග්ලිෂ්)</option>
-                          <option value="english">🇬🇧 English</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                          Marketing Tone
-                        </label>
-                        <select
-                          value={aiStyle}
-                          onChange={(e) => setAiStyle(e.target.value)}
-                          className="w-full bg-slate-950 text-slate-200 text-xs px-3 py-2 rounded-xl border border-slate-700 focus:border-sky-500 outline-none cursor-pointer"
-                        >
-                          <option value="promotional">High-Converting (ආකර්ෂණීය)</option>
-                          <option value="urgent">Urgent Offer (සීමිත කාලීන)</option>
-                          <option value="premium">Tech Premium (වෘත්තීය)</option>
-                          <option value="educational">Educational (පැහැදිලි)</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                          Preferred Badge
-                        </label>
-                        <select
-                          value={aiBadge}
-                          onChange={(e) => setAiBadge(e.target.value)}
-                          className="w-full bg-slate-950 text-slate-200 text-xs px-3 py-2 rounded-xl border border-slate-700 focus:border-sky-500 outline-none cursor-pointer"
-                        >
-                          <option value="">AI Recommended (Auto)</option>
-                          <option value="PROMOTION">PROMOTION</option>
-                          <option value="FEATURED">FEATURED</option>
-                          <option value="NEW SERVICE">NEW SERVICE</option>
-                          <option value="SPECIAL OFFER">SPECIAL OFFER</option>
-                          <option value="EDUCATIONAL">EDUCATIONAL</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => handleGenerateAiCopy()}
-                      disabled={aiGenerating || !aiPrompt.trim()}
-                      className="w-full py-2.5 rounded-xl bg-gradient-to-r from-sky-500 via-indigo-500 to-teal-400 hover:from-sky-400 hover:to-teal-300 text-slate-950 font-black text-xs transition-all shadow-lg shadow-sky-500/25 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {aiGenerating ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 animate-spin text-slate-950" />
-                          <span>Generating Copy with Cloudflare AI...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Wand2 className="w-4 h-4 text-slate-950" />
-                          <span>Generate Banner Copy</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  {/* AI Generated Output Preview */}
-                  {aiResult && (
-                    <div className="p-4 rounded-xl bg-slate-950 border border-sky-500/40 space-y-3 animate-in fade-in duration-200">
-                      <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                        <span className="text-[10px] font-bold text-sky-400 flex items-center gap-1.5 uppercase tracking-wider">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                          Generated Output Preview
-                        </span>
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-sky-500/10 text-sky-300 border border-sky-500/30">
-                          {aiResult.engine || 'Cloudflare Workers AI'}
-                        </span>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                            {aiResult.badge || 'PROMOTION'}
-                          </span>
-                        </div>
-                        <h4 className="text-sm font-black text-white leading-snug">
-                          {aiResult.title}
-                        </h4>
-                        <p className="text-xs text-slate-300 leading-relaxed">
-                          {aiResult.subtitle}
-                        </p>
-                        <div className="pt-2 flex items-center gap-2">
-                          <span className="px-3 py-1 rounded-lg bg-sky-500 text-slate-950 text-[11px] font-black flex items-center gap-1">
-                            {aiResult.linkText || 'Learn More'}
-                            <ArrowRight className="w-3 h-3" />
-                          </span>
-                          <span className="text-[10px] font-mono text-slate-500">
-                            Action: {aiResult.linkUrl || '#services'}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="pt-3 border-t border-slate-800/80 flex items-center justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleGenerateAiCopy()}
-                          disabled={aiGenerating}
-                          className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-bold transition-colors cursor-pointer border border-slate-800"
-                        >
-                          Regenerate 🔄
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleApplyAiCopy}
-                          className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs transition-all shadow-md shadow-emerald-500/20 flex items-center gap-1.5 cursor-pointer"
-                        >
-                          <Check className="w-3.5 h-3.5 stroke-[3]" />
-                          <span>Use This Copy (Apply)</span>
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  </div>
-
-                  {/* Footer */}
-                  <div className="shrink-0 flex items-center justify-between px-5 sm:px-6 py-3 border-t border-slate-800 text-[11px] text-slate-500 bg-[#0b182f]">
-                    <span>Runs on Cloudflare Free Tier (10,000 free neurons/day)</span>
-                    <button
-                      type="button"
-                      onClick={() => setIsAiModalOpen(false)}
-                      className="text-slate-400 hover:text-white transition-colors cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              </div>,
-              document.body
-            )}
+            {/* Cloudflare Workers AI Copywriter Modal */}
+            <WorkersAiModal
+              isOpen={isAiModalOpen}
+              onClose={() => setIsAiModalOpen(false)}
+              aiTarget={aiTarget}
+              aiPrompt={aiPrompt}
+              setAiPrompt={setAiPrompt}
+              aiLanguage={aiLanguage}
+              setAiLanguage={setAiLanguage}
+              aiStyle={aiStyle}
+              setAiStyle={setAiStyle}
+              aiBadge={aiBadge}
+              setAiBadge={setAiBadge}
+              aiGenerating={aiGenerating}
+              aiResult={aiResult}
+              handleGenerateAiCopy={handleGenerateAiCopy}
+              handleApplyAiCopy={handleApplyAiCopy}
+            />
 
           </div>
         )}
@@ -1620,7 +1449,7 @@ export default function Settings({ isAdmin }) {
                   </div>
                   <div className="min-w-0">
                     <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-200 truncate flex items-center gap-2">
-                      <span>Add New Public Service Category • නව සේවා ප්‍රවර්ගයක් එක්කිරීම</span>
+                      <span>Add New Public Service Category</span>
                     </h3>
                     <p className="text-[11px] text-slate-400 hidden sm:block truncate">
                       Add services showcase category with Sinhala translation, icons & interactive sub-services
@@ -1648,7 +1477,7 @@ export default function Settings({ isAdmin }) {
                   <div className="flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-sky-400" />
                     <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-200">
-                      Add New Public Service Category • නව සේවා ප්‍රවර්ගයක් එක්කිරීම
+                      Add New Public Service Category
                     </h3>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1690,7 +1519,7 @@ export default function Settings({ isAdmin }) {
                         </label>
                         <input
                           type="text"
-                          placeholder="උදා: පරිගණක අලුත්වැඩියා"
+                          placeholder="e.g. Sinhala title"
                           value={newService.sinhala}
                           onChange={(e) => setNewService({ ...newService, sinhala: e.target.value })}
                           className="w-full bg-slate-950 text-slate-100 text-xs px-3 py-2 rounded-xl border border-slate-700 focus:border-sky-500 outline-none"
@@ -1870,14 +1699,14 @@ export default function Settings({ isAdmin }) {
                           ) : (
                             <>
                               <Sparkles className="w-3 h-3 text-sky-400" />
-                              <span>✨ AI Generate (සිංහල)</span>
+                              <span>✨ AI Generate Description</span>
                             </>
                           )}
                         </button>
                       </div>
                       <textarea
                         rows={2}
-                        placeholder="දෝෂ හඳුනාගැනීම, Motherboard chip-level රෙපයාර්, Display & Battery මාරු කිරීම..."
+                        placeholder="Comprehensive repair solutions, troubleshooting, hardware upgrades..."
                         value={newService.description}
                         onChange={(e) => setNewService({ ...newService, description: e.target.value })}
                         className="w-full bg-slate-950 text-slate-100 text-xs px-3 py-2 rounded-xl border border-slate-700 focus:border-sky-500 outline-none resize-none leading-relaxed"
@@ -2127,327 +1956,400 @@ export default function Settings({ isAdmin }) {
             {/* ======================================================== */}
             {/* EDIT SERVICE CATEGORY MODAL                              */}
             {/* ======================================================== */}
-            {editingService && createPortal(
-              <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
-                <div className="bg-[#071326] border border-sky-500/30 rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-[0_0_50px_rgba(14,165,233,0.15)] overflow-hidden slide-in-from-bottom-6">
-                  {/* Modal Header */}
-                  <div className="px-6 py-4 border-b border-sky-500/20 bg-gradient-to-r from-[#0a1e38] via-[#09182d] to-[#071326] flex justify-between items-center shrink-0">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-sky-500/20 border border-sky-400/40 flex items-center justify-center text-sky-400">
-                        <Edit className="w-4 h-4" />
+            <ServiceEditModal
+              editingService={editingService}
+              setEditingService={setEditingService}
+              editServiceImageMode={editServiceImageMode}
+              setEditServiceImageMode={setEditServiceImageMode}
+              editServiceAiPrompt={editServiceAiPrompt}
+              setEditServiceAiPrompt={setEditServiceAiPrompt}
+              editAiGeneratingServiceImage={editAiGeneratingServiceImage}
+              handleGenerateServiceAiImage={handleGenerateServiceAiImage}
+              editServiceUploading={editServiceUploading}
+              uploadToCloudflare={uploadToCloudflare}
+              notify={notify}
+              handleGenerateServiceDescription={handleGenerateServiceDescription}
+              editAiGeneratingServiceDesc={editAiGeneratingServiceDesc}
+              editSubInput={editSubInput}
+              setEditSubInput={setEditSubInput}
+              servicesList={servicesList}
+              handleUpdateEditingService={handleUpdateEditingService}
+            />
+
+          </div>
+        )}
+
+        {/* ======================================================== */}
+        {/* TAB: OUR WORKS SHOWCASE (PORTFOLIO GALLERY MANAGEMENT)    */}
+        {/* ======================================================== */}
+        {activeTab === 'our-works' && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            
+            {/* Add New Work Item Card (Collapsible) */}
+            {!isNewWorkOpen ? (
+              <div className="bg-[#071326] border border-indigo-500/30 hover:border-indigo-500/50 rounded-2xl p-4 sm:p-5 shadow-xl flex items-center justify-between gap-4 transition-all">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+                    <Layers className="w-5 h-5 text-indigo-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-200 truncate flex items-center gap-2">
+                      <span>Add New Work Showcase Item</span>
+                    </h3>
+                    <p className="text-[11px] text-slate-400 hidden sm:block truncate">
+                      Upload portfolio photo, title, short description and publish to homepage cover-flow carousel
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsNewWorkOpen(true)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl font-black text-xs bg-gradient-to-r from-indigo-500 to-sky-500 hover:from-indigo-400 hover:to-sky-400 text-white transition-all shadow-md shadow-indigo-500/20 cursor-pointer shrink-0"
+                >
+                  <Plus className="w-4 h-4 text-white stroke-[3]" />
+                  <span>+ New Work Item</span>
+                </button>
+              </div>
+            ) : (
+              <div className="bg-[#071326] border border-indigo-500/30 rounded-2xl p-5 sm:p-6 shadow-xl space-y-5 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-indigo-400" />
+                    <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-200">
+                      Add New Showcase Item
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsNewWorkOpen(false)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    <ChevronUp className="w-3.5 h-3.5" />
+                    <span>Collapse</span>
+                  </button>
+                </div>
+
+                <form onSubmit={handleAddWorkItem} className="space-y-4">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                    {/* Left Column: Image Upload & Preview */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                          Work Showcase Photo *
+                        </label>
+                        <div className="flex items-center gap-1 bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-xs">
+                          <button
+                            type="button"
+                            onClick={() => setWorkImageMode('file')}
+                            className={`px-2 py-0.5 rounded cursor-pointer transition-all ${
+                              workImageMode === 'file'
+                                ? 'bg-indigo-500/20 text-indigo-300 font-bold'
+                                : 'text-slate-400 hover:text-slate-200'
+                            }`}
+                          >
+                            Upload File
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setWorkImageMode('url')}
+                            className={`px-2 py-0.5 rounded cursor-pointer transition-all ${
+                              workImageMode === 'url'
+                                ? 'bg-indigo-500/20 text-indigo-300 font-bold'
+                                : 'text-slate-400 hover:text-slate-200'
+                            }`}
+                          >
+                            Paste URL
+                          </button>
+                        </div>
                       </div>
+
+                      {workImageMode === 'file' ? (
+                        <div className="relative border-2 border-dashed border-slate-700 hover:border-indigo-500/60 rounded-2xl p-6 text-center bg-slate-950/60 transition-colors group">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleWorkFileUpload}
+                            disabled={workUploading}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                          />
+                          <div className="flex flex-col items-center justify-center gap-2">
+                            <UploadCloud className="w-8 h-8 text-indigo-400 group-hover:scale-110 transition-transform" />
+                            <p className="text-xs font-bold text-slate-200">
+                              {workUploading ? 'Uploading / Processing photo...' : 'Click or drop sample photo here'}
+                            </p>
+                            <p className="text-[10px] text-slate-400">Supports JPG, PNG, WebP (Portrait or Landscape)</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <input
+                          type="text"
+                          value={newWork.image}
+                          onChange={(e) => setNewWork(prev => ({ ...prev, image: e.target.value }))}
+                          placeholder="https://... or /images/services/..."
+                          className="w-full bg-slate-950 text-slate-100 px-3.5 py-2.5 rounded-xl border border-slate-700 focus:border-indigo-500 outline-none font-mono text-xs"
+                        />
+                      )}
+
+                      {/* Image Preview */}
+                      {newWork.image && (
+                        <div className="p-2.5 bg-slate-950 rounded-xl border border-slate-800 flex items-center gap-3">
+                          <img
+                            src={newWork.image}
+                            alt="Preview"
+                            className="w-16 h-16 object-cover rounded-lg border border-slate-700 shrink-0"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
+                              <Check className="w-3 h-3" /> Image Loaded & Ready
+                            </span>
+                            <p className="text-[11px] text-slate-400 truncate font-mono mt-0.5">{newWork.image}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Right Column: Title & Small Description */}
+                    <div className="space-y-3">
                       <div>
-                        <h3 className="text-base font-bold text-white uppercase tracking-wider">
-                          Edit Service Category • {editingService.title}
-                        </h3>
-                        <p className="text-xs text-slate-400">Update category details, Sinhala translation, icon and sub-services</p>
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-300 block mb-1">
+                          Work Title *
+                        </label>
+                        <input
+                          type="text"
+                          value={newWork.title}
+                          onChange={(e) => setNewWork(prev => ({ ...prev, title: e.target.value }))}
+                          className="w-full bg-slate-950 text-slate-100 text-xs px-3.5 py-2.5 rounded-xl border border-slate-700 focus:border-indigo-500 outline-none"
+                          placeholder="e.g. Modern Executive ATS Resume"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-300 block mb-1">
+                          Small Description *
+                        </label>
+                        <textarea
+                          rows={4}
+                          value={newWork.description}
+                          onChange={(e) => setNewWork(prev => ({ ...prev, description: e.target.value }))}
+                          className="w-full bg-slate-950 text-slate-100 text-xs px-3.5 py-2.5 rounded-xl border border-slate-700 focus:border-indigo-500 outline-none resize-none leading-relaxed"
+                          placeholder="Concise overview of the work sample or project details..."
+                          required
+                        />
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setEditingService(null)}
-                      className="p-1 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
                   </div>
 
-                  <form onSubmit={handleUpdateEditingService} className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs">
-                    <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4 custom-scrollbar">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                          Category Title (English) *
-                        </label>
-                        <input
-                          type="text"
-                          value={editingService.title}
-                          onChange={(e) => setEditingService({ ...editingService, title: e.target.value })}
-                          className="w-full bg-slate-950 text-slate-100 text-xs px-3 py-2 rounded-xl border border-slate-700 focus:border-sky-500 outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                          Category Title (Sinhala) *
-                        </label>
-                        <input
-                          type="text"
-                          value={editingService.sinhala}
-                          onChange={(e) => setEditingService({ ...editingService, sinhala: e.target.value })}
-                          className="w-full bg-slate-950 text-slate-100 text-xs px-3 py-2 rounded-xl border border-slate-700 focus:border-sky-500 outline-none"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Image section */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                          Category Visual Image
-                        </label>
-                        <div className="flex items-center gap-1 bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-[10px]">
-                          <button
-                            type="button"
-                            onClick={() => setEditServiceImageMode('ai')}
-                            className={`px-2 py-0.5 rounded cursor-pointer ${
-                              editServiceImageMode === 'ai' ? 'bg-purple-500/20 text-purple-300 font-bold' : 'text-slate-400'
-                            }`}
-                          >
-                            🎨 Cloudflare AI
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditServiceImageMode('file')}
-                            className={`px-2 py-0.5 rounded cursor-pointer ${
-                              editServiceImageMode === 'file' ? 'bg-sky-500/20 text-sky-300 font-bold' : 'text-slate-400'
-                            }`}
-                          >
-                            Upload
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditServiceImageMode('url')}
-                            className={`px-2 py-0.5 rounded cursor-pointer ${
-                              editServiceImageMode === 'url' ? 'bg-sky-500/20 text-sky-300 font-bold' : 'text-slate-400'
-                            }`}
-                          >
-                            URL
-                          </button>
-                        </div>
-                      </div>
-
-                      {editServiceImageMode === 'ai' && (
-                        <div className="p-3 rounded-xl bg-slate-950 border border-purple-500/30 flex gap-2">
-                          <input
-                            type="text"
-                            placeholder="Prompt for AI image generation..."
-                            value={editServiceAiPrompt}
-                            onChange={(e) => setEditServiceAiPrompt(e.target.value)}
-                            className="flex-1 bg-slate-900 text-slate-100 text-xs px-3 py-1.5 rounded-xl border border-slate-700 focus:border-purple-500 outline-none"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleGenerateServiceAiImage('edit')}
-                            disabled={editAiGeneratingServiceImage}
-                            className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs cursor-pointer flex items-center gap-1 shrink-0"
-                          >
-                            {editAiGeneratingServiceImage ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Palette className="w-3.5 h-3.5" />}
-                            <span>Generate</span>
-                          </button>
-                        </div>
-                      )}
-
-                      {editServiceImageMode === 'file' && (
-                        <input
-                          type="file"
-                          accept="image/*"
-                          disabled={editServiceUploading}
-                          onChange={async (e) => {
-                            const f = e.target.files?.[0];
-                            if (!f) return;
-                            setEditServiceUploading(true);
-                            try {
-                              const res = await uploadToCloudflare(f);
-                              setEditingService(prev => ({ ...prev, image: res.url }));
-                              notify.success('Image uploaded!');
-                            } catch (err) {
-                              notify.error(err.message);
-                            } finally {
-                              setEditServiceUploading(false);
-                            }
-                          }}
-                          className="w-full text-xs text-slate-400 file:mr-2 file:py-1 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-sky-600 file:text-white cursor-pointer"
-                        />
-                      )}
-
-                      {editServiceImageMode === 'url' && (
-                        <input
-                          type="url"
-                          value={editingService.image}
-                          onChange={(e) => setEditingService({ ...editingService, image: e.target.value })}
-                          className="w-full bg-slate-950 text-slate-100 text-xs px-3 py-2 rounded-xl border border-slate-700 focus:border-sky-500 outline-none font-mono"
-                        />
-                      )}
-
-                      {editingService.image && (
-                        <div className="p-2 bg-slate-950 rounded-xl border border-slate-800 flex items-center gap-3">
-                          <img
-                            src={editingService.image}
-                            alt="Visual"
-                            className="w-12 h-12 object-cover rounded-lg border border-slate-700 shrink-0"
-                          />
-                          <p className="text-[10px] text-slate-400 truncate font-mono flex-1">{editingService.image}</p>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Description */}
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                          Description
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => handleGenerateServiceDescription('edit', 'sinhala')}
-                          disabled={editAiGeneratingServiceDesc}
-                          className="text-[10px] font-bold text-sky-400 hover:text-sky-300 flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                        >
-                          <Sparkles className="w-3 h-3 text-sky-400" />
-                          <span>✨ AI Rewrite Description</span>
-                        </button>
-                      </div>
-                      <textarea
-                        rows={2}
-                        value={editingService.description}
-                        onChange={(e) => setEditingService({ ...editingService, description: e.target.value })}
-                        className="w-full bg-slate-950 text-slate-100 text-xs px-3 py-2 rounded-xl border border-slate-700 focus:border-sky-500 outline-none resize-none"
-                      />
-                    </div>
-
-                    {/* Sub-services */}
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                          Sub-Services ({editingService.items?.length || 0})
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => handleGenerateServiceDescription('edit', 'english')}
-                          disabled={editAiGeneratingServiceDesc}
-                          className="text-[10px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                        >
-                          <Zap className="w-3 h-3" />
-                          <span>⚡ Suggest Items</span>
-                        </button>
-                      </div>
-
-                      <div className="flex gap-2 mb-2">
-                        <input
-                          type="text"
-                          placeholder="Type sub-service and press Enter..."
-                          value={editSubInput}
-                          onChange={(e) => setEditSubInput(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              const val = editSubInput.trim();
-                              if (!val) return;
-                              setEditingService(prev => ({
-                                ...prev,
-                                items: [...(prev.items || []), { name: val }]
-                              }));
-                              setEditSubInput('');
-                            }
-                          }}
-                          className="flex-1 bg-slate-950 text-slate-100 text-xs px-3 py-1.5 rounded-xl border border-slate-700 focus:border-sky-500 outline-none"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const val = editSubInput.trim();
-                            if (!val) return;
-                            setEditingService(prev => ({
-                              ...prev,
-                              items: [...(prev.items || []), { name: val }]
-                            }));
-                            setEditSubInput('');
-                          }}
-                          className="px-3 py-1.5 rounded-xl bg-slate-800 text-slate-200 text-xs font-bold border border-slate-700 cursor-pointer"
-                        >
-                          + Add
-                        </button>
-                      </div>
-
-                      <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto custom-scrollbar p-1.5 bg-slate-950 rounded-xl border border-slate-800">
-                        {(!editingService.items || editingService.items.length === 0) ? (
-                          <span className="text-[10px] text-slate-500 italic p-1">No items</span>
-                        ) : (
-                          editingService.items.map((item, idx) => {
-                            const name = typeof item === 'string' ? item : item.name;
-                            return (
-                              <span
-                                key={idx}
-                                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-sky-950/60 border border-sky-500/30 text-sky-300 text-[10px]"
-                              >
-                                <Check className="w-2.5 h-2.5 text-sky-400" />
-                                <span>{name}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setEditingService(prev => ({
-                                      ...prev,
-                                      items: prev.items.filter((_, i) => i !== idx)
-                                    }));
-                                  }}
-                                  className="text-slate-400 hover:text-rose-400 cursor-pointer"
-                                >
-                                  <X className="w-2.5 h-2.5" />
-                                </button>
-                              </span>
-                            );
-                          })
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Order & Visibility */}
-                    <div className="grid grid-cols-2 gap-3 pt-2">
-                      <div>
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                          Display Sequence (Order #)
-                        </label>
-                        <select
-                          value={editingService.order || 1}
-                          onChange={(e) => setEditingService({ ...editingService, order: Number(e.target.value) })}
-                          className="w-full bg-slate-950 text-slate-200 text-xs px-3 py-2 rounded-xl border border-slate-700 focus:border-sky-500 outline-none cursor-pointer"
-                        >
-                          {servicesList.map((_, i) => (
-                            <option key={i + 1} value={i + 1}>
-                              Order #{i + 1}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                          Public Visibility
-                        </label>
-                        <select
-                          value={editingService.active !== false ? 'active' : 'hidden'}
-                          onChange={(e) => setEditingService({ ...editingService, active: e.target.value === 'active' })}
-                          className="w-full bg-slate-950 text-slate-200 text-xs px-3 py-2 rounded-xl border border-slate-700 focus:border-sky-500 outline-none cursor-pointer"
-                        >
-                          <option value="active" className="text-emerald-400">Visible on Public Site</option>
-                          <option value="hidden" className="text-slate-400">Hidden (Draft)</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    </div>
-
-                    {/* Modal Fixed Footer */}
-                    <div className="shrink-0 px-6 py-4 border-t border-slate-800 bg-[#071326] flex items-center justify-end gap-2.5">
-                      <button
-                        type="button"
-                        onClick={() => setEditingService(null)}
-                        className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        className="px-5 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-teal-500 hover:from-sky-400 hover:to-teal-400 text-slate-950 font-black text-xs transition-all shadow-md shadow-sky-500/25 flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Save className="w-3.5 h-3.5" />
-                        <span>Save & Update Category</span>
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </div>,
-              document.body
+                  <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => setIsNewWorkOpen(false)}
+                      className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={savingWorks || workUploading}
+                      className="px-5 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-sky-500 hover:from-indigo-400 hover:to-sky-400 text-white font-black text-xs transition-all shadow-md shadow-indigo-500/20 disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>{savingWorks ? 'Saving...' : 'Add & Publish to Our Works'}</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
             )}
+
+            {/* Works Showcase List & Reorder Section */}
+            <div className="bg-[#071326] border border-slate-800/80 rounded-2xl p-5 sm:p-6 shadow-xl space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-indigo-400" />
+                    <span>Showcase Portfolio Items ({worksList.length})</span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Display sequence on homepage cover-flow carousel. Use Move Up / Down buttons to rearrange order.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-[11px] text-slate-400 font-mono bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800">
+                    Total: {worksList.length} items
+                  </span>
+                </div>
+              </div>
+
+              {/* Works Items Grid / List */}
+              {worksList.length === 0 ? (
+                <div className="text-center py-12 px-4 rounded-xl border border-dashed border-slate-800 bg-slate-950/40">
+                  <Layers className="w-10 h-10 text-slate-600 mx-auto mb-2" />
+                  <p className="text-sm font-bold text-slate-400">No work items found</p>
+                  <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                    Click "Reset Defaults" to load standard showcase items, or click "+ New Work Item" to add your own creations.
+                  </p>
+                  <div className="mt-4 flex items-center justify-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleResetDefaultWorks}
+                      className="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs"
+                    >
+                      Reset Defaults
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsNewWorkOpen(true)}
+                      className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs"
+                    >
+                      + Add First Work
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {worksList.map((work, idx) => {
+                    const isFirst = idx === 0;
+                    const isLast = idx === worksList.length - 1;
+
+                    return (
+                      <div
+                        key={work.id || idx}
+                        className={`p-3.5 sm:p-4 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+                          work.active !== false
+                            ? 'bg-[#09152b] border-slate-800 hover:border-slate-700'
+                            : 'bg-slate-950/60 border-slate-800/50 opacity-60'
+                        }`}
+                      >
+                        {/* Left: Reorder controls + Thumbnail + Details */}
+                        <div className="flex items-start sm:items-center gap-3.5 min-w-0 flex-1">
+                          
+                          {/* Order Badging & Move Up/Down Buttons */}
+                          <div className="flex flex-col items-center justify-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => handleMoveWork(idx, 'up')}
+                              disabled={isFirst}
+                              title="Move Up"
+                              className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
+                                isFirst
+                                  ? 'text-slate-700 cursor-not-allowed'
+                                  : 'bg-slate-800 hover:bg-sky-500 hover:text-slate-950 text-slate-300'
+                              }`}
+                            >
+                              <ChevronUp className="w-4 h-4" />
+                            </button>
+
+                            <span className="text-[10px] font-mono font-black text-indigo-400 bg-indigo-500/10 border border-indigo-500/30 px-1.5 py-0.5 rounded">
+                              #{idx + 1}
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={() => handleMoveWork(idx, 'down')}
+                              disabled={isLast}
+                              title="Move Down"
+                              className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
+                                isLast
+                                  ? 'text-slate-700 cursor-not-allowed'
+                                  : 'bg-slate-800 hover:bg-sky-500 hover:text-slate-950 text-slate-300'
+                              }`}
+                            >
+                              <ChevronDown className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          {/* Image Thumbnail */}
+                          <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden border border-slate-700 shrink-0 bg-slate-950">
+                            <img
+                              src={work.image}
+                              alt={work.title}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                            {work.active === false && (
+                              <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                <span className="text-[9px] font-bold text-amber-300 bg-black/80 px-1 py-0.5 rounded">
+                                  Hidden
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Text Info */}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-sm font-bold text-white truncate">
+                                {work.title}
+                              </h4>
+                              {work.active === false && (
+                                <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                  Draft / Hidden
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-300 line-clamp-2 mt-1 leading-relaxed">
+                              {work.description}
+                            </p>
+                          </div>
+
+                        </div>
+
+                        {/* Right: Actions */}
+                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/80 w-full sm:w-auto justify-end">
+                          {/* Toggle Active */}
+                          <button
+                            type="button"
+                            onClick={() => handleToggleWorkActive(work.id)}
+                            title={work.active !== false ? 'Hide from website' : 'Show on website'}
+                            className={`p-2 rounded-xl border transition-colors cursor-pointer ${
+                              work.active !== false
+                                ? 'bg-slate-800/80 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700'
+                                : 'bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20'
+                            }`}
+                          >
+                            {work.active !== false ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                          </button>
+
+                          {/* Edit Button */}
+                          <button
+                            type="button"
+                            onClick={() => setEditingWork({ ...work, originalIndex: idx })}
+                            title="Edit Work Details"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-sky-500 hover:text-slate-950 text-slate-200 border border-slate-700 text-xs font-bold transition-all cursor-pointer"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                            <span>Edit</span>
+                          </button>
+
+                          {/* Delete Button */}
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteWork(work.id)}
+                            title="Delete Work Item"
+                            className="p-2 rounded-xl bg-slate-800/80 hover:bg-red-500/20 text-slate-400 hover:text-red-400 border border-slate-700 hover:border-red-500/30 transition-all cursor-pointer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Edit Work Modal */}
+            <WorkEditModal
+              editingWork={editingWork}
+              setEditingWork={setEditingWork}
+              worksList={worksList}
+              editWorkImageMode={editWorkImageMode}
+              setEditWorkImageMode={setEditWorkImageMode}
+              editWorkUploading={editWorkUploading}
+              handleEditWorkFileUpload={handleEditWorkFileUpload}
+              handleSaveEditedWork={handleSaveEditedWork}
+            />
 
           </div>
         )}

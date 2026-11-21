@@ -138,9 +138,11 @@ export default function Login({
 
             {/* Optional subtle background image blending */}
             <img 
-              src="/images/login_tech_art.jpg" 
+              src="/images/login_tech_art.webp" 
               alt="DESH Digital Tech Background"
               className="absolute inset-0 w-full h-full object-cover opacity-15 mix-blend-overlay pointer-events-none"
+              loading="lazy"
+              decoding="async"
             />
           </div>
 

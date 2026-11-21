@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Send, MessageSquare, Phone, User, CheckCircle2, MessageCircle, Sparkles, HelpCircle } from 'lucide-react';
+import { Send, MessageSquare, Phone, User, CheckCircle2, Sparkles, HelpCircle } from 'lucide-react';
 import { notify } from '../../utils/toast';
 import { inquiryService } from '../../services/supabaseService';
+import WhatsAppIcon from '../common/WhatsAppIcon';
 
 export default function QuickInquiry() {
   const [formData, setFormData] = useState({
@@ -152,7 +153,7 @@ export default function QuickInquiry() {
               {/* Phone / WhatsApp Input */}
               <div>
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-300 block mb-2 flex items-center gap-1.5">
-                  <Phone className="w-3.5 h-3.5 text-emerald-400" />
+                  <WhatsAppIcon className="w-4 h-4 shrink-0" />
                   <span>Phone / WhatsApp Number (දුරකථන අංකය) *</span>
                 </label>
                 <input
@@ -201,51 +202,50 @@ export default function QuickInquiry() {
               />
             </div>
 
-            {/* Dual Action Buttons: Send via WhatsApp & Send Normal Message */}
-            <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            {/* Action Buttons: System Message as Primary Action */}
+            <div className="pt-2 space-y-3.5">
               
-              {/* WhatsApp Button */}
+              {/* PRIMARY ACTION: Send Directly to System Admin Message Panel */}
               <button
-                type="button"
-                onClick={() => handleSendMessage('whatsapp')}
+                type="submit"
                 disabled={submittingWhatsApp || submittingSystem}
-                className="w-full py-3 px-5 rounded-2xl font-bold text-sm bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 flex items-center justify-center gap-2.5 transition-all shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[1.01] active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                className="w-full py-3.5 px-6 rounded-2xl font-black text-sm bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white flex items-center justify-center gap-3 transition-all shadow-xl shadow-sky-500/25 hover:shadow-sky-500/40 hover:scale-[1.01] active:scale-[0.98] cursor-pointer disabled:opacity-50"
               >
-                <MessageCircle className="w-5 h-5 fill-current shrink-0" />
-                <div className="flex flex-col items-start text-left leading-tight">
-                  <span className="font-extrabold text-sm">
-                    {submittingWhatsApp ? 'Connecting...' : 'Send via WhatsApp'}
+                <Send className="w-5 h-5 shrink-0" />
+                <div className="flex flex-col items-start sm:items-center text-left sm:text-center leading-tight">
+                  <span className="font-black text-sm sm:text-base">
+                    {submittingSystem ? 'Sending Message to System...' : 'Send Message to System (පද්ධතියට සෘජුව පණිවිඩය එවන්න)'}
                   </span>
-                  <span className="text-[10px] font-semibold opacity-85">
-                    WhatsApp හරහා එවන්න
+                  <span className="text-[10px] font-medium text-sky-200 mt-0.5">
+                    පණිවිඩය Admin Panel වෙත සෘජුවම ලැබෙන අතර කඩිනමින් ඔබව අමතන්නෙමු
                   </span>
                 </div>
               </button>
 
-              {/* Normal System Message Button */}
-              <button
-                type="button"
-                onClick={() => handleSendMessage('system')}
-                disabled={submittingWhatsApp || submittingSystem}
-                className="w-full py-3 px-5 rounded-2xl font-bold text-sm bg-gradient-to-r from-blue-600 via-sky-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white flex items-center justify-center gap-2.5 transition-all shadow-lg shadow-sky-500/25 hover:shadow-sky-500/40 hover:scale-[1.01] active:scale-[0.98] cursor-pointer disabled:opacity-50"
-              >
-                <Send className="w-4 h-4 shrink-0" />
-                <div className="flex flex-col items-start text-left leading-tight">
-                  <span className="font-extrabold text-sm">
-                    {submittingSystem ? 'Sending...' : 'Send Normal Message'}
-                  </span>
-                  <span className="text-[10px] font-semibold text-sky-200">
-                    පද්ධතියට සෘජුව එවන්න
-                  </span>
+              {/* SECONDARY ACTION: Direct WhatsApp Contact */}
+              <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-800/80">
+                <div className="flex items-center gap-2 text-xs text-slate-300">
+                  <WhatsAppIcon className="w-4 h-4 shrink-0" />
+                  <span>කෙලින්ම WhatsApp හරහා සම්බන්ධ වීමට අවශ්‍යද?</span>
                 </div>
-              </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleSendMessage('whatsapp')}
+                  disabled={submittingWhatsApp || submittingSystem}
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#25D366]/15 hover:bg-[#25D366]/25 border border-[#25D366]/40 hover:border-[#25D366] text-white text-xs font-bold font-mono flex items-center justify-center gap-2 transition-all shadow-sm hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                >
+                  <WhatsAppIcon className="w-4 h-4 shrink-0" />
+                  <span>Chat on WhatsApp (+94 71 998 9000)</span>
+                </button>
+              </div>
 
             </div>
 
             {/* Helpful Notice */}
-            <div className="flex items-center justify-center gap-2 text-xs text-slate-400 pt-2 text-center">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>ලේඛන, ඡායාරූප හෝ PDF ගොනු ඇත්නම් කෙලින්ම අපගේ WhatsApp වෙත එවිය හැක.</span>
+            <div className="flex items-center justify-center gap-2 text-xs text-slate-400 pt-1 text-center">
+              <WhatsAppIcon className="w-3.5 h-3.5 shrink-0" />
+              <span>ලේඛන, ඡායාරූප හෝ PDF ගොනු ඇත්නම් අපගේ WhatsApp වෙත කෙලින්ම එවිය හැක.</span>
             </div>
 
           </form>

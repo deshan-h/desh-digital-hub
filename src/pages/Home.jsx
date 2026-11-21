@@ -1,13 +1,20 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import MainLayout from '../layouts/MainLayout';
 import Hero from '../components/home/Hero';
+import OnlinePortfolioGallery from '../components/home/OnlinePortfolioGallery';
+import OnlineServices from '../components/home/OnlineServices';
 import Services from '../components/home/Services';
 import SocialChannels from '../components/home/SocialChannels';
 import WorkingHoursAndLocation from '../components/home/WorkingHoursAndLocation';
 import About from '../components/home/About';
 import QuickInquiry from '../components/home/QuickInquiry';
+import { visitTracker } from '../services/visitTracker';
 
 export default function Home() {
+  useEffect(() => {
+    visitTracker.recordVisit();
+  }, []);
+
   return (
     <MainLayout>
       <div className="bg-[#050c18] text-slate-200">
@@ -15,7 +22,6 @@ export default function Home() {
         {/* Top Hero Section */}
         <section id="home" className="relative flex flex-col items-center pt-10 md:pt-14 pb-8 overflow-hidden">
           {/* Ambient Glowing Orbs */}
-          <div className="absolute top-[-10%] left-[-10%] w-[40rem] h-[40rem] bg-sky-500/15 rounded-full blur-[160px] pointer-events-none mix-blend-screen" />
           <div className="absolute bottom-[-10%] right-[-10%] w-[40rem] h-[40rem] bg-indigo-500/10 rounded-full blur-[160px] pointer-events-none mix-blend-screen" />
 
           {/* Subtle Tech Grid */}
@@ -35,7 +41,13 @@ export default function Home() {
           <Hero />
         </section>
 
-        {/* 1. Services Showcase (No Prices) */}
+        {/* 1. Our Works & Real Samples Showcase Slider (Directly below Hero) */}
+        <OnlinePortfolioGallery />
+
+        {/* 2. 100% Online Services Grid (Remote Applications, Design, Courier Print & Remote Support) */}
+        <OnlineServices />
+
+        {/* 3. Services Showcase (In-store & General) */}
         <Services />
 
         {/* 2. Digital Community & EduHub Showcase (YouTube, TikTok, EduHub) */}

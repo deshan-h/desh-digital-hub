@@ -66,7 +66,7 @@ export default function EduHubSection() {
 
               <div className="mt-6">
                 <a
-                  href="https://deshedublog.blogspot.com"
+                  href="https://desh.s.gy/edu-hub"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2.5 px-6 py-3 rounded-2xl font-bold text-xs sm:text-sm bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 transition-all shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 hover:scale-[1.02] cursor-pointer"
