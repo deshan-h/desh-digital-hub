@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, MessageCircle } from 'lucide-react';
 import BannerCarousel from './BannerCarousel';
 
 export default function Hero() {

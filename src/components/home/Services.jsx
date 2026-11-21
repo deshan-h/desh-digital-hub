@@ -212,6 +212,12 @@ export default function Services() {
           serviceList = publicServicesSetting.items;
         }
 
+        // Automatically map any legacy .jpg paths to modern WebP
+        serviceList = serviceList.map(s => ({
+          ...s,
+          image: (s.image || '').replace(/\.jpg$/i, '.webp')
+        }));
+
         const visible = serviceList.filter(s => {
           if (s.active === false) return false;
           if (Array.isArray(hiddenIds) && hiddenIds.length > 0) {
@@ -309,11 +315,16 @@ export default function Services() {
 
                   {/* Full Box Edge-to-Edge Image */}
                   <img 
-                    src={service.image} 
+                    src={(service.image || '').replace(/\.jpg$/i, '.webp')} 
                     alt={service.title} 
                     className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-108 block"
                     loading="lazy"
                     decoding="async"
+                    onError={(e) => {
+                      if (e.target.src && !e.target.src.endsWith('.webp')) {
+                        e.target.src = e.target.src.replace(/\.(jpg|jpeg|png)$/i, '.webp');
+                      }
+                    }}
                   />
 
                   {/* Bottom Dark Gradient Fade for Text */}
