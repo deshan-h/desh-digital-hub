@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { Menu, X, MessageCircle, Lock, ChevronRight, Phone, Sparkles } from 'lucide-react';
+import { Menu, X, Lock, ChevronRight, Phone, Sparkles } from 'lucide-react';
 import BannerCarousel from '../home/BannerCarousel';
 import WhatsAppIcon from './WhatsAppIcon';
 
@@ -49,10 +49,10 @@ export default function Navbar() {
   ];
 
   return (
-    <header className={`sticky top-0 z-40 w-full transition-all duration-300 bg-[#0c2340]/95 backdrop-blur-xl border-b border-sky-500/15 ${
+    <header className={`sticky top-0 z-40 w-full transition-all duration-300 bg-[#0c2340]/95 backdrop-blur-xl border-b-0 sm:border-b sm:border-sky-500/15 ${
       scrolled 
-        ? 'shadow-xl shadow-black/40 py-2.5 sm:py-3 px-4 sm:px-8' 
-        : 'shadow-md py-3 sm:py-4 px-4 sm:px-8'
+        ? 'shadow-lg shadow-black/30 py-2 sm:py-3 px-3 sm:px-8' 
+        : 'shadow-none py-2.5 sm:py-4 px-3 sm:px-8'
     }`}>
       <nav 
         aria-label="Main Navigation"
@@ -61,8 +61,8 @@ export default function Navbar() {
         <div className="flex justify-between items-center">
             
             {/* Brand Logo & Name */}
-            <Link to="/" className="flex items-center gap-3 group z-50">
-              <div className="w-9 h-9 rounded-xl bg-white/10 p-1 border border-white/15 backdrop-blur-md flex items-center justify-center shrink-0 shadow-inner group-hover:border-sky-400/40 transition-colors">
+            <Link to="/" className="flex items-center gap-2.5 sm:gap-3 group z-50">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-white/10 p-1 border border-white/15 backdrop-blur-md flex items-center justify-center shrink-0 shadow-inner group-hover:border-sky-400/40 transition-colors">
                 <img 
                   src="/pwa-192x192.png" 
                   alt="DESH Digital Hub Logo" 
@@ -70,10 +70,10 @@ export default function Navbar() {
                 />
               </div>
               <div className="flex flex-col justify-center">
-                <span className="text-base sm:text-lg font-black tracking-tight text-white group-hover:text-sky-300 transition-colors leading-normal pb-0.5">
+                <span className="text-[14px] sm:text-lg font-black tracking-tight text-white group-hover:text-sky-300 transition-colors leading-tight pb-0.5">
                   DESH Digital Hub
                 </span>
-                <span className="text-[10px] text-sky-300/80 font-semibold tracking-wider uppercase leading-normal">
+                <span className="text-[8.5px] sm:text-[10px] text-sky-300/80 font-semibold tracking-wider uppercase leading-tight">
                   Your One Step Digital Solution
                 </span>
               </div>
@@ -123,22 +123,21 @@ export default function Navbar() {
             {/* Mobile Hamburger Toggle Button */}
             <div className="flex lg:hidden items-center gap-2 z-50">
               <a 
-                href="https://wa.me/94719989000" 
+                href="https://wa.me/94719989000?text=Hello%20DESH%20Digital%20Hub,%20I%20would%20like%20to%20order%20or%20inquire." 
                 target="_blank" 
                 rel="noreferrer"
-                className="sm:hidden px-2.5 py-1.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[11px] font-bold font-mono flex items-center gap-1.5"
-                title="WhatsApp: +94 (71) 998 9000"
+                className="w-8 h-8 rounded-full bg-emerald-500/15 hover:bg-emerald-500 text-emerald-400 hover:text-slate-950 border border-emerald-500/30 flex items-center justify-center transition-all shadow-sm"
+                title="WhatsApp (+94 71 998 9000)"
               >
-                <WhatsAppIcon className="w-3 h-3 shrink-0" />
-                <span>+94 (71) 998 9000</span>
+                <WhatsAppIcon className="w-4 h-4 shrink-0" />
               </a>
 
               <button 
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="p-2 text-slate-300 hover:text-sky-400 focus:outline-none transition-colors"
+                className="p-1.5 text-slate-300 hover:text-sky-400 focus:outline-none transition-colors"
                 title="Toggle Menu"
               >
-                {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+                {isMobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
               </button>
             </div>
 
@@ -146,8 +145,10 @@ export default function Navbar() {
 
         {/* Mobile Dropdown Drawer */}
         <div 
-          className={`lg:hidden transition-all duration-300 ease-in-out overflow-hidden bg-[#071322]/95 backdrop-blur-3xl border-b border-sky-500/20 ${
-            isMobileMenuOpen ? 'max-h-[420px] py-4' : 'max-h-0 py-0 border-transparent'
+          className={`lg:hidden transition-all duration-300 ease-in-out overflow-hidden bg-[#071322]/95 backdrop-blur-3xl ${
+            isMobileMenuOpen 
+              ? 'max-h-[420px] py-4 border-b border-sky-500/20 mt-2' 
+              : 'max-h-0 py-0 border-none pointer-events-none'
           }`}
         >
           <div className="flex flex-col px-6 space-y-3">

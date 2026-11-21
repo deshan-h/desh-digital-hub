@@ -6,7 +6,6 @@ import { compressAndConvertToWebP } from '../utils/imageCompressor';
  */
 
 const UPLOAD_ENDPOINT = import.meta.env.VITE_CLOUDFLARE_UPLOAD_URL;
-const PUBLIC_R2_URL = import.meta.env.VITE_CLOUDFLARE_R2_PUBLIC_URL;
 
 /**
  * Upload an image file to Cloudflare R2 via Cloudflare Worker Gateway.

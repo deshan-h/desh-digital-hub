@@ -17,7 +17,7 @@ export default function MainLayout({ children }) {
       <Navbar />
 
       {/* Main Content Area - Seamless flow with navbar */}
-      <main className="flex-grow w-full bg-[#050c18] relative z-10 pt-4 sm:pt-6 pb-12 sm:pb-16 overflow-hidden">
+      <main className="flex-grow w-full bg-[#050c18] relative z-10 pt-0 sm:pt-4 pb-12 sm:pb-16 overflow-hidden">
         {children}
       </main>
 

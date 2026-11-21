@@ -33,12 +33,12 @@ export const authService = {
     // Immediate initial check
     supabase.auth.getSession().then(({ data }) => {
       const u = data?.session?.user ? { ...data.session.user, uid: data.session.user.id } : null;
-      callback(u);
-    }).catch(() => callback(null));
+      callback(u, 'INITIAL_SESSION');
+    }).catch(() => callback(null, 'ERROR'));
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       const u = session?.user ? { ...session.user, uid: session.user.id } : null;
-      callback(u);
+      callback(u, event);
     });
     return () => subscription.unsubscribe();
   }

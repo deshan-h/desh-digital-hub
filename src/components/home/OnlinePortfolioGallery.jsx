@@ -91,6 +91,18 @@ export default function OnlinePortfolioGallery() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedSample, setSelectedSample] = useState(null);
   const [isPaused, setIsPaused] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : false);
+  const [touchStartX, setTouchStartX] = useState(null);
+  const [touchEndX, setTouchEndX] = useState(null);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsDesktop(window.innerWidth >= 1024);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Fetch dynamic works from Supabase settings
   useEffect(() => {
@@ -173,7 +185,7 @@ export default function OnlinePortfolioGallery() {
     window.open(`https://wa.me/94719989000?text=${text}`, '_blank');
   };
 
-  // 3D Cover-Flow Style calculation
+  // 3D Cover-Flow Style calculation (5 Cards on PC/Desktop, 3 Cards on Mobile)
   const getCardStyle = (index) => {
     const diff = (index - safeCurrentIndex + total) % total;
 
@@ -188,31 +200,51 @@ export default function OnlinePortfolioGallery() {
         isCenter: true
       };
     } else if (diff === total - 1 || (total === 2 && diff === 1)) {
-      // Left card (Behind, shifted left, scaled down, clickable)
+      // Mid Left card (Behind, shifted left, scaled down, clickable)
       return {
-        zIndex: 10,
-        x: '-50%',
-        scale: 0.85,
-        opacity: 0.75,
+        zIndex: 20,
+        x: isDesktop ? '-50%' : '-56%',
+        scale: 0.86,
+        opacity: isDesktop ? 0.85 : 0.65,
         cursor: 'pointer',
         isLeft: true
       };
     } else if (diff === 1) {
-      // Right card (Behind, shifted right, scaled down, clickable)
+      // Mid Right card (Behind, shifted right, scaled down, clickable)
       return {
-        zIndex: 10,
-        x: '50%',
-        scale: 0.85,
-        opacity: 0.75,
+        zIndex: 20,
+        x: isDesktop ? '50%' : '56%',
+        scale: 0.86,
+        opacity: isDesktop ? 0.85 : 0.65,
         cursor: 'pointer',
         isRight: true
+      };
+    } else if (isDesktop && total >= 5 && diff === total - 2) {
+      // Far Left card (5-Card Coverflow on PC/Desktop)
+      return {
+        zIndex: 10,
+        x: '-95%',
+        scale: 0.72,
+        opacity: 0.45,
+        cursor: 'pointer',
+        isFarLeft: true
+      };
+    } else if (isDesktop && total >= 5 && diff === 2) {
+      // Far Right card (5-Card Coverflow on PC/Desktop)
+      return {
+        zIndex: 10,
+        x: '95%',
+        scale: 0.72,
+        opacity: 0.45,
+        cursor: 'pointer',
+        isFarRight: true
       };
     } else {
       // Hidden offscreen
       return {
         zIndex: 1,
-        x: diff < total / 2 ? '110%' : '-110%',
-        scale: 0.6,
+        x: diff < total / 2 ? '150%' : '-150%',
+        scale: 0.5,
         opacity: 0,
         pointerEvents: 'none'
       };
@@ -241,16 +273,37 @@ export default function OnlinePortfolioGallery() {
         </div>
 
         {/* ======================================================== */}
-        {/* 3D COVER-FLOW LAYERED CAROUSEL (AS PER USER SKETCH)     */}
-        {/* Left Card (Behind) | Center Card (In Front) | Right Card (Behind) */}
+        {/* 3D COVER-FLOW LAYERED CAROUSEL (5 CARDS ON DESKTOP, 3 ON MOBILE) */}
+        {/* Touch Swipe Gesture Enabled for Mobile & Tablet           */}
         {/* ======================================================== */}
         <div 
-          className="relative max-w-5xl mx-auto py-4 sm:py-6"
+          className="relative max-w-7xl mx-auto py-3 sm:py-6"
           onMouseEnter={() => setIsPaused(true)}
           onMouseLeave={() => setIsPaused(false)}
+          onTouchStart={(e) => {
+            setTouchStartX(e.targetTouches[0].clientX);
+            setTouchEndX(null);
+            setIsPaused(true);
+          }}
+          onTouchMove={(e) => {
+            setTouchEndX(e.targetTouches[0].clientX);
+          }}
+          onTouchEnd={() => {
+            if (touchStartX !== null && touchEndX !== null) {
+              const diff = touchStartX - touchEndX;
+              if (diff > 45) {
+                handleNext();
+              } else if (diff < -45) {
+                handlePrev();
+              }
+            }
+            setTouchStartX(null);
+            setTouchEndX(null);
+            setIsPaused(false);
+          }}
         >
           {/* Main 3D Card Stage */}
-          <div className="relative h-[480px] sm:h-[530px] md:h-[560px] w-full flex items-center justify-center overflow-visible">
+          <div className="relative h-[430px] sm:h-[480px] md:h-[520px] lg:h-[560px] w-full flex items-center justify-center overflow-visible">
             {displayWorks.map((work, idx) => {
               const style = getCardStyle(idx);
               if (style.opacity === 0 && !style.isCenter) return null;
@@ -266,11 +319,13 @@ export default function OnlinePortfolioGallery() {
                   }}
                   transition={{ duration: 0.45, ease: [0.25, 1, 0.5, 1] }}
                   onClick={() => {
-                    if (style.isLeft) handlePrev();
-                    if (style.isRight) handleNext();
-                    if (style.isCenter) setSelectedSample(work);
+                    if (style.isFarLeft) setCurrentIndex(prev => (prev - 2 + total) % total);
+                    else if (style.isLeft) handlePrev();
+                    else if (style.isFarRight) setCurrentIndex(prev => (prev + 2) % total);
+                    else if (style.isRight) handleNext();
+                    else if (style.isCenter) setSelectedSample(work);
                   }}
-                  className={`absolute w-[290px] sm:w-[350px] md:w-[390px] h-[460px] sm:h-[510px] md:h-[540px] rounded-[32px] sm:rounded-[38px] overflow-hidden select-none isolate transition-all duration-300 bg-[#071326] ${
+                  className={`absolute w-[76vw] max-w-[285px] sm:w-[320px] md:w-[350px] lg:w-[370px] xl:w-[390px] h-[395px] sm:h-[450px] md:h-[490px] lg:h-[530px] rounded-3xl sm:rounded-[36px] overflow-hidden select-none isolate transition-all duration-300 bg-[#071326] ${
                     style.isCenter 
                       ? 'border-2 border-sky-400 shadow-[0_25px_60px_rgba(0,0,0,0.9),0_0_35px_rgba(56,189,248,0.35)] ring-2 ring-sky-400/20' 
                       : 'border border-sky-500/25 shadow-xl hover:border-sky-400/50 hover:opacity-85'
@@ -291,24 +346,24 @@ export default function OnlinePortfolioGallery() {
                   />
 
                   {/* Top Subtle Vignette */}
-                  <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/80 via-black/30 to-transparent pointer-events-none z-10" />
+                  <div className="absolute inset-x-0 top-0 h-20 sm:h-24 bg-gradient-to-b from-black/80 via-black/30 to-transparent pointer-events-none z-10" />
 
                   {/* Zoom indicator on active center card */}
                   {style.isCenter && (
-                    <div className="absolute top-4 right-4 z-20 pointer-events-none">
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/20 text-sky-300 text-[11px] font-bold shadow-lg">
-                        <ZoomIn className="w-3.5 h-3.5 text-sky-400" />
+                    <div className="absolute top-3.5 right-3.5 sm:top-4 sm:right-4 z-20 pointer-events-none">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/20 text-sky-300 text-[10px] sm:text-[11px] font-bold shadow-lg">
+                        <ZoomIn className="w-3 sm:w-3.5 h-3 sm:h-3.5 text-sky-400" />
                         <span>Click to Zoom</span>
                       </span>
                     </div>
                   )}
 
                   {/* Bottom Dark Gradient Shadow covering description area */}
-                  <div className="absolute inset-x-0 bottom-0 pt-28 pb-6 px-5 sm:px-6 bg-gradient-to-t from-black via-black/90 to-transparent z-20 flex flex-col justify-end text-left pointer-events-none">
-                    <h3 className="text-lg sm:text-xl font-black text-white leading-tight drop-shadow-md">
+                  <div className="absolute inset-x-0 bottom-0 pt-20 sm:pt-28 pb-4 sm:pb-6 px-4 sm:px-6 bg-gradient-to-t from-black via-black/90 to-transparent z-20 flex flex-col justify-end text-left pointer-events-none">
+                    <h3 className="text-base sm:text-lg md:text-xl font-black text-white leading-tight drop-shadow-md">
                       {work.title}
                     </h3>
-                    <p className="text-xs sm:text-sm text-slate-300 mt-1.5 line-clamp-2 leading-relaxed font-normal">
+                    <p className="text-[11px] sm:text-xs md:text-sm text-slate-300 mt-1 line-clamp-2 leading-relaxed font-normal">
                       {work.description}
                     </p>
                   </div>
@@ -321,21 +376,21 @@ export default function OnlinePortfolioGallery() {
           <button
             type="button"
             onClick={handlePrev}
-            className="absolute left-1 sm:left-4 top-1/2 -translate-y-1/2 w-11 h-11 sm:w-13 sm:h-13 rounded-full bg-[#08162e]/95 hover:bg-sky-600 text-white border border-sky-400/40 shadow-2xl flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer z-40 backdrop-blur-md"
-            title="Previous (Left Card)"
+            className="absolute left-1 sm:left-3 lg:left-4 top-1/2 -translate-y-1/2 w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-[#08162e]/90 hover:bg-sky-600 text-white border border-sky-400/30 shadow-2xl flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer z-40 backdrop-blur-md"
+            title="Previous"
             aria-label="Previous Work"
           >
-            <ChevronLeft className="w-6 h-6 sm:w-7 sm:h-7" />
+            <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
 
           <button
             type="button"
             onClick={handleNext}
-            className="absolute right-1 sm:right-4 top-1/2 -translate-y-1/2 w-11 h-11 sm:w-13 sm:h-13 rounded-full bg-[#08162e]/95 hover:bg-sky-600 text-white border border-sky-400/40 shadow-2xl flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer z-40 backdrop-blur-md"
-            title="Next (Right Card)"
+            className="absolute right-1 sm:right-3 lg:right-4 top-1/2 -translate-y-1/2 w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-[#08162e]/90 hover:bg-sky-600 text-white border border-sky-400/30 shadow-2xl flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer z-40 backdrop-blur-md"
+            title="Next"
             aria-label="Next Work"
           >
-            <ChevronRight className="w-6 h-6 sm:w-7 sm:h-7" />
+            <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
 
           {/* ======================================================== */}

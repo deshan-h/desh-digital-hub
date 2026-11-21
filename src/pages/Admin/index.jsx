@@ -51,8 +51,23 @@ export default function Admin() {
     return localStorage.getItem('desh_remember_me') !== 'false';
   });
 
-  // Dashboard State
-  const [activeTab, setActiveTab] = useState('pos');
+  // Dashboard State (Persisted in sessionStorage so active tab is preserved across refreshes)
+  const [activeTab, setActiveTabState] = useState(() => {
+    try {
+      return sessionStorage.getItem('desh_admin_active_tab') || 'pos';
+    } catch {
+      return 'pos';
+    }
+  });
+
+  const setActiveTab = useCallback((tab) => {
+    setActiveTabState(tab);
+    try {
+      sessionStorage.setItem('desh_admin_active_tab', tab);
+    } catch {
+      // Ignore sessionStorage errors
+    }
+  }, []);
   const [salesHistory, setSalesHistory] = useState(() => {
     const saved = localStorage.getItem('salesHistory');
     return saved ? JSON.parse(saved) : [];
@@ -124,9 +139,15 @@ export default function Admin() {
     let categoriesUnsubscribe = null;
     let inquiriesUnsubscribe = null;
 
-    const unsubscribe = authService.onAuthStateChange(async (currentUser) => {
+    const unsubscribe = authService.onAuthStateChange(async (currentUser, event) => {
       if (currentUser) {
         setUser(currentUser);
+
+        // If this is merely a background token refresh or user update, avoid disrupting ongoing edits
+        if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+          return;
+        }
+
         fetchSales();
         fetchCategories();
         fetchCustomerDues();
@@ -179,7 +200,7 @@ export default function Admin() {
         // Initial fetch of pending orders
         pendingOrderService.getPendingOrders().then(orders => setPendingOrders(orders || [])).catch(console.error);
 
-        setActiveTab('pos');
+        // Retain user's current view; do NOT force setActiveTab('pos') on auth state/token refresh
         setAuthLoading(false);
       } else {
         // Auto-login check if rememberMe was chosen and user did not explicitly click Logout
@@ -341,6 +362,7 @@ export default function Admin() {
       const loggedUser = await authService.login(email.trim(), password);
       setUser(loggedUser);
       localStorage.removeItem('desh_explicit_logout');
+      setActiveTab('pos');
 
       const shouldRemember = isRemember !== undefined ? isRemember : rememberMe;
       if (shouldRemember) {

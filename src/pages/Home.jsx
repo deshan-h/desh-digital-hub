@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import MainLayout from '../layouts/MainLayout';
 import Hero from '../components/home/Hero';
 import OnlinePortfolioGallery from '../components/home/OnlinePortfolioGallery';
@@ -20,7 +20,7 @@ export default function Home() {
       <div className="bg-[#050c18] text-slate-200">
 
         {/* Top Hero Section */}
-        <section id="home" className="relative flex flex-col items-center pt-10 md:pt-14 pb-8 overflow-hidden">
+        <section id="home" className="relative flex flex-col items-center pt-3 sm:pt-8 md:pt-12 pb-6 sm:pb-8 overflow-hidden">
           {/* Ambient Glowing Orbs */}
           <div className="absolute bottom-[-10%] right-[-10%] w-[40rem] h-[40rem] bg-indigo-500/10 rounded-full blur-[160px] pointer-events-none mix-blend-screen" />
 

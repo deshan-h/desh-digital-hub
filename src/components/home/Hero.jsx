@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronRight, MessageCircle, Sparkles, Clock, MapPin, Phone } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import BannerCarousel from './BannerCarousel';
 
 export default function Hero() {
@@ -127,7 +127,7 @@ export default function Hero() {
   }, []);
 
   return (
-    <div className="container mx-auto px-4 md:px-6 relative z-10 flex flex-col lg:flex-row items-center justify-between w-full mt-2 mb-16 md:mb-20 gap-10 lg:gap-12">
+    <div className="container mx-auto px-4 md:px-6 relative z-10 flex flex-col lg:flex-row items-center justify-between w-full mt-0 mb-12 sm:mb-16 md:mb-20 gap-8 lg:gap-12">
       
       {/* Left Column (Hero Content) */}
       <div className="flex flex-col items-center lg:items-start text-center lg:text-left w-full lg:w-[54%]">
@@ -137,7 +137,7 @@ export default function Hero() {
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#0a1832] border border-sky-500/25 mb-6 shadow-md backdrop-blur-md"
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#0a1832] border border-sky-500/25 mb-4 sm:mb-6 shadow-md backdrop-blur-md"
         >
           <span className={`w-2.5 h-2.5 rounded-full ${isOpenNow ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}`} />
           <span className="text-xs font-bold text-slate-200">
@@ -159,24 +159,24 @@ export default function Hero() {
             aria-label="DESH Digital Hub"
             className="font-black tracking-tight text-white drop-shadow-2xl flex flex-col items-center lg:items-start leading-tight"
           >
-            <span className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl tracking-tighter inline-flex items-center min-h-[1.1em]">
+            <span className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl tracking-tight inline-flex items-center min-h-[1.1em]">
               <span>{deshText}</span>
               {activeCursor === 'desh' && (
                 <span className="inline-block w-2 sm:w-3 h-[0.75em] bg-white ml-2 animate-pulse shadow-[0_0_12px_rgba(255,255,255,0.8)] rounded-xs" />
               )}
             </span>
             <div className="flex items-center min-h-[1.25em]">
-              <span className="inline-block text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-cyan-300 to-emerald-400 animate-gradient-x text-2xl sm:text-4xl md:text-5xl lg:text-6xl tracking-tight mt-1 pb-3 sm:pb-4 pt-1 leading-normal overflow-visible">
+              <span className="inline-block text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-cyan-300 to-emerald-400 animate-gradient-x text-3xl sm:text-4xl md:text-5xl lg:text-6xl tracking-tight mt-0.5 pb-2.5 sm:pb-4 pt-0.5 leading-normal overflow-visible">
                 {digitalHubText}
               </span>
               {(activeCursor === 'digital' || activeCursor === 'done') && (
-                <span className="inline-block w-1.5 sm:w-2.5 h-[0.7em] bg-cyan-400 ml-2 animate-pulse shadow-[0_0_12px_#22d3ee] rounded-xs shrink-0 self-center" />
+                <span className="inline-block w-2 sm:w-2.5 h-[0.7em] bg-cyan-400 ml-2 animate-pulse shadow-[0_0_12px_#22d3ee] rounded-xs shrink-0 self-center" />
               )}
             </div>
           </h1>
 
           {/* Animated Futuristic Circuit Board Under DESH Digital Hub */}
-          <div className="relative w-full max-w-[340px] sm:max-w-[420px] h-6 mt-1 mb-3.5 flex items-center justify-center lg:justify-start overflow-visible pointer-events-none select-none">
+          <div className="relative w-full max-w-[290px] sm:max-w-[420px] h-6 mt-1 mb-3.5 flex items-center justify-center lg:justify-start overflow-visible pointer-events-none select-none">
             <svg viewBox="0 0 420 26" className="w-full h-full overflow-visible">
               <defs>
                 <linearGradient id="heroCircuitGrad" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -281,20 +281,20 @@ export default function Hero() {
           </span>
         </motion.div>
         
-        {/* Bilingual Tagline - SINGLE LINE */}
+        {/* Bilingual Tagline - Fully Responsive Wrap */}
         <motion.p 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.8, delay: 0.2 }}
-          className="text-xs sm:text-sm md:text-base text-slate-200 font-medium tracking-wide mb-6 drop-shadow-lg max-w-xl whitespace-nowrap min-h-[1.5em] flex items-center justify-center lg:justify-start"
+          className="text-xs sm:text-sm md:text-base text-slate-200 font-medium tracking-wide mb-5 sm:mb-6 drop-shadow-lg max-w-xl text-center lg:text-left min-h-[2.4em] sm:min-h-[1.5em] leading-relaxed px-2 sm:px-0"
         >
           {taglineText.startsWith('ඔබේ සියලුම ඩිජිටල් හා පරිගණක අවශ්‍යතා') ? (
-            <>
-              <span>ඔබේ සියලුම ඩිජිටල් හා පරිගණක අවශ්‍යතා </span>
-              <span className="text-sky-400 font-bold ml-1">
+            <span>
+              ඔබේ සියලුම ඩිජිටල් හා පරිගණක අවශ්‍යතා{' '}
+              <span className="text-sky-400 font-bold">
                 {taglineText.slice('ඔබේ සියලුම ඩිජිටල් හා පරිගණක අවශ්‍යතා '.length)}
               </span>
-            </>
+            </span>
           ) : (
             <span>{taglineText}</span>
           )}
@@ -303,12 +303,12 @@ export default function Hero() {
           )}
         </motion.p>
 
-        {/* Feature Badges - SINGLE LINE */}
+        {/* Feature Badges - Balanced 2x2 Grid on Mobile, Row on Tablet/Desktop */}
         <motion.div 
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.3 }}
-          className="flex flex-nowrap items-center justify-center lg:justify-start gap-2 sm:gap-2.5 mb-8 max-w-full overflow-x-auto no-scrollbar pb-1"
+          className="grid grid-cols-2 sm:flex sm:flex-wrap items-center justify-center lg:justify-start gap-2 sm:gap-2.5 mb-6 sm:mb-8 w-full sm:w-auto px-1 sm:px-0"
         >
           {[
             { icon: '⚡', text: 'වේගවත් සේවාව' },
@@ -318,10 +318,10 @@ export default function Hero() {
           ].map((badge, idx) => (
             <div 
               key={idx} 
-              className="px-3 py-1.5 bg-slate-900/60 backdrop-blur-xl border border-sky-500/15 rounded-xl text-slate-200 text-xs font-semibold flex items-center gap-1.5 shadow-lg shadow-black/20 shrink-0 whitespace-nowrap"
+              className="px-2.5 py-1.5 sm:px-3.5 bg-slate-900/70 backdrop-blur-xl border border-sky-500/20 rounded-xl text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm"
             >
-              <span className="text-sm">{badge.icon}</span> 
-              <span className="font-bold tracking-tight">{badge.text}</span>
+              <span className="text-sm shrink-0">{badge.icon}</span> 
+              <span className="font-bold tracking-tight whitespace-nowrap">{badge.text}</span>
             </div>
           ))}
         </motion.div>
