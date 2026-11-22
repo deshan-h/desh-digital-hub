@@ -1,6 +1,6 @@
 import { settingsService } from './supabaseService';
 
-const STORAGE_KEY = 'desh_public_visits_cache';
+const STORAGE_KEY = 'desh_public_visits_v2';
 const SESSION_KEY = 'desh_last_visit_timestamp';
 
 // Helper to format date in YYYY-MM-DD (Sri Lanka local date)
@@ -20,10 +20,10 @@ export const visitTracker = {
     try {
       if (typeof window === 'undefined') return;
 
-      // Prevent spamming on immediate multi-render within 5 seconds in the same tab
+      // Prevent spamming on immediate multi-render within 2 seconds in the same tab
       const lastVisit = sessionStorage.getItem(SESSION_KEY);
       const now = Date.now();
-      if (lastVisit && now - Number(lastVisit) < 5000) {
+      if (lastVisit && now - Number(lastVisit) < 2000) {
         return;
       }
       sessionStorage.setItem(SESSION_KEY, now.toString());
@@ -56,7 +56,22 @@ export const visitTracker = {
       visits[today] = currentToday + 1;
 
       // Update local cache
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(visits));
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(visits));
+      } catch (e) {
+        console.warn('localStorage error:', e);
+      }
+
+      // Broadcast immediately across tabs (Admin dashboard updates instantly)
+      try {
+        if (typeof window !== 'undefined' && typeof window.BroadcastChannel !== 'undefined') {
+          const bc = new BroadcastChannel('desh_visits_sync');
+          bc.postMessage({ type: 'VISIT_RECORDED', today, count: visits[today] });
+          bc.close();
+        }
+      } catch (e) {
+        // Fallback silently if BroadcastChannel not supported
+      }
 
       // Sync to Supabase settings
       await settingsService.saveSetting('public_site_visits', {

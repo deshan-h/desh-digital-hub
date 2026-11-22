@@ -160,21 +160,59 @@ export default function Dashboard({
 
   // Realtime subscription & re-fetch on filter change for public site visits
   useEffect(() => {
-    visitTracker.getDailyVisits(visitsTimeFilter).then(data => {
-      if (data && data.length > 0) setPublicVisits(data);
-    }).catch(console.error);
+    let isMounted = true;
 
-    const unsubscribe = settingsService.subscribe('public_site_visits', async () => {
+    const refreshVisits = async () => {
       try {
-        const fresh = await visitTracker.getDailyVisits(visitsTimeFilter);
-        if (fresh && fresh.length > 0) setPublicVisits(fresh);
+        const data = await visitTracker.getDailyVisits(visitsTimeFilter);
+        if (isMounted && data && data.length > 0) {
+          setPublicVisits(data);
+        }
       } catch (e) {
         console.error('Error refreshing visits:', e);
       }
+    };
+
+    // Initial load
+    refreshVisits();
+
+    // 1. Cross-tab immediate sync via BroadcastChannel
+    let bc = null;
+    try {
+      if (typeof window !== 'undefined' && typeof window.BroadcastChannel !== 'undefined') {
+        bc = new BroadcastChannel('desh_visits_sync');
+        bc.onmessage = (event) => {
+          if (event.data?.type === 'VISIT_RECORDED') {
+            refreshVisits();
+          }
+        };
+      }
+    } catch (e) {
+      console.warn('BroadcastChannel error:', e);
+    }
+
+    // 2. Storage event listener (fires when localStorage changes in another tab)
+    const handleStorageChange = (e) => {
+      if (e.key === 'desh_public_visits_v2') {
+        refreshVisits();
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+
+    // 3. Supabase realtime subscription
+    const unsubscribe = settingsService.subscribe('public_site_visits', () => {
+      refreshVisits();
     });
 
+    // 4. Fallback interval polling every 10 seconds to catch visits from other devices
+    const interval = setInterval(refreshVisits, 10000);
+
     return () => {
+      isMounted = false;
+      if (bc) bc.close();
+      window.removeEventListener('storage', handleStorageChange);
       if (unsubscribe) unsubscribe();
+      clearInterval(interval);
     };
   }, [visitsTimeFilter]);
 
