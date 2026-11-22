@@ -108,6 +108,7 @@ export function PublicVisitsWidget({
           {/* Range Toggle */}
           <div className="flex bg-slate-950 p-0.5 rounded-xl border border-slate-800">
             {[
+              { key: 'month', label: 'This Month' },
               { key: '7', label: '7 Days' },
               { key: '14', label: '14 Days' },
               { key: '30', label: '30 Days' },

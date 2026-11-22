@@ -732,6 +732,24 @@ export const settingsService = {
 
   async setPublicCategoryVisibility(hiddenIds) {
     return await this.saveSetting('public_categories_visibility', { hiddenIds: Array.from(new Set(hiddenIds)) });
+  },
+
+  subscribe(id, callback) {
+    const channelName = `setting_${id}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const channel = supabase
+      .channel(channelName)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings', filter: `id=eq.${id}` }, (payload) => {
+        if (payload?.new?.data) {
+          callback(payload.new.data);
+        } else {
+          this.getSetting(id).then(callback).catch(console.error);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }
 };
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AreaChart, Area, BarChart, Bar, LineChart, Line, ComposedChart, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ReferenceDot, Label, LabelList, ReferenceLine } from 'recharts';
-import { repairService, expenseService, inquiryService, customerService } from '../../services/supabaseService';
+import { repairService, expenseService, inquiryService, customerService, settingsService } from '../../services/supabaseService';
 import { visitTracker } from '../../services/visitTracker';
 import { PublicVisitsWidget, DailyNewCustomersWidget, BarCustomTooltip, CustomTooltip } from './DashboardComponents';
 import { formatDistanceToNow } from 'date-fns';
@@ -56,7 +56,7 @@ export default function Dashboard({
   const [summaryTimeFilter, setSummaryTimeFilter] = useState('today');
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
   const [publicVisits, setPublicVisits] = useState([]);
-  const [visitsTimeFilter, setVisitsTimeFilter] = useState('14'); // '7' | '14' | '30'
+  const [visitsTimeFilter, setVisitsTimeFilter] = useState('month'); // 'month' | '7' | '14' | '30'
   const [topSpendersView, setTopSpendersView] = useState('both'); // 'chart' | 'list' | 'both'
   const [internalCustomers, setInternalCustomers] = useState(() => {
     try {
@@ -145,7 +145,7 @@ export default function Dashboard({
         console.error("Error fetching inquiries:", err);
       }
 
-      const visitsHistory = await visitTracker.getDailyVisits(30);
+      const visitsHistory = await visitTracker.getDailyVisits(visitsTimeFilter);
       setPublicVisits(visitsHistory);
 
       const now = new Date().toISOString();
@@ -157,6 +157,26 @@ export default function Dashboard({
       setLoading(false);
     }
   };
+
+  // Realtime subscription & re-fetch on filter change for public site visits
+  useEffect(() => {
+    visitTracker.getDailyVisits(visitsTimeFilter).then(data => {
+      if (data && data.length > 0) setPublicVisits(data);
+    }).catch(console.error);
+
+    const unsubscribe = settingsService.subscribe('public_site_visits', async () => {
+      try {
+        const fresh = await visitTracker.getDailyVisits(visitsTimeFilter);
+        if (fresh && fresh.length > 0) setPublicVisits(fresh);
+      } catch (e) {
+        console.error('Error refreshing visits:', e);
+      }
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [visitsTimeFilter]);
 
   const today = new Date();
 
@@ -1065,12 +1085,8 @@ export default function Dashboard({
   };
 
   // -- PUBLIC SITE DAILY VISITS METRICS --
-  const filteredVisitsData = React.useMemo(() => {
-    const days = Number(visitsTimeFilter) || 14;
-    return publicVisits.slice(-days);
-  }, [publicVisits, visitsTimeFilter]);
-
-  const todayVisits = publicVisits.length > 0 ? (publicVisits[publicVisits.length - 1]?.visits || 0) : 0;
+  const filteredVisitsData = publicVisits;
+  const todayVisits = publicVisits.find(item => item.isToday)?.visits || 0;
   const totalVisitsInPeriod = filteredVisitsData.reduce((sum, item) => sum + (item.visits || 0), 0);
   const avgVisitsPerDay = filteredVisitsData.length > 0 ? Math.round(totalVisitsInPeriod / filteredVisitsData.length) : 0;
   
