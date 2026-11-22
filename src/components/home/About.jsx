@@ -7,7 +7,8 @@ import {
   Globe, 
   CheckCircle2, 
   Clock, 
-  Award 
+  Award,
+  HeartHandshake
 } from 'lucide-react';
 
 /**
@@ -95,7 +96,7 @@ export default function About() {
                 අපගේ මධ්‍යස්ථානය සතු නවීන තාක්ෂණික උපකරණ සහ වසර 6+ ක අඛණ්ඩ විශ්වාසය හරහා ඔබගේ සෑම ඩිජිටල් අවශ්‍යතාවක්ම ඉහළම ප්‍රමිතියෙන් හා කඩිනමින් ඉටු කරනු ලැබේ.
               </p>
 
-              {/* 3 Core Trust Guarantees */}
+              {/* Core Quality & Trust Guarantees */}
               <div className="space-y-3 mb-6">
                 <div className="flex items-start gap-3 p-3 rounded-2xl bg-white/[0.03] border border-sky-500/15">
                   <div className="w-8 h-8 rounded-xl bg-sky-500/15 border border-sky-400/30 flex items-center justify-center text-sky-400 shrink-0 mt-0.5">
@@ -129,6 +130,18 @@ export default function About() {
                     <span className="text-xs font-bold text-white block">කඩිනම් කාර්යක්ෂම සේවය</span>
                     <span className="text-[11px] text-slate-400 block mt-0.5">
                       Same-Day Express Service සහ දින 365 ම විවෘත මධ්‍යස්ථානය.
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 p-3 rounded-2xl bg-white/[0.03] border border-sky-500/15">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-400/30 flex items-center justify-center text-amber-400 shrink-0 mt-0.5">
+                    <HeartHandshake className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-xs font-bold text-white block">මිත්‍රශීලී සේවාව (Friendly Service)</span>
+                    <span className="text-[11px] text-slate-400 block mt-0.5">
+                      සෑම පාරිභෝගිකයෙකුටම ගෞරවනීය, කාරුණික සහ විශ්වාසදායී මඟපෙන්වීම.
                     </span>
                   </div>
                 </div>

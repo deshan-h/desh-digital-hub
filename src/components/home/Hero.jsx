@@ -312,9 +312,9 @@ export default function Hero() {
         >
           {[
             { icon: '⚡', text: 'වේගවත් සේවාව' },
-            { icon: '💎', text: 'උසස් ප්‍රමිතිය' },
             { icon: '🛡️', text: 'විශ්වාසදායී' },
             { icon: '✨', text: 'සාධාරණ මිල' },
+            { icon: '🤝', text: 'Friendly Service' },
           ].map((badge, idx) => (
             <div 
               key={idx} 

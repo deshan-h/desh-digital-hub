@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { AreaChart, Area, BarChart, Bar, LineChart, Line, ComposedChart, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ReferenceDot, Label, LabelList, ReferenceLine } from 'recharts';
-import { repairService, expenseService, inquiryService } from '../../services/supabaseService';
+import { repairService, expenseService, inquiryService, customerService } from '../../services/supabaseService';
 import { visitTracker } from '../../services/visitTracker';
-import { PublicVisitsWidget, BarCustomTooltip, CustomTooltip } from './DashboardComponents';
+import { PublicVisitsWidget, DailyNewCustomersWidget, BarCustomTooltip, CustomTooltip } from './DashboardComponents';
 import { formatDistanceToNow } from 'date-fns';
 import { parseTimestamp } from '../../utils/helpers';
 import { 
@@ -32,7 +32,19 @@ const COLORS_EXTENDED = [
   '#0ea5e9', '#d946ef', '#f43f5e', '#eab308', '#22c55e', '#a855f7', '#06b6d4'
 ];
 
-export default function Dashboard({ salesHistory, setActiveTab, posCategories = [], totalPendingDues = 0, fetchSales, fetchCustomerDues, pendingOrders = [], customerDuesList = [], inquiries = [] }) {
+export default function Dashboard({ 
+  salesHistory, 
+  setActiveTab, 
+  posCategories = [], 
+  totalPendingDues = 0, 
+  fetchSales, 
+  fetchCustomerDues, 
+  pendingOrders = [], 
+  customerDuesList = [], 
+  inquiries = [],
+  customersList: propCustomersList = [],
+  fetchCustomersList
+}) {
   const [repairs, setRepairs] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [localInquiries, setLocalInquiries] = useState(inquiries || []);
@@ -45,7 +57,21 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
   const [publicVisits, setPublicVisits] = useState([]);
   const [visitsTimeFilter, setVisitsTimeFilter] = useState('14'); // '7' | '14' | '30'
+  const [topSpendersView, setTopSpendersView] = useState('both'); // 'chart' | 'list' | 'both'
+  const [internalCustomers, setInternalCustomers] = useState(() => {
+    try {
+      const saved = localStorage.getItem('customersList');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [customersTimeFilter, setCustomersTimeFilter] = useState('month'); // 'month' | '7' | '14' | '30'
   const dropdownRef = React.useRef(null);
+
+  const activeCustomersList = (propCustomersList && propCustomersList.length > 0)
+    ? propCustomersList
+    : internalCustomers;
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -64,9 +90,11 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
   useEffect(() => {
     const savedRepairs = localStorage.getItem('dashboardRepairs');
     const savedExpenses = localStorage.getItem('dashboardExpenses');
+    const savedCustomers = localStorage.getItem('customersList');
     
     if (savedRepairs) setRepairs(JSON.parse(savedRepairs));
     if (savedExpenses) setExpenses(JSON.parse(savedExpenses));
+    if (savedCustomers) setInternalCustomers(JSON.parse(savedCustomers));
     
     if (!savedRepairs || !savedExpenses) {
       // no local data, we just wait for the refresh
@@ -95,6 +123,20 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
       const expensesData = await expenseService.getExpenses();
       setExpenses(expensesData);
       localStorage.setItem('dashboardExpenses', JSON.stringify(expensesData));
+
+      if (fetchCustomersList) {
+        await fetchCustomersList();
+      } else {
+        try {
+          const custsData = await customerService.getCustomers();
+          if (custsData) {
+            setInternalCustomers(custsData);
+            localStorage.setItem('customersList', JSON.stringify(custsData));
+          }
+        } catch (err) {
+          console.error("Error fetching customers for dashboard:", err);
+        }
+      }
 
       try {
         const inqData = await inquiryService.getInquiries();
@@ -753,20 +795,202 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
     if (sale.timestamp) {
       const d = parseTimestamp(sale.timestamp);
       if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
-        const custName = sale.customerName?.trim() || 'Walk-in Customer';
-        if (!customerSpendMap[custName]) {
-          customerSpendMap[custName] = { name: custName, totalSpend: 0, orderCount: 0 };
+        const rawName = sale.customerName ? String(sale.customerName).trim() : '';
+        if (!rawName) return;
+
+        const lower = rawName.toLowerCase();
+        // Skip walk-in, anonymous, or "no name provided" records
+        if (
+          lower === 'walk-in customer' ||
+          lower === 'walk in customer' ||
+          lower.startsWith('customer ') ||
+          lower.includes('no name') ||
+          lower === 'none' ||
+          lower === 'n/a' ||
+          lower === 'unknown' ||
+          lower === 'null' ||
+          lower === 'undefined'
+        ) {
+          return;
         }
-        customerSpendMap[custName].totalSpend += Number(sale.amount || 0);
-        customerSpendMap[custName].orderCount += 1;
+
+        if (!customerSpendMap[rawName]) {
+          customerSpendMap[rawName] = { name: rawName, totalSpend: 0, orderCount: 0 };
+        }
+        customerSpendMap[rawName].totalSpend += Number(sale.amount || 0);
+        customerSpendMap[rawName].orderCount += 1;
       }
     }
   });
   
   const top5Customers = Object.values(customerSpendMap)
-    .filter(c => c.name !== 'Walk-in Customer' && !c.name.toLowerCase().startsWith('customer '))
+    .filter(c => {
+      if (!c.name) return false;
+      const lower = c.name.toLowerCase().trim();
+      return (
+        lower !== 'walk-in customer' &&
+        lower !== 'walk in customer' &&
+        !lower.startsWith('customer ') &&
+        !lower.includes('no name') &&
+        lower !== 'none' &&
+        lower !== 'n/a' &&
+        lower !== 'unknown'
+      );
+    })
     .sort((a, b) => b.totalSpend - a.totalSpend)
     .slice(0, 5);
+
+  const topSpendersChartData = top5Customers.map((cust, i) => {
+    const parts = cust.name.trim().split(/\s+/);
+    const shortLabel = parts.length > 1 
+      ? `${parts[0]} ${parts[1][0]}.` 
+      : (cust.name.length > 8 ? cust.name.substring(0, 7) + '…' : cust.name);
+
+    return {
+      rank: `#${i + 1}`,
+      name: cust.name,
+      shortLabel,
+      spend: Math.round(cust.totalSpend),
+      orderCount: cust.orderCount
+    };
+  });
+
+  const toLocalDateKey = (raw) => {
+    if (!raw) return '';
+    const d = raw instanceof Date ? raw : parseTimestamp(raw);
+    if (!d || isNaN(d.getTime())) return '';
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  // -- DAILY NEW CUSTOMERS DATA (FOR NEW CUSTOMERS WIDGET) --
+  const dailyCustomersData = React.useMemo(() => {
+    const daysMap = {};
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+
+    // Map each customer's earliest creation date
+    const customerFirstSeenMap = {};
+    (salesHistory || []).forEach(s => {
+      if (s.customerName && s.timestamp) {
+        const raw = String(s.customerName).trim();
+        const lower = raw.toLowerCase();
+        if (!raw || lower.includes('no name') || lower === 'walk-in customer' || lower.startsWith('customer ')) return;
+        const sDate = parseTimestamp(s.timestamp);
+        if (!customerFirstSeenMap[raw] || sDate < customerFirstSeenMap[raw]) {
+          customerFirstSeenMap[raw] = sDate;
+        }
+      }
+    });
+
+    if (customersTimeFilter === 'month') {
+      // Show every day of this month up to today
+      const daysCount = now.getDate();
+      for (let dayNum = 1; dayNum <= daysCount; dayNum++) {
+        const d = new Date(currentYear, currentMonth, dayNum);
+        const key = toLocalDateKey(d);
+        const displayDate = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const fullDate = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+        const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
+        const isToday = d.toDateString() === now.toDateString();
+
+        daysMap[key] = {
+          key,
+          date: d,
+          displayDate,
+          fullDate,
+          dayName,
+          isToday,
+          count: 0,
+          customers: []
+        };
+      }
+    } else {
+      const daysCount = parseInt(customersTimeFilter, 10) || 14;
+      for (let i = daysCount - 1; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+        const key = toLocalDateKey(d);
+        const displayDate = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const fullDate = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+        const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
+        const isToday = d.toDateString() === now.toDateString();
+
+        daysMap[key] = {
+          key,
+          date: d,
+          displayDate,
+          fullDate,
+          dayName,
+          isToday,
+          count: 0,
+          customers: []
+        };
+      }
+    }
+
+    // Populate from activeCustomersList
+    const seenCustIds = new Set();
+    (activeCustomersList || []).forEach(c => {
+      if (!c.name) return;
+      const lower = c.name.toLowerCase().trim();
+      if (lower.includes('no name') || lower === 'walk-in customer' || lower.startsWith('customer ')) return;
+      
+      const createdRaw = c.createdAt || c.timestamp || c.created_at;
+      const key = toLocalDateKey(createdRaw) || (customerFirstSeenMap[c.name] ? toLocalDateKey(customerFirstSeenMap[c.name]) : '');
+      if (key && daysMap[key]) {
+        daysMap[key].customers.push({
+          id: c.id,
+          name: c.name,
+          phone: c.phone || '',
+          area: c.area || ''
+        });
+        daysMap[key].count += 1;
+        seenCustIds.add(c.name);
+      }
+    });
+
+    // Check any customers in customerFirstSeenMap not already captured
+    Object.entries(customerFirstSeenMap).forEach(([name, firstDate]) => {
+      if (!seenCustIds.has(name) && firstDate) {
+        const key = toLocalDateKey(firstDate);
+        if (key && daysMap[key]) {
+          daysMap[key].customers.push({
+            id: `sale-${name}`,
+            name: name,
+            phone: '',
+            area: ''
+          });
+          daysMap[key].count += 1;
+        }
+      }
+    });
+
+    return Object.values(daysMap);
+  }, [activeCustomersList, salesHistory, customersTimeFilter]);
+
+  const todayCustomersItem = dailyCustomersData.find(d => d.isToday);
+  const todayNewCustomersCount = todayCustomersItem ? todayCustomersItem.count : 0;
+  const totalNewCustomersInPeriod = dailyCustomersData.reduce((sum, d) => sum + d.count, 0);
+  const avgNewCustomersPerDay = dailyCustomersData.length > 0 
+    ? (totalNewCustomersInPeriod / dailyCustomersData.length).toFixed(1) 
+    : '0.0';
+  const peakNewCustomersDay = React.useMemo(() => {
+    if (dailyCustomersData.length === 0) return { displayDate: '-', count: 0 };
+    return [...dailyCustomersData].sort((a, b) => b.count - a.count)[0];
+  }, [dailyCustomersData]);
+
+  const recentNewCustomers = React.useMemo(() => {
+    const list = [];
+    dailyCustomersData.forEach(d => {
+      d.customers.forEach(c => {
+        list.push({ ...c, date: d.date, displayDate: d.displayDate });
+      });
+    });
+    return list.reverse().slice(0, 5);
+  }, [dailyCustomersData]);
 
   // -- RECENT ACTIVITY --
   // Merge sales and repairs, sort by date
@@ -1324,37 +1548,142 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
         {/* ROW 3: TOP SPENDERS, FAST-MOVING ITEMS & REVENUE BY CATEGORY */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
           
-          {/* 1. Top Spenders */}
+          {/* 1. Top Spenders with Line Chart & List View */}
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.3 }} className="bg-[#071326] border border-slate-800/80 rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col h-[370px] hover:border-slate-700/80 transition-all">
-            <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest mb-3 flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+            <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest mb-2 flex items-center justify-between border-b border-slate-800/80 pb-2.5">
               <span className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
                 Top Spenders (This Month)
               </span>
-              <Users className="w-4 h-4 text-emerald-400" />
+              <div className="flex items-center gap-1.5">
+                <div className="flex bg-slate-950 p-0.5 rounded-lg border border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setTopSpendersView('both')}
+                    className={`px-1.5 py-0.5 text-[9px] font-bold rounded cursor-pointer transition-colors ${
+                      topSpendersView === 'both' ? 'bg-emerald-500 text-slate-950 font-black' : 'text-slate-400 hover:text-white'
+                    }`}
+                    title="Chart & List"
+                  >
+                    Both
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTopSpendersView('chart')}
+                    className={`px-1.5 py-0.5 text-[9px] font-bold rounded cursor-pointer transition-colors ${
+                      topSpendersView === 'chart' ? 'bg-emerald-500 text-slate-950 font-black' : 'text-slate-400 hover:text-white'
+                    }`}
+                    title="Line Chart"
+                  >
+                    Chart
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTopSpendersView('list')}
+                    className={`px-1.5 py-0.5 text-[9px] font-bold rounded cursor-pointer transition-colors ${
+                      topSpendersView === 'list' ? 'bg-emerald-500 text-slate-950 font-black' : 'text-slate-400 hover:text-white'
+                    }`}
+                    title="Rank List"
+                  >
+                    List
+                  </button>
+                </div>
+                <Users className="w-4 h-4 text-emerald-400" />
+              </div>
             </h3>
-            <div className="flex-1 overflow-y-auto pr-1 space-y-2 no-scrollbar">
-              {top5Customers.length === 0 ? (
-                <p className="text-slate-500 text-xs text-center mt-6">No customer data yet</p>
-              ) : (
-                top5Customers.map((cust, i) => (
-                  <div key={i} className="flex gap-2.5 items-center p-2 rounded-xl bg-slate-950/60 hover:bg-slate-800/40 transition-all border border-slate-800/80 hover:border-slate-700">
-                    <div className="w-7 h-7 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center font-black text-xs shrink-0 shadow-[0_0_10px_rgba(16,185,129,0.15)] font-mono">
-                      #{i + 1}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-slate-200 truncate">{cust.name}</p>
-                      <p className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1 font-mono">
-                        <ShoppingCart className="w-3 h-3 text-emerald-400/70" /> {cust.orderCount} Orders
-                      </p>
-                    </div>
-                    <div className="text-[11px] font-black text-emerald-400 whitespace-nowrap bg-emerald-500/10 px-2 py-1 rounded-lg border border-emerald-500/20 font-mono">
-                      Rs {cust.totalSpend.toFixed(0)}
-                    </div>
+
+            {top5Customers.length === 0 ? (
+              <p className="text-slate-500 text-xs text-center mt-12">No customer data yet</p>
+            ) : (
+              <div className="flex-1 flex flex-col justify-between overflow-hidden">
+                {/* Line Chart Section */}
+                {(topSpendersView === 'chart' || topSpendersView === 'both') && (
+                  <div className={`w-full ${topSpendersView === 'chart' ? 'h-[240px] my-auto' : 'h-[125px] mb-2'}`}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={topSpendersChartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="topSpenderFillGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.35} />
+                            <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                          </linearGradient>
+                          <linearGradient id="topSpenderStrokeGrad" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stopColor="#10b981" />
+                            <stop offset="100%" stopColor="#06b6d4" />
+                          </linearGradient>
+                        </defs>
+                        <XAxis 
+                          dataKey="shortLabel" 
+                          stroke="#64748b" 
+                          fontSize={9} 
+                          tickLine={false}
+                          axisLine={false}
+                        />
+                        <YAxis 
+                          stroke="#64748b" 
+                          fontSize={9} 
+                          tickLine={false}
+                          axisLine={false}
+                          tickFormatter={(v) => `Rs ${v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v}`}
+                        />
+                        <Tooltip 
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              const d = payload[0].payload;
+                              return (
+                                <div className="bg-[#0b182f]/98 backdrop-blur-md border border-emerald-500/40 rounded-xl p-2.5 shadow-2xl text-xs z-50">
+                                  <div className="flex items-center gap-1.5 font-bold text-white border-b border-slate-700 pb-1 mb-1">
+                                    <span className="text-emerald-400 font-mono text-[10px] bg-emerald-500/20 px-1 rounded">{d.rank}</span>
+                                    <span>{d.name}</span>
+                                  </div>
+                                  <p className="text-emerald-400 font-black font-mono text-xs">
+                                    Rs {d.spend.toLocaleString()}
+                                  </p>
+                                  <p className="text-[10px] text-slate-400 mt-0.5 font-mono">
+                                    {d.orderCount} Orders this month
+                                  </p>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        <Area 
+                          type="monotone" 
+                          dataKey="spend" 
+                          stroke="url(#topSpenderStrokeGrad)" 
+                          strokeWidth={2.5} 
+                          fill="url(#topSpenderFillGrad)" 
+                          dot={{ r: 3.5, fill: '#10b981', stroke: '#071326', strokeWidth: 1.5 }}
+                          activeDot={{ r: 5.5, fill: '#34d399', stroke: '#ffffff', strokeWidth: 2 }}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
                   </div>
-                ))
-              )}
-            </div>
+                )}
+
+                {/* Ranked List Section */}
+                {(topSpendersView === 'list' || topSpendersView === 'both') && (
+                  <div className={`overflow-y-auto space-y-1.5 no-scrollbar pr-0.5 ${topSpendersView === 'both' ? 'max-h-[145px]' : 'flex-1'}`}>
+                    {top5Customers.map((cust, i) => (
+                      <div key={i} className="flex gap-2 items-center p-1.5 sm:p-2 rounded-xl bg-slate-950/60 hover:bg-slate-800/40 transition-all border border-slate-800/80 hover:border-slate-700">
+                        <div className="w-6 h-6 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center font-black text-[10px] shrink-0 font-mono">
+                          #{i + 1}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-slate-200 truncate">{cust.name}</p>
+                          <p className="text-[10px] text-slate-400 flex items-center gap-1 font-mono">
+                            <ShoppingCart className="w-2.5 h-2.5 text-emerald-400/70" /> {cust.orderCount} Orders
+                          </p>
+                        </div>
+                        <div className="text-[11px] font-black text-emerald-400 whitespace-nowrap bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20 font-mono">
+                          Rs {cust.totalSpend.toFixed(0)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </motion.div>
 
           {/* 2. Fast-Moving Items (Pie / Donut Chart) */}
@@ -1655,6 +1984,19 @@ export default function Dashboard({ salesHistory, setActiveTab, posCategories = 
           totalVisitsInPeriod={totalVisitsInPeriod}
           avgVisitsPerDay={avgVisitsPerDay}
           peakVisitsDay={peakVisitsDay}
+        />
+
+        {/* ROW: DAILY NEW CUSTOMERS ACQUISITION (INTERACTIVE HOVER CHART WIDGET) */}
+        <DailyNewCustomersWidget
+          dailyCustomersData={dailyCustomersData}
+          customersTimeFilter={customersTimeFilter}
+          setCustomersTimeFilter={setCustomersTimeFilter}
+          todayNewCount={todayNewCustomersCount}
+          totalNewInPeriod={totalNewCustomersInPeriod}
+          avgNewPerDay={avgNewCustomersPerDay}
+          peakNewDay={peakNewCustomersDay}
+          recentNewCustomers={recentNewCustomers}
+          setActiveTab={setActiveTab}
         />
 
         {/* ROW 5: CATEGORY BREAKDOWN COMPARISON (FULL WIDTH) */}

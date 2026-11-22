@@ -692,7 +692,21 @@ export default function Admin() {
         onMarkAllInquiriesRead={handleMarkAllInquiriesRead}
       >
         <Suspense fallback={<Loader />}>
-          {activeTab === 'dashboard' && <Dashboard salesHistory={salesHistory} setActiveTab={setActiveTab} posCategories={posCategories} totalPendingDues={totalPendingDues} fetchSales={fetchSales} fetchCustomerDues={fetchCustomerDues} pendingOrders={pendingOrders} customerDuesList={customerDuesList} inquiries={inquiries} />}
+          {activeTab === 'dashboard' && (
+            <Dashboard 
+              salesHistory={salesHistory} 
+              setActiveTab={setActiveTab} 
+              posCategories={posCategories} 
+              totalPendingDues={totalPendingDues} 
+              fetchSales={fetchSales} 
+              fetchCustomerDues={fetchCustomerDues} 
+              pendingOrders={pendingOrders} 
+              customerDuesList={customerDuesList} 
+              inquiries={inquiries}
+              customersList={customersList}
+              fetchCustomersList={fetchCustomersList}
+            />
+          )}
           {activeTab === 'pos' && (
             <POS 
               cart={cart}

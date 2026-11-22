@@ -30,9 +30,10 @@ export const ONLINE_SERVICES_DATA = [
     accentColor: 'from-sky-500 to-blue-600',
     borderColor: 'border-sky-500/30 hover:border-sky-400',
     iconBg: 'bg-sky-500/15 text-sky-400 border-sky-500/30',
-    description: 'ඔබ සිටින තැන සිටම රජයේ සියලුම විභාග, පාස්පෝට් දිනයන්, විශ්වවිද්‍යාල සහ ආදායම් බලපත්‍ර ඔන්ලයින් අයදුම් කරගන්න.',
+    description: 'ඔබ සිටින තැන සිටම රජයේ සියලුම විභාග, පොලිස් වාර්තා (Police Clearance), පාස්පෝට් දිනයන්, විශ්වවිද්‍යාල සහ ආදායම් බලපත්‍ර ඔන්ලයින් අයදුම් කරගන්න.',
     deliveryTime: 'Same-day instant processing',
     items: [
+      { name: 'පොලිස් වාර්තා (Police Clearance Certificate / Report) ඔන්ලයින් අයදුම් කිරීම', highlight: true },
       { name: 'විභාග අයදුම්පත් (A/L, O/L, රජයේ විභාග, ගුරු විභාග)', highlight: true },
       { name: 'විශ්වවිද්‍යාල අයදුම්පත් හා ලියාපදිංචි කිරීම් (University Applications)', highlight: false },
       { name: 'පාස්පෝට් (Passport) ඔන්ලයින් දිනයන් වෙන් කිරීම', highlight: true },
@@ -106,6 +107,8 @@ export const ONLINE_SERVICES_DATA = [
     ],
     whatsappTemplate: 'Hi DESH Digital Hub! මට Website එකක් / Web Application එකක් නිර්මාණය කරගැනීමට අවශ්‍යයි.'
   },
+  /*
+  // TEMPORARILY HIDDEN / COMMENTED OUT AS PER CLIENT REQUEST:
   {
     id: 'online-print',
     badge: 'Islandwide Delivery',
@@ -126,6 +129,7 @@ export const ONLINE_SERVICES_DATA = [
     ],
     whatsappTemplate: 'Hi DESH Digital Hub! මට ලේඛන මුද්‍රණය කර Courier මඟින් නිවසටම ගෙන්වා ගැනීමට අවශ්‍යයි.'
   }
+  */
 ];
 
 export default function OnlineServices() {
@@ -152,7 +156,7 @@ export default function OnlineServices() {
           </h2>
 
           <p className="text-sm sm:text-base text-slate-300 mt-3 font-medium">
-            කඩේට නොපැමිණ ඔබ සිටින තැන සිටම WhatsApp හෝ අපගේ වෙබ් අඩවිය හරහා ලේඛන යවා, සේවාව නිමවා Softcopy එක WhatsApp වෙත හෝ Courier මඟින් නිවසටම ගෙන්වා ගන්න.
+            අපගේ සේවා මධ්‍යස්ථානය (Shop) වෙත නොපැමිණ ඔබ සිටින තැන සිටම WhatsApp හෝ අපගේ වෙබ් අඩවිය හරහා ලේඛන යවා, සේවාව නිමවා Softcopy එක WhatsApp වෙත ක්ෂණිකව ලබාගන්න.
           </p>
 
           {/* Quick How It Works Bar */}
@@ -184,12 +188,12 @@ export default function OnlineServices() {
         </div>
 
         {/* ======================================================== */}
-        {/* 5 DEDICATED CARDS GRID (2 COLUMNS, LAST CARD CENTERED)    */}
+        {/* ONLINE SERVICES CARDS GRID (BALANCED 2-COLUMN RESPONSIVE) */}
         {/* ======================================================== */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 mb-12">
           {ONLINE_SERVICES_DATA.map((service, idx) => {
             const IconComponent = service.icon;
-            const isLastCentered = idx === 4;
+            const isLastCentered = ONLINE_SERVICES_DATA.length % 2 !== 0 && idx === ONLINE_SERVICES_DATA.length - 1;
 
             return (
               <motion.div
