@@ -13,12 +13,15 @@ import {
   Star, 
   ChevronLeft, 
   ChevronRight, 
+  ChevronUp,
+  ChevronDown,
   X, 
   Printer,
   Minus,
   Zap,
   CheckCircle2,
-  Receipt
+  Receipt,
+  Percent
 } from 'lucide-react';
 import { notify } from '../../utils/toast';
 import { parseTimestamp } from '../../utils/helpers';
@@ -163,6 +166,8 @@ export default function POS({
   const [activeCategoryIndex, setActiveCategoryIndex] = useState(0);
   const [customerName, setCustomerName] = useState('');
   const [discount, setDiscount] = useState('');
+  const [discountPercent, setDiscountPercent] = useState(null);
+  const [isPricingExpanded, setIsPricingExpanded] = useState(false);
   const [cashGiven, setCashGiven] = useState('');
   const [isCredit, setIsCredit] = useState(false);
   const [includePreviousArrears, setIncludePreviousArrears] = useState(true);
@@ -364,6 +369,8 @@ export default function POS({
       setCashGiven('');
       setCustomerName('');
       setDiscount('');
+      setDiscountPercent(null);
+      setIsPricingExpanded(false);
       setIsCredit(false);
       setKeepChangeAsAdvance(false);
       setIncludePreviousArrears(true);
@@ -403,6 +410,8 @@ export default function POS({
       setCustomerName('');
       setWhatsappNumber('');
       setDiscount('');
+      setDiscountPercent(null);
+      setIsPricingExpanded(false);
       setCashGiven('');
       if (refreshPOSData) refreshPOSData();
     } catch (error) {
@@ -429,6 +438,7 @@ export default function POS({
       }
       if (order.discount) {
         setDiscount(String(order.discount));
+        setDiscountPercent(null);
       }
       notify.success(`Loaded pending sale for "${order.note || 'customer'}"`);
 
@@ -446,6 +456,38 @@ export default function POS({
 
   // Calculations
   const rawSubTotal = cartTotal;
+
+  // Handle % discount application
+  const handleApplyPercentDiscount = (customPct = null) => {
+    const pct = customPct !== null ? Number(customPct) : Number(discount || 0);
+
+    if (!pct || pct <= 0) {
+      notify.error("කරුණාකර Discount ප්‍රතිශතය (%) ඇතුළත් කරන්න (උදා: 10)");
+      return;
+    }
+    if (!rawSubTotal || rawSubTotal <= 0) {
+      notify.error("Discount යෙදීමට පෙර භාණ්ඩ Cart එකට එකතු කරන්න");
+      return;
+    }
+    if (pct > 100) {
+      notify.error("Discount ප්‍රතිශතය 100% කට වඩා වැඩි විය නොහැක");
+      return;
+    }
+
+    const calculatedAmt = Math.round(((rawSubTotal * pct) / 100) * 100) / 100;
+    setDiscount(calculatedAmt % 1 === 0 ? String(calculatedAmt) : calculatedAmt.toFixed(2));
+    setDiscountPercent(pct);
+    notify.success(`${pct}% Discount (Rs ${calculatedAmt.toFixed(2)}) applied!`);
+  };
+
+  // Re-calculate % discount when subtotal changes, if a percentage was applied
+  useEffect(() => {
+    if (discountPercent !== null && rawSubTotal > 0) {
+      const calculatedAmt = Math.round(((rawSubTotal * discountPercent) / 100) * 100) / 100;
+      setDiscount(calculatedAmt % 1 === 0 ? String(calculatedAmt) : calculatedAmt.toFixed(2));
+    }
+  }, [rawSubTotal, discountPercent]);
+
   const discountVal = Number(discount || 0);
   const finalPayable = Math.max(0, rawSubTotal - discountVal) + (includePreviousArrears ? currentCustomerArrears : 0) - currentCustomerAdvance;
   const cashVal = cashGiven === '' ? 0 : Number(cashGiven);
@@ -858,9 +900,23 @@ export default function POS({
                     {/* Item Name & Unit Price on Single Line */}
                     <div className="flex-1 min-w-0 flex items-center gap-1.5 pr-1">
                       <span className="font-bold text-slate-200 truncate text-[11px]">{item.name}</span>
-                      <span className="text-[10px] text-slate-500 font-mono shrink-0">
-                        @{Number(item.price || 0).toFixed(0)}
-                      </span>
+                      {String(item.id).startsWith('custom-') || item.price === 0 ? (
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          <span className="text-[10px] text-slate-500 font-mono">@</span>
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="0"
+                            value={item.price || ''}
+                            onChange={(e) => updateCartItem(item.id, 'price', Math.max(0, Number(e.target.value) || 0))}
+                            className="w-12 text-right bg-slate-950 border border-slate-700/80 rounded px-1 py-0.2 text-emerald-400 font-mono font-bold text-[10px] focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-slate-500 font-mono shrink-0">
+                          @{Number(item.price || 0).toFixed(0)}
+                        </span>
+                      )}
                     </div>
 
                     {/* Quantity Stepper (Compact) */}
@@ -902,50 +958,162 @@ export default function POS({
             </div>
           </div>
 
-          {/* BOX 2: Total & Cash Given / Payment Box */}
-          <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-2.5 sm:p-3 shadow-xl space-y-2 text-xs shrink-0">
+          {/* BOX 2: Total & Cash Given / Payment Box (Expands Upwards with Large Text & Inputs) */}
+          <div 
+            onClick={() => {
+              if (!isPricingExpanded) setIsPricingExpanded(true);
+            }}
+            className={`bg-slate-900/90 backdrop-blur-md rounded-2xl shadow-2xl shrink-0 transition-all duration-300 ease-in-out ${
+              isPricingExpanded 
+                ? 'p-3.5 sm:p-4 space-y-3 border-2 border-sky-500/40 ring-2 ring-sky-500/20 shadow-sky-950/70 max-h-[85%] overflow-y-auto' 
+                : 'p-2.5 sm:p-3 space-y-2 text-xs border border-slate-800/80 hover:border-slate-700/80 cursor-pointer'
+            }`}
+          >
+            {/* Header Strip with Expand / Collapse Toggle */}
+            <div 
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsPricingExpanded(prev => !prev);
+              }}
+              className="flex items-center justify-between pb-1.5 border-b border-slate-800/80 cursor-pointer select-none group"
+              title={isPricingExpanded ? "Click to switch to Compact View" : "Click to expand with large text & inputs"}
+            >
+              <div className="flex items-center gap-2">
+                <Receipt className={`text-sky-400 ${isPricingExpanded ? 'w-4 h-4' : 'w-3.5 h-3.5'}`} />
+                <span className={`font-black text-slate-200 tracking-wide uppercase ${isPricingExpanded ? 'text-xs sm:text-sm text-sky-200' : 'text-xs'}`}>
+                  Payment & Bill
+                </span>
+                {discountPercent !== null && (
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30 font-black">
+                    {discountPercent}% OFF
+                  </span>
+                )}
+              </div>
+
+              <button
+                type="button"
+                className={`flex items-center gap-1.5 font-bold transition-all cursor-pointer rounded-lg border ${
+                  isPricingExpanded 
+                    ? 'text-xs px-2.5 py-1 bg-sky-500/15 text-sky-300 border-sky-500/40 hover:bg-sky-500/25' 
+                    : 'text-[11px] px-2 py-0.5 bg-slate-950/80 text-slate-400 group-hover:text-sky-400 border-slate-800 group-hover:border-sky-500/40'
+                }`}
+              >
+                <span>{isPricingExpanded ? 'Compact View' : 'Expand View'}</span>
+                {isPricingExpanded ? (
+                  <ChevronDown className="w-3.5 h-3.5 text-sky-400" />
+                ) : (
+                  <ChevronUp className="w-3.5 h-3.5 text-slate-400 group-hover:text-sky-400" />
+                )}
+              </button>
+            </div>
             
-            {/* Subtotal & Discount */}
+            {/* Subtotal */}
             <div className="flex items-center justify-between text-slate-300">
-              <span className="font-medium text-xs">Sub Total:</span>
-              <span className="font-mono font-bold text-xs text-slate-100">Rs {rawSubTotal.toFixed(2)}</span>
+              <span className={`font-semibold ${isPricingExpanded ? 'text-sm text-slate-200' : 'text-xs'}`}>
+                Sub Total:
+              </span>
+              <span className={`font-mono font-black text-slate-100 ${isPricingExpanded ? 'text-base sm:text-lg' : 'text-xs'}`}>
+                Rs {rawSubTotal.toFixed(2)}
+              </span>
             </div>
 
+            {/* Discount with % button */}
             <div className="flex items-center justify-between gap-2">
-              <span className="text-slate-400 font-medium text-xs">Discount (Rs):</span>
-              <input
-                type="number"
-                min="0"
-                placeholder="0.00"
-                value={discount}
-                onChange={(e) => setDiscount(e.target.value)}
-                className="w-24 text-right bg-[#090d16] border border-slate-800/90 rounded-lg px-2 py-0.5 text-slate-200 font-mono text-xs focus:outline-none focus:border-blue-500 transition-colors"
-              />
+              <div className="flex items-center gap-1.5">
+                <span className={`font-semibold text-slate-300 ${isPricingExpanded ? 'text-sm' : 'text-xs'}`}>
+                  Discount:
+                </span>
+                {discountPercent !== null && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDiscount('');
+                      setDiscountPercent(null);
+                    }}
+                    className="text-[10px] sm:text-xs text-rose-400 hover:text-rose-300 cursor-pointer font-bold underline"
+                    title="Clear percentage discount"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <div className="relative">
+                  <span className={`absolute left-2 top-1/2 -translate-y-1/2 font-mono text-slate-500 pointer-events-none font-bold ${
+                    isPricingExpanded ? 'text-xs' : 'text-[10px]'
+                  }`}>
+                    Rs
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="0.00"
+                    value={discount}
+                    onFocus={() => setIsPricingExpanded(true)}
+                    onChange={(e) => {
+                      setDiscount(e.target.value);
+                      setDiscountPercent(null);
+                    }}
+                    className={`text-right bg-[#090d16] border border-slate-700/80 rounded-xl text-slate-100 font-mono font-bold focus:outline-none focus:border-sky-500 transition-all shadow-inner ${
+                      isPricingExpanded 
+                        ? 'w-32 sm:w-36 pl-8 pr-2.5 py-1.5 text-base sm:text-lg' 
+                        : 'w-24 pl-6 pr-2 py-0.5 text-xs'
+                    }`}
+                  />
+                </div>
+
+                {/* % Button */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleApplyPercentDiscount();
+                  }}
+                  className={`rounded-xl font-black font-mono transition-all cursor-pointer shadow-sm active:scale-95 flex items-center justify-center ${
+                    discountPercent !== null
+                      ? 'bg-amber-500 text-slate-950 shadow-amber-500/30'
+                      : 'bg-sky-500/20 hover:bg-sky-500/30 text-sky-400 border border-sky-500/40 hover:border-sky-400'
+                  } ${isPricingExpanded ? 'px-3 py-1.5 text-sm sm:text-base' : 'px-2 py-0.5 text-xs'}`}
+                  title="Enter % value & click to apply percentage from Total Bill"
+                >
+                  <Percent className={isPricingExpanded ? 'w-4 h-4 stroke-[3]' : 'w-3 h-3 stroke-[2.5]'} />
+                </button>
+              </div>
             </div>
 
             {/* Credit Toggle */}
-            <div className="pt-1.5 border-t border-slate-800/80 flex items-center justify-between">
-              <span className="text-slate-400 font-semibold text-xs">Payment Mode:</span>
+            <div className={`border-t border-slate-800/80 flex items-center justify-between ${isPricingExpanded ? 'pt-2.5' : 'pt-1.5'}`}>
+              <span className={`font-semibold text-slate-300 ${isPricingExpanded ? 'text-sm' : 'text-xs'}`}>
+                Payment Mode:
+              </span>
               <div className="flex gap-1.5">
                 <button
                   type="button"
-                  onClick={() => setIsCredit(false)}
-                  className={`px-2.5 py-0.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsCredit(false);
+                  }}
+                  className={`rounded-xl font-bold transition-all cursor-pointer ${
                     !isCredit 
-                      ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-sm' 
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-sm' 
                       : 'bg-[#090d16] text-slate-400 border border-slate-800/80 hover:text-slate-300'
-                  }`}
+                  } ${isPricingExpanded ? 'px-3.5 py-1.5 text-xs sm:text-sm font-black' : 'px-2.5 py-0.5 text-xs'}`}
                 >
                   Cash
                 </button>
                 <button
                   type="button"
-                  onClick={() => setIsCredit(true)}
-                  className={`px-2.5 py-0.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsCredit(true);
+                  }}
+                  className={`rounded-xl font-bold transition-all cursor-pointer ${
                     isCredit 
-                      ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30 shadow-sm' 
+                      ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 shadow-sm' 
                       : 'bg-[#090d16] text-slate-400 border border-slate-800/80 hover:text-slate-300'
-                  }`}
+                  } ${isPricingExpanded ? 'px-3.5 py-1.5 text-xs sm:text-sm font-black' : 'px-2.5 py-0.5 text-xs'}`}
                 >
                   Credit
                 </button>
@@ -954,34 +1122,56 @@ export default function POS({
 
             {/* Cash Given & Change Due */}
             {!isCredit && (
-              <div className="pt-1.5 border-t border-slate-800/80 space-y-1.5">
+              <div className={`border-t border-slate-800/80 ${isPricingExpanded ? 'pt-2.5 space-y-2' : 'pt-1.5 space-y-1.5'}`}>
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-slate-300 font-bold text-xs">Cash Given:</span>
+                    <span className={`font-black text-slate-200 ${isPricingExpanded ? 'text-sm' : 'text-xs'}`}>
+                      Cash Given:
+                    </span>
                     <button
                       type="button"
-                      onClick={() => setCashGiven(finalPayable.toFixed(2))}
-                      className="text-[10px] text-sky-400 bg-sky-500/15 px-2 py-0.5 rounded-md border border-sky-500/30 hover:bg-sky-500/25 font-bold cursor-pointer transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCashGiven(finalPayable.toFixed(2));
+                      }}
+                      className={`font-bold rounded-lg bg-sky-500/15 text-sky-400 border border-sky-500/30 hover:bg-sky-500/25 transition-colors cursor-pointer ${
+                        isPricingExpanded ? 'text-xs px-2.5 py-1' : 'text-[10px] px-2 py-0.5'
+                      }`}
                     >
                       Exact
                     </button>
                   </div>
-                  <input
-                    type="number"
-                    min="0"
-                    placeholder="0.00"
-                    value={cashGiven}
-                    onChange={(e) => setCashGiven(e.target.value)}
-                    className="w-24 text-right bg-[#090d16] border border-slate-800/90 rounded-lg px-2 py-0.5 text-emerald-400 font-mono font-bold text-xs focus:outline-none focus:border-emerald-500/70 transition-colors shadow-inner"
-                  />
+
+                  <div className="relative">
+                    {isPricingExpanded && (
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-mono text-emerald-600/70 pointer-events-none font-bold">
+                        Rs
+                      </span>
+                    )}
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="0.00"
+                      value={cashGiven}
+                      onFocus={() => setIsPricingExpanded(true)}
+                      onChange={(e) => setCashGiven(e.target.value)}
+                      className={`text-right bg-[#090d16] rounded-xl text-emerald-400 font-mono font-black focus:outline-none transition-all shadow-inner ${
+                        isPricingExpanded 
+                          ? 'w-36 sm:w-44 pl-8 pr-3 py-1.5 text-lg sm:text-xl border-2 border-emerald-500/60 focus:border-emerald-400 ring-2 ring-emerald-500/20' 
+                          : 'w-24 px-2 py-0.5 text-xs border border-slate-800/90 focus:border-emerald-500/70'
+                      }`}
+                    />
+                  </div>
                 </div>
 
                 {cashGiven !== '' && (
-                  <div className="flex items-center justify-between text-xs pt-0.5">
-                    <span className="text-slate-400 font-semibold text-[11px]">
+                  <div className={`flex items-center justify-between ${isPricingExpanded ? 'pt-1 text-sm' : 'pt-0.5 text-xs'}`}>
+                    <span className={`font-bold ${isPricingExpanded ? 'text-xs sm:text-sm text-slate-300' : 'text-[11px] text-slate-400'}`}>
                       {cashDiff >= 0 ? 'Change Due:' : 'Short Amount:'}
                     </span>
-                    <span className={`font-mono font-black text-xs ${cashDiff >= 0 ? 'text-sky-400' : 'text-rose-400'}`}>
+                    <span className={`font-mono font-black ${
+                      cashDiff >= 0 ? 'text-sky-400' : 'text-rose-400'
+                    } ${isPricingExpanded ? 'text-base sm:text-lg' : 'text-xs'}`}>
                       Rs {Math.abs(cashDiff).toFixed(2)}
                     </span>
                   </div>
@@ -989,11 +1179,65 @@ export default function POS({
               </div>
             )}
 
+            {/* Customer Arrears & Advance */}
+            {(currentCustomerArrears > 0 || currentCustomerAdvance > 0) && (
+              <div className={`border-t border-slate-800/80 bg-slate-950/40 rounded-xl border border-slate-800/60 ${
+                isPricingExpanded ? 'p-2.5 space-y-1.5 text-xs sm:text-sm' : 'p-2 space-y-1 text-xs'
+              }`}>
+                {currentCustomerArrears > 0 && (
+                  <label className="flex items-center justify-between cursor-pointer select-none">
+                    <span className="text-slate-300 flex items-center gap-1.5 font-medium">
+                      <input
+                        type="checkbox"
+                        checked={includePreviousArrears}
+                        onChange={(e) => setIncludePreviousArrears(e.target.checked)}
+                        className="rounded border-slate-700 text-sky-500 focus:ring-sky-500 focus:ring-offset-0 bg-slate-900 cursor-pointer"
+                      />
+                      <span>Include Previous Arrears:</span>
+                    </span>
+                    <span className="font-mono font-bold text-rose-400">
+                      +Rs {currentCustomerArrears.toFixed(2)}
+                    </span>
+                  </label>
+                )}
+
+                {currentCustomerAdvance > 0 && (
+                  <div className="flex items-center justify-between font-medium">
+                    <span className="text-emerald-400">Advance Deducted:</span>
+                    <span className="font-mono font-bold text-emerald-400">
+                      -Rs {currentCustomerAdvance.toFixed(2)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Keep change as advance toggle */}
+            {!isCredit && cashDiff > 0 && (
+              <label className={`flex items-center gap-2 text-slate-400 cursor-pointer select-none pt-0.5 ${
+                isPricingExpanded ? 'text-xs font-medium' : 'text-[11px]'
+              }`}>
+                <input
+                  type="checkbox"
+                  checked={keepChangeAsAdvance}
+                  onChange={(e) => setKeepChangeAsAdvance(e.target.checked)}
+                  className="rounded border-slate-700 text-sky-500 focus:ring-sky-500 focus:ring-offset-0 bg-slate-900 cursor-pointer"
+                />
+                <span>Keep change (Rs {cashDiff.toFixed(2)}) as customer advance</span>
+              </label>
+            )}
+
             {/* Total Payable Banner */}
-            <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-blue-950/80 via-indigo-950/80 to-slate-900 border border-blue-500/30 p-2.5 sm:p-3 shadow-xl shadow-blue-950/40 mt-1 flex items-center justify-between">
+            <div className={`relative overflow-hidden rounded-xl bg-gradient-to-r from-blue-950/90 via-indigo-950/90 to-slate-900 border border-blue-500/40 shadow-xl shadow-blue-950/50 flex items-center justify-between ${
+              isPricingExpanded ? 'p-3.5 sm:p-4 mt-2' : 'p-2.5 sm:p-3 mt-1'
+            }`}>
               <div className="absolute -right-6 -bottom-6 w-24 h-24 bg-blue-500/10 rounded-full blur-xl pointer-events-none"></div>
-              <span className="text-[11px] font-black uppercase tracking-wider text-blue-200">Total Payable:</span>
-              <span className="text-xl font-black font-mono text-white tracking-tight drop-shadow-[0_2px_10px_rgba(56,189,248,0.3)]">
+              <span className={`font-black uppercase tracking-wider text-blue-200 ${isPricingExpanded ? 'text-xs sm:text-sm' : 'text-[11px]'}`}>
+                Total Payable:
+              </span>
+              <span className={`font-black font-mono text-white tracking-tight drop-shadow-[0_2px_12px_rgba(56,189,248,0.4)] ${
+                isPricingExpanded ? 'text-2xl sm:text-3xl' : 'text-xl'
+              }`}>
                 Rs {finalPayable.toFixed(2)}
               </span>
             </div>
@@ -1002,21 +1246,31 @@ export default function POS({
             <div className="grid grid-cols-2 gap-2 pt-0.5">
               <button
                 type="button"
-                onClick={handleCompleteOrder}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCompleteOrder();
+                }}
                 disabled={cart.length === 0 || checkoutLoading}
-                className="w-full py-2.5 px-2 rounded-xl font-black text-xs bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-lg shadow-emerald-500/20 disabled:opacity-50 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.99] text-center"
+                className={`w-full rounded-xl font-black bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-lg shadow-emerald-500/20 disabled:opacity-50 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.99] text-center ${
+                  isPricingExpanded ? 'py-3 sm:py-3.5 px-3 text-xs sm:text-sm' : 'py-2.5 px-2 text-xs'
+                }`}
               >
-                <CheckCircle2 className="w-4 h-4 stroke-[2.5] shrink-0" />
+                <CheckCircle2 className={`stroke-[2.5] shrink-0 ${isPricingExpanded ? 'w-4 h-4' : 'w-3.5 h-3.5'}`} />
                 <span className="truncate">{checkoutLoading ? 'Processing...' : (isCredit ? 'Confirm Bill' : 'Complete Sale')}</span>
               </button>
 
               <button
                 type="button"
-                onClick={handleDirectSavePending}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDirectSavePending();
+                }}
                 disabled={cart.length === 0 || pendingLoading}
-                className="w-full py-2.5 px-2 rounded-xl font-bold text-xs bg-[#090d16] hover:bg-slate-800 text-slate-300 border border-slate-800 transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40 text-center"
+                className={`w-full rounded-xl font-bold bg-[#090d16] hover:bg-slate-800 text-slate-300 border border-slate-800 transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40 text-center ${
+                  isPricingExpanded ? 'py-3 sm:py-3.5 px-3 text-xs sm:text-sm' : 'py-2.5 px-2 text-xs'
+                }`}
               >
-                <Save className="w-3.5 h-3.5 shrink-0" />
+                <Save className={`shrink-0 ${isPricingExpanded ? 'w-4 h-4' : 'w-3.5 h-3.5'}`} />
                 <span className="truncate">{pendingLoading ? 'Saving...' : 'Save Pending Sale'}</span>
               </button>
             </div>
